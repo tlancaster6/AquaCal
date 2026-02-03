@@ -23,13 +23,13 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **2.1** Implement camera model (`core/camera.py`)
 - [x] **2.2** Implement interface model (`core/interface_model.py`)
-- [ ] **2.3** Implement refractive geometry (`core/refractive_geometry.py`)
+- [x] **2.3** Implement refractive geometry (`core/refractive_geometry.py`)
 
 ## Phase 3: Data Pipeline
 
-- [ ] **3.1** Implement video loading (`io/video.py`)
-- [ ] **3.2** Implement ChArUco detection (`io/detection.py`)
-- [ ] **3.3** Implement serialization (`io/serialization.py`)
+- [x] **3.1** Implement video loading (`io/video.py`)
+- [x] **3.2** Implement ChArUco detection (`io/detection.py`)
+- [x] **3.3** Implement serialization (`io/serialization.py`)
 
 ## Phase 4: Calibration Stages
 

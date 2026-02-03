@@ -9,6 +9,68 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-03
+### [src/aquacal/io/serialization.py]
+- Implemented save_calibration: serializes CalibrationResult to JSON with numpy arrays converted to nested lists
+- Implemented load_calibration: deserializes JSON to CalibrationResult with version checking and proper error handling
+- Helper functions serialize/deserialize all dataclasses: CameraIntrinsics, CameraExtrinsics, CameraCalibration, InterfaceParams, BoardConfig, DiagnosticsData, CalibrationMetadata
+- Optional fields (per_corner_residuals, per_frame_errors) handled correctly with None support
+- per_frame_errors dict keys converted str↔int for JSON compatibility (JSON doesn't support integer keys)
+- Serialization version: "1.0", raises ValueError on version mismatch, FileNotFoundError for missing files
+
+### [tests/unit/test_serialization.py]
+- Created comprehensive test suite with 13 tests covering all serialization functionality
+- Tests verify: save creates valid JSON, load reconstructs identical objects, round-trip consistency
+- Tests verify: numpy array dtypes (float64) and shapes preserved, tuple/int conversions (image_size, per_frame_errors keys)
+- Tests verify: optional fields handling (with/without per_corner_residuals and per_frame_errors)
+- Tests verify: error handling (FileNotFoundError, ValueError for version mismatch)
+- Tests verify: accepts both str and Path arguments
+- All tests pass with multi-camera calibration fixtures
+
+### [src/aquacal/io/__init__.py]
+- Uncommented save_calibration and load_calibration imports and exports
+- Module now properly exports both serialization functions
+
+## 2026-02-03
+### [src/aquacal/io/detection.py]
+- Implemented detect_charuco: detects ChArUco corners in single images using OpenCV 4.13+ API
+- Uses CharucoDetector.detectBoard() with CharucoParameters for camera intrinsic refinement
+- Converts BGR to grayscale automatically, returns Detection object or None
+- Implemented detect_all_frames: processes synchronized multi-camera videos for batch detection
+- Accepts VideoSet or dict of paths, filters by min_corners, supports frame_step and progress_callback
+- Returns DetectionResult with organized detections by frame and camera, cleans up resources
+
+### [tests/unit/test_detection.py]
+- Created comprehensive test suite with 19 tests covering all detection functionality
+- Tests verify: corner detection in clean/warped images, grayscale/BGR input handling, blank images return None
+- Tests verify: intrinsics usage, correct dtypes (int32 for IDs, float64 for corners)
+- Tests verify: detect_all_frames with dict/VideoSet inputs, frame_step, min_corners filtering, progress callback
+- Tests verify: DetectionResult structure, partial intrinsics support, get_frames_with_min_cameras method
+- All tests pass using synthetic ChArUco board images generated with OpenCV
+
+### [src/aquacal/io/__init__.py]
+- Uncommented detect_charuco and detect_all_frames imports and exports
+- Module now properly exports both detection functions
+
+## 2026-02-03
+### [src/aquacal/io/video.py]
+- Implemented VideoSet class for managing synchronized multi-camera video files
+- Added lazy initialization: videos open on first access, not in __init__
+- Implemented get_frame() for random access and iterate_frames() for efficient sequential iteration
+- Context manager support with automatic resource cleanup
+- Synchronized frame count (minimum across all cameras)
+- Proper error handling: FileNotFoundError for missing files, IndexError for invalid frame indices, ValueError for empty paths/invalid iteration params
+
+### [tests/unit/test_video.py]
+- Created comprehensive test suite with 27 tests covering all VideoSet functionality
+- Tests verify: initialization, properties (camera_names, frame_count, is_open), open/close behavior, context manager
+- Tests verify: get_frame (correct keys, shape/dtype, index bounds, auto-open), iterate_frames (start/stop/step params, validation, auto-open)
+- All tests pass with synthetic video fixtures
+
+### [src/aquacal/io/__init__.py]
+- Uncommented VideoSet import and export
+- Module now properly exports VideoSet class
+
+## 2026-02-03
 ### [src/aquacal/core/refractive_geometry.py]
 - Implemented snells_law_3d: 3D Snell's law with automatic normal orientation handling, returns None for TIR
 - Implemented trace_ray_air_to_water: traces ray from camera pixel through air-water interface into water

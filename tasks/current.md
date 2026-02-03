@@ -1,671 +1,751 @@
-# Task: 2.3 Implement refractive geometry
+# Task: 3.3 Serialization (io/serialization.py)
 
 ## Objective
 
-Implement `core/refractive_geometry.py` with Snell's law, ray tracing through the air-water interface, and refractive projection/back-projection functions.
+Implement save/load functions for `CalibrationResult` using JSON format with numpy arrays converted to nested lists.
 
 ## Context Files
 
 Read these files before starting (in order):
 
-1. `CLAUDE.md` — Project conventions (Z-down world frame, interface normal [0,0,-1])
-2. `docs/agent_implementation_spec.md` (lines 761-924) — Function specifications
-3. `docs/COORDINATES.md` — Coordinate frame definitions
-4. `src/aquacal/core/camera.py` — Camera class (dependency)
-5. `src/aquacal/core/interface_model.py` — Interface class, ray_plane_intersection (dependency)
+1. `CLAUDE.md` — project conventions and error handling rules
+2. `docs/development_plan.md` (lines 283-296) — serialization responsibilities
+3. `src/aquacal/config/schema.py` (lines 26-168) — all dataclasses that need serialization
+4. `src/aquacal/__init__.py` — for `__version__` string
 
 ## Dependencies
 
-- Task 2.1 (`core/camera.py`) — Camera class
-- Task 2.2 (`core/interface_model.py`) — Interface class, ray_plane_intersection
+- Task 1.1 (`config/schema.py`) — all dataclasses
 
 ## Modify
 
-Files to create:
+Files to create or edit:
 
-- `src/aquacal/core/refractive_geometry.py`
-- `tests/unit/test_refractive_geometry.py`
-
-Files to update:
-
-- `src/aquacal/core/__init__.py` — Add exports for all 4 functions
+- `src/aquacal/io/serialization.py` (create)
+- `tests/unit/test_serialization.py` (create)
+- `src/aquacal/io/__init__.py` (add serialization imports/exports)
 
 ## Do Not Modify
 
-- `config/schema.py`, `utils/transforms.py`, `core/board.py`, `core/camera.py`, `core/interface_model.py`
+Everything not listed above. In particular:
+- `src/aquacal/config/schema.py`
+- Any other io/ modules
 
-## Acceptance Criteria
+---
 
-- [ ] `snells_law_3d` implemented with automatic normal orientation handling
-- [ ] `snells_law_3d` returns `None` for total internal reflection
-- [ ] `trace_ray_air_to_water` traces pixel through interface into water
-- [ ] `refractive_back_project` delegates to `trace_ray_air_to_water`
-- [ ] `refractive_project` uses iterative optimization to find interface intersection
-- [ ] Round-trip test: `refractive_project` then `refractive_back_project` recovers ray through original point
-- [ ] Tests pass: `pytest tests/unit/test_refractive_geometry.py -v`
-- [ ] Type check passes: `mypy src/aquacal/core/refractive_geometry.py --ignore-missing-imports`
-- [ ] `core/__init__.py` exports all 4 functions
+## Function Signatures
 
-## Function Specifications
-
-### snells_law_3d
+Implement the following in `src/aquacal/io/serialization.py`:
 
 ```python
-def snells_law_3d(
-    incident_direction: Vec3,
-    surface_normal: Vec3,
-    n_ratio: float
-) -> Vec3 | None:
+"""Save and load calibration results."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+from numpy.typing import NDArray
+
+from aquacal.config.schema import (
+    BoardConfig,
+    CalibrationMetadata,
+    CalibrationResult,
+    CameraCalibration,
+    CameraExtrinsics,
+    CameraIntrinsics,
+    DiagnosticsData,
+    InterfaceParams,
+)
+
+# Current serialization format version
+SERIALIZATION_VERSION = "1.0"
+
+
+def save_calibration(result: CalibrationResult, path: str | Path) -> None:
     """
-    Apply Snell's law in 3D to compute refracted ray direction.
+    Save calibration result to JSON file.
 
     Args:
-        incident_direction: Unit vector of incoming ray (toward interface)
-        surface_normal: Unit normal of interface (always pass interface.normal,
-                       which points from water toward air [0,0,-1])
-        n_ratio: Ratio n1/n2 where ray goes from medium 1 to medium 2
+        result: Complete calibration result to save
+        path: Output file path (should end in .json)
 
-    Returns:
-        Unit vector of refracted ray direction, or None if total internal reflection.
+    Raises:
+        OSError: If file cannot be written
 
-    Notes:
-        - Function handles normal orientation internally based on ray direction
-        - For air-to-water: n_ratio = n_air / n_water ≈ 0.75
-        - For water-to-air: n_ratio = n_water / n_air ≈ 1.33
-        - TIR only possible when going from denser to less dense medium
+    Example:
+        >>> save_calibration(result, "calibration.json")
     """
-```
+    pass
 
-### trace_ray_air_to_water
 
-```python
-def trace_ray_air_to_water(
-    camera: Camera,
-    interface: Interface,
-    pixel: Vec2
-) -> tuple[Vec3, Vec3] | tuple[None, None]:
+def load_calibration(path: str | Path) -> CalibrationResult:
     """
-    Trace ray from camera through air-water interface.
+    Load calibration result from JSON file.
 
     Args:
-        camera: Camera object (camera.name must be in interface.camera_offsets)
-        interface: Interface object
-        pixel: 2D pixel coordinates
+        path: Path to calibration JSON file
 
     Returns:
-        Tuple of (intersection_point, refracted_direction):
-        - intersection_point: where ray hits interface (world coords)
-        - refracted_direction: unit direction of ray in water (points +Z, into water)
-        Returns (None, None) if ray doesn't hit interface or TIR occurs.
+        CalibrationResult object
+
+    Raises:
+        FileNotFoundError: If file does not exist
+        ValueError: If file format is invalid or version mismatch
+
+    Example:
+        >>> result = load_calibration("calibration.json")
+        >>> print(result.diagnostics.reprojection_error_rms)
     """
+    pass
 ```
 
-### refractive_back_project
-
-```python
-def refractive_back_project(
-    camera: Camera,
-    interface: Interface,
-    pixel: Vec2
-) -> tuple[Vec3, Vec3] | tuple[None, None]:
-    """
-    Back-project pixel to ray in water.
-
-    This is a convenience wrapper around trace_ray_air_to_water, providing
-    an API consistent with Camera.pixel_to_ray_world.
-
-    Args:
-        camera: Camera object
-        interface: Interface object
-        pixel: 2D pixel coordinates
-
-    Returns:
-        Tuple of (ray_origin, ray_direction):
-        - ray_origin: point on interface where ray enters water
-        - ray_direction: unit direction of ray in water
-        Returns (None, None) if back-projection fails.
-    """
-```
-
-### refractive_project
-
-```python
-def refractive_project(
-    camera: Camera,
-    interface: Interface,
-    point_3d: Vec3
-) -> Vec2 | None:
-    """
-    Project 3D underwater point to 2D pixel through refractive interface.
-
-    This is the forward projection used for computing reprojection error.
-
-    Args:
-        camera: Camera object
-        interface: Interface object
-        point_3d: 3D point in water (world coordinates, Z > interface_z)
-
-    Returns:
-        2D pixel coordinates, or None if projection fails.
-
-    Notes:
-        - Uses 1D optimization to find interface intersection point
-        - Returns None if: point above interface, TIR, optimization fails,
-          or refracted ray doesn't reach camera
-    """
-```
+---
 
 ## Implementation Details
 
-### snells_law_3d
+### JSON Structure
 
-```python
-def snells_law_3d(
-    incident_direction: Vec3,
-    surface_normal: Vec3,
-    n_ratio: float
-) -> Vec3 | None:
-    # Normalize incident direction
-    d = incident_direction / np.linalg.norm(incident_direction)
+The output JSON should have this structure:
 
-    # Compute cos of incident angle with surface normal
-    cos_i = np.dot(d, surface_normal)
-
-    # Determine normal orientation: n should point into the destination medium
-    # If cos_i < 0, ray travels opposite to normal (e.g., air->water when normal points up)
-    # If cos_i > 0, ray travels same direction as normal (e.g., water->air)
-    if cos_i < 0:
-        n = -surface_normal
-        cos_i = -cos_i
-    else:
-        n = surface_normal
-
-    # Apply Snell's law: n1*sin(θ1) = n2*sin(θ2)
-    # sin²(θ_t) = n_ratio² * sin²(θ_i) = n_ratio² * (1 - cos²(θ_i))
-    sin_t_sq = n_ratio**2 * (1 - cos_i**2)
-
-    # Check for total internal reflection
-    if sin_t_sq > 1.0:
-        return None
-
-    cos_t = np.sqrt(1 - sin_t_sq)
-
-    # Compute refracted direction using vector form of Snell's law
-    # t = n_ratio * d + (cos_t - n_ratio * cos_i) * n
-    t = n_ratio * d + (cos_t - n_ratio * cos_i) * n
-
-    # Normalize (should already be unit, but ensure numerical stability)
-    return t / np.linalg.norm(t)
+```json
+{
+  "version": "1.0",
+  "cameras": {
+    "cam0": {
+      "name": "cam0",
+      "intrinsics": {
+        "K": [[fx, 0, cx], [0, fy, cy], [0, 0, 1]],
+        "dist_coeffs": [k1, k2, p1, p2, k3],
+        "image_size": [width, height]
+      },
+      "extrinsics": {
+        "R": [[r11, r12, r13], ...],
+        "t": [tx, ty, tz]
+      },
+      "interface_distance": 0.15
+    },
+    "cam1": { ... }
+  },
+  "interface": {
+    "normal": [0, 0, -1],
+    "n_air": 1.0,
+    "n_water": 1.333
+  },
+  "board": {
+    "squares_x": 8,
+    "squares_y": 6,
+    "square_size": 0.03,
+    "marker_size": 0.022,
+    "dictionary": "DICT_4X4_50"
+  },
+  "diagnostics": {
+    "reprojection_error_rms": 0.45,
+    "reprojection_error_per_camera": {"cam0": 0.42, "cam1": 0.48},
+    "validation_3d_error_mean": 0.0015,
+    "validation_3d_error_std": 0.0008
+  },
+  "metadata": {
+    "calibration_date": "2024-01-15T10:30:00",
+    "software_version": "0.1.0",
+    "config_hash": "abc123...",
+    "num_frames_used": 50,
+    "num_frames_holdout": 10
+  }
+}
 ```
 
-### trace_ray_air_to_water
+### Serialization Helpers
 
 ```python
-def trace_ray_air_to_water(
-    camera: Camera,
-    interface: Interface,
-    pixel: Vec2
-) -> tuple[Vec3, Vec3] | tuple[None, None]:
-    # Get ray from camera in world frame
-    ray_origin, ray_direction = camera.pixel_to_ray_world(pixel)
+def _ndarray_to_list(arr: NDArray) -> list:
+    """Convert numpy array to nested Python list."""
+    return arr.tolist()
 
-    # Get interface plane point for this camera
-    interface_point = interface.get_interface_point(camera.C, camera.name)
 
-    # Intersect ray with interface plane
-    intersection, t = ray_plane_intersection(
-        ray_origin, ray_direction, interface_point, interface.normal
+def _list_to_ndarray(lst: list, dtype: type = np.float64) -> NDArray:
+    """Convert nested list to numpy array."""
+    return np.array(lst, dtype=dtype)
+
+
+def _serialize_camera_intrinsics(intrinsics: CameraIntrinsics) -> dict[str, Any]:
+    """Serialize CameraIntrinsics to dict."""
+    return {
+        "K": _ndarray_to_list(intrinsics.K),
+        "dist_coeffs": _ndarray_to_list(intrinsics.dist_coeffs),
+        "image_size": list(intrinsics.image_size),
+    }
+
+
+def _deserialize_camera_intrinsics(data: dict[str, Any]) -> CameraIntrinsics:
+    """Deserialize dict to CameraIntrinsics."""
+    return CameraIntrinsics(
+        K=_list_to_ndarray(data["K"]),
+        dist_coeffs=_list_to_ndarray(data["dist_coeffs"]),
+        image_size=tuple(data["image_size"]),
     )
 
-    # Check for valid intersection (ray must hit interface in forward direction)
-    if intersection is None or t <= 0:
-        return None, None
 
-    # Refract at interface (air to water)
-    refracted = snells_law_3d(
-        ray_direction,
-        interface.normal,
-        interface.n_ratio_air_to_water
+def _serialize_camera_extrinsics(extrinsics: CameraExtrinsics) -> dict[str, Any]:
+    """Serialize CameraExtrinsics to dict."""
+    return {
+        "R": _ndarray_to_list(extrinsics.R),
+        "t": _ndarray_to_list(extrinsics.t),
+    }
+
+
+def _deserialize_camera_extrinsics(data: dict[str, Any]) -> CameraExtrinsics:
+    """Deserialize dict to CameraExtrinsics."""
+    return CameraExtrinsics(
+        R=_list_to_ndarray(data["R"]),
+        t=_list_to_ndarray(data["t"]),
     )
 
-    if refracted is None:  # TIR (shouldn't happen for air->water at normal incidence)
-        return None, None
 
-    return intersection, refracted
+def _serialize_camera_calibration(cam: CameraCalibration) -> dict[str, Any]:
+    """Serialize CameraCalibration to dict."""
+    return {
+        "name": cam.name,
+        "intrinsics": _serialize_camera_intrinsics(cam.intrinsics),
+        "extrinsics": _serialize_camera_extrinsics(cam.extrinsics),
+        "interface_distance": cam.interface_distance,
+    }
+
+
+def _deserialize_camera_calibration(data: dict[str, Any]) -> CameraCalibration:
+    """Deserialize dict to CameraCalibration."""
+    return CameraCalibration(
+        name=data["name"],
+        intrinsics=_deserialize_camera_intrinsics(data["intrinsics"]),
+        extrinsics=_deserialize_camera_extrinsics(data["extrinsics"]),
+        interface_distance=data["interface_distance"],
+    )
+
+
+def _serialize_interface_params(interface: InterfaceParams) -> dict[str, Any]:
+    """Serialize InterfaceParams to dict."""
+    return {
+        "normal": _ndarray_to_list(interface.normal),
+        "n_air": interface.n_air,
+        "n_water": interface.n_water,
+    }
+
+
+def _deserialize_interface_params(data: dict[str, Any]) -> InterfaceParams:
+    """Deserialize dict to InterfaceParams."""
+    return InterfaceParams(
+        normal=_list_to_ndarray(data["normal"]),
+        n_air=data["n_air"],
+        n_water=data["n_water"],
+    )
+
+
+def _serialize_board_config(board: BoardConfig) -> dict[str, Any]:
+    """Serialize BoardConfig to dict."""
+    return {
+        "squares_x": board.squares_x,
+        "squares_y": board.squares_y,
+        "square_size": board.square_size,
+        "marker_size": board.marker_size,
+        "dictionary": board.dictionary,
+    }
+
+
+def _deserialize_board_config(data: dict[str, Any]) -> BoardConfig:
+    """Deserialize dict to BoardConfig."""
+    return BoardConfig(
+        squares_x=data["squares_x"],
+        squares_y=data["squares_y"],
+        square_size=data["square_size"],
+        marker_size=data["marker_size"],
+        dictionary=data["dictionary"],
+    )
+
+
+def _serialize_diagnostics(diag: DiagnosticsData) -> dict[str, Any]:
+    """Serialize DiagnosticsData to dict. Omits None fields."""
+    result = {
+        "reprojection_error_rms": diag.reprojection_error_rms,
+        "reprojection_error_per_camera": diag.reprojection_error_per_camera,
+        "validation_3d_error_mean": diag.validation_3d_error_mean,
+        "validation_3d_error_std": diag.validation_3d_error_std,
+    }
+    # Only include optional fields if not None
+    if diag.per_corner_residuals is not None:
+        result["per_corner_residuals"] = _ndarray_to_list(diag.per_corner_residuals)
+    if diag.per_frame_errors is not None:
+        # Convert int keys to strings for JSON compatibility
+        result["per_frame_errors"] = {str(k): v for k, v in diag.per_frame_errors.items()}
+    return result
+
+
+def _deserialize_diagnostics(data: dict[str, Any]) -> DiagnosticsData:
+    """Deserialize dict to DiagnosticsData."""
+    per_corner_residuals = None
+    if "per_corner_residuals" in data:
+        per_corner_residuals = _list_to_ndarray(data["per_corner_residuals"])
+
+    per_frame_errors = None
+    if "per_frame_errors" in data:
+        # Convert string keys back to int
+        per_frame_errors = {int(k): v for k, v in data["per_frame_errors"].items()}
+
+    return DiagnosticsData(
+        reprojection_error_rms=data["reprojection_error_rms"],
+        reprojection_error_per_camera=data["reprojection_error_per_camera"],
+        validation_3d_error_mean=data["validation_3d_error_mean"],
+        validation_3d_error_std=data["validation_3d_error_std"],
+        per_corner_residuals=per_corner_residuals,
+        per_frame_errors=per_frame_errors,
+    )
+
+
+def _serialize_metadata(meta: CalibrationMetadata) -> dict[str, Any]:
+    """Serialize CalibrationMetadata to dict."""
+    return {
+        "calibration_date": meta.calibration_date,
+        "software_version": meta.software_version,
+        "config_hash": meta.config_hash,
+        "num_frames_used": meta.num_frames_used,
+        "num_frames_holdout": meta.num_frames_holdout,
+    }
+
+
+def _deserialize_metadata(data: dict[str, Any]) -> CalibrationMetadata:
+    """Deserialize dict to CalibrationMetadata."""
+    return CalibrationMetadata(
+        calibration_date=data["calibration_date"],
+        software_version=data["software_version"],
+        config_hash=data["config_hash"],
+        num_frames_used=data["num_frames_used"],
+        num_frames_holdout=data["num_frames_holdout"],
+    )
 ```
 
-### refractive_back_project
+### Main Functions
 
 ```python
-def refractive_back_project(
-    camera: Camera,
-    interface: Interface,
-    pixel: Vec2
-) -> tuple[Vec3, Vec3] | tuple[None, None]:
-    # Delegates to trace_ray_air_to_water
-    return trace_ray_air_to_water(camera, interface, pixel)
+def save_calibration(result: CalibrationResult, path: str | Path) -> None:
+    """Save calibration result to JSON file."""
+    data = {
+        "version": SERIALIZATION_VERSION,
+        "cameras": {
+            name: _serialize_camera_calibration(cam)
+            for name, cam in result.cameras.items()
+        },
+        "interface": _serialize_interface_params(result.interface),
+        "board": _serialize_board_config(result.board),
+        "diagnostics": _serialize_diagnostics(result.diagnostics),
+        "metadata": _serialize_metadata(result.metadata),
+    }
+
+    path = Path(path)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def load_calibration(path: str | Path) -> CalibrationResult:
+    """Load calibration result from JSON file."""
+    path = Path(path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Calibration file not found: {path}")
+
+    with open(path, "r") as f:
+        data = json.load(f)
+
+    # Version check
+    version = data.get("version")
+    if version != SERIALIZATION_VERSION:
+        raise ValueError(
+            f"Unsupported calibration file version: {version}. "
+            f"Expected: {SERIALIZATION_VERSION}"
+        )
+
+    return CalibrationResult(
+        cameras={
+            name: _deserialize_camera_calibration(cam_data)
+            for name, cam_data in data["cameras"].items()
+        },
+        interface=_deserialize_interface_params(data["interface"]),
+        board=_deserialize_board_config(data["board"]),
+        diagnostics=_deserialize_diagnostics(data["diagnostics"]),
+        metadata=_deserialize_metadata(data["metadata"]),
+    )
 ```
 
-### refractive_project
+---
+
+## Acceptance Criteria
+
+- [ ] `save_calibration` writes valid JSON file
+- [ ] `load_calibration` reconstructs identical `CalibrationResult`
+- [ ] Round-trip test: save then load produces equivalent object
+- [ ] Numpy arrays are correctly serialized/deserialized with correct dtypes
+- [ ] Optional fields (`per_corner_residuals`, `per_frame_errors`) handled correctly
+- [ ] `per_frame_errors` dict keys converted int↔str for JSON compatibility
+- [ ] Version field is written and checked on load
+- [ ] `FileNotFoundError` raised for missing file
+- [ ] `ValueError` raised for version mismatch
+- [ ] Accepts both `str` and `Path` arguments
+- [ ] Tests pass: `pytest tests/unit/test_serialization.py -v`
+- [ ] Type check passes: `mypy src/aquacal/io/serialization.py --ignore-missing-imports`
+- [ ] `src/aquacal/io/__init__.py` exports `save_calibration` and `load_calibration`
+
+---
+
+## Testing Strategy
+
+### Test Fixtures
 
 ```python
-from scipy.optimize import brentq
-
-def refractive_project(
-    camera: Camera,
-    interface: Interface,
-    point_3d: Vec3
-) -> Vec2 | None:
-    """
-    Algorithm:
-    1. Parameterize interface point P along line from camera XY to point XY
-    2. Find parameter s where refracted ray from point_3d through P points to camera
-    3. Project along the air ray to get pixel coordinates
-    """
-    C = camera.C
-    Q = point_3d
-    z_int = interface.get_interface_distance(camera.name)
-
-    # Check point is below interface (in water)
-    if Q[2] <= z_int:
-        return None
-
-    # Parameterize interface point: P(s) interpolates XY from C to Q at z=z_int
-    # s=0 -> directly below camera, s=1 -> directly above point
-    def get_interface_point(s: float) -> Vec3:
-        px = C[0] + s * (Q[0] - C[0])
-        py = C[1] + s * (Q[1] - C[1])
-        return np.array([px, py, z_int], dtype=np.float64)
-
-    def error_function(s: float) -> float:
-        """
-        Returns signed error: positive if refracted ray is "left" of camera,
-        negative if "right". Zero when ray points exactly at camera.
-        """
-        P = get_interface_point(s)
-
-        # Direction from Q to P (in water, going up toward interface)
-        d_water = P - Q
-        d_water_norm = np.linalg.norm(d_water)
-        if d_water_norm < 1e-10:
-            return 0.0
-        d_water = d_water / d_water_norm
-
-        # Refract at interface (water to air)
-        d_air = snells_law_3d(d_water, interface.normal, interface.n_ratio_water_to_air)
-        if d_air is None:  # TIR
-            # Return large error to push optimization away from this region
-            return 1e6 if s > 0.5 else -1e6
-
-        # Vector from P to camera
-        to_camera = C - P
-        to_camera_norm = np.linalg.norm(to_camera)
-        if to_camera_norm < 1e-10:
-            return 0.0
-        to_camera = to_camera / to_camera_norm
-
-        # Error: cross product magnitude (signed by z-component)
-        # If d_air and to_camera are aligned, cross product is zero
-        cross = np.cross(d_air, to_camera)
-        return cross[2]  # Use Z component as signed error
-
-    # Find bracket for root finding
-    # Try s in [0, 2] to allow some extrapolation
-    try:
-        # Check if solution exists in bracket
-        e0 = error_function(0.0)
-        e1 = error_function(1.0)
-        e2 = error_function(2.0)
-
-        # Find bracket with sign change
-        if e0 * e1 < 0:
-            s_lo, s_hi = 0.0, 1.0
-        elif e1 * e2 < 0:
-            s_lo, s_hi = 1.0, 2.0
-        elif e0 * e2 < 0:
-            s_lo, s_hi = 0.0, 2.0
-        else:
-            # No sign change found, try to find one
-            # Sample more points
-            for s_test in np.linspace(0, 2, 21):
-                e_test = error_function(s_test)
-                if e0 * e_test < 0:
-                    s_lo, s_hi = 0.0, s_test
-                    break
-            else:
-                return None  # Could not find valid bracket
-
-        # Solve for s where error = 0
-        s_solution = brentq(error_function, s_lo, s_hi, xtol=1e-9)
-
-    except (ValueError, RuntimeError):
-        return None
-
-    # Get the interface point and refracted ray
-    P = get_interface_point(s_solution)
-    d_water = P - Q
-    d_water = d_water / np.linalg.norm(d_water)
-    d_air = snells_law_3d(d_water, interface.normal, interface.n_ratio_water_to_air)
-
-    if d_air is None:
-        return None
-
-    # Project a point along the air ray to get pixel
-    # Use P + d_air (any point along ray works for projection direction)
-    # But we need a point in front of camera, so go toward camera
-    point_in_air = P - 0.01 * d_air  # Small step toward camera (d_air points away from camera)
-
-    # Actually, d_air points from P toward... let's check
-    # d_water points from Q toward P (upward, -Z direction)
-    # After refraction, d_air continues upward toward camera
-    # So to get a point between P and C, we add d_air * small_positive
-    # But we need the ray direction toward camera, which is -d_air
-
-    # Simpler: just project P onto the image (P is on the interface, visible to camera)
-    # The pixel is where the ray from C through P lands... but that's without distortion consideration
-
-    # Best approach: project the underwater point Q using the found interface point
-    # We know the ray path: Q -> P -> C
-    # The pixel is determined by the direction from C toward P
-    ray_to_interface = P - C
-    ray_to_interface = ray_to_interface / np.linalg.norm(ray_to_interface)
-
-    # Find where this ray (from C in direction ray_to_interface) projects
-    # Use a point along this ray for projection
-    point_for_projection = C + ray_to_interface  # 1 meter along ray
-
-    return camera.project(point_for_projection, apply_distortion=True)
-```
-
-## Test Cases
-
-```python
-import numpy as np
 import pytest
-from aquacal.config.schema import CameraIntrinsics, CameraExtrinsics
-from aquacal.core.camera import Camera
-from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import (
-    snells_law_3d,
-    trace_ray_air_to_water,
-    refractive_back_project,
-    refractive_project,
+import numpy as np
+from pathlib import Path
+
+from aquacal.config.schema import (
+    BoardConfig,
+    CalibrationMetadata,
+    CalibrationResult,
+    CameraCalibration,
+    CameraExtrinsics,
+    CameraIntrinsics,
+    DiagnosticsData,
+    InterfaceParams,
+)
+from aquacal.io.serialization import (
+    save_calibration,
+    load_calibration,
+    SERIALIZATION_VERSION,
 )
 
 
 @pytest.fixture
-def simple_camera():
-    """Camera at origin looking down +Z."""
-    intrinsics = CameraIntrinsics(
-        K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
-        dist_coeffs=np.zeros(5),
-        image_size=(640, 480)
+def sample_intrinsics() -> CameraIntrinsics:
+    """Sample camera intrinsics."""
+    return CameraIntrinsics(
+        K=np.array([[500.0, 0, 320], [0, 500.0, 240], [0, 0, 1]], dtype=np.float64),
+        dist_coeffs=np.array([0.1, -0.2, 0.001, 0.002, 0.05], dtype=np.float64),
+        image_size=(640, 480),
     )
-    extrinsics = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
-    return Camera("cam0", intrinsics, extrinsics)
 
 
 @pytest.fixture
-def simple_interface():
-    """Horizontal interface at Z=0.15."""
-    return Interface(
-        normal=np.array([0, 0, -1]),
-        base_height=0.15,
-        camera_offsets={'cam0': 0.0},
-        n_air=1.0,
-        n_water=1.333
+def sample_extrinsics() -> CameraExtrinsics:
+    """Sample camera extrinsics."""
+    return CameraExtrinsics(
+        R=np.eye(3, dtype=np.float64),
+        t=np.array([0.0, 0.0, 0.0], dtype=np.float64),
     )
 
 
-class TestSnellsLaw3D:
-    def test_normal_incidence(self):
-        """Ray perpendicular to surface passes straight through."""
-        incident = np.array([0, 0, 1])  # Down (+Z)
-        normal = np.array([0, 0, -1])   # Up (water to air)
-        n_ratio = 1.0 / 1.333
-
-        refracted = snells_law_3d(incident, normal, n_ratio)
-
-        assert refracted is not None
-        np.testing.assert_allclose(refracted, np.array([0, 0, 1]), atol=1e-10)
-
-    def test_bends_toward_normal_air_to_water(self):
-        """Ray entering water bends toward normal (steeper)."""
-        # 30 degrees from vertical
-        incident = np.array([0.5, 0, np.sqrt(0.75)])
-        incident = incident / np.linalg.norm(incident)
-        normal = np.array([0, 0, -1])
-        n_ratio = 1.0 / 1.333
-
-        refracted = snells_law_3d(incident, normal, n_ratio)
-
-        assert refracted is not None
-        # Refracted ray should be more vertical (larger Z component)
-        assert abs(refracted[2]) > abs(incident[2])
-        # X component should be smaller (bent toward normal)
-        assert abs(refracted[0]) < abs(incident[0])
-
-    def test_bends_away_from_normal_water_to_air(self):
-        """Ray exiting water bends away from normal."""
-        # Ray going up from water (negative Z direction)
-        incident = np.array([0.2, 0, -np.sqrt(1 - 0.04)])
-        incident = incident / np.linalg.norm(incident)
-        normal = np.array([0, 0, -1])
-        n_ratio = 1.333 / 1.0
-
-        refracted = snells_law_3d(incident, normal, n_ratio)
-
-        assert refracted is not None
-        # X component should be larger (bent away from normal)
-        assert abs(refracted[0]) > abs(incident[0])
-
-    def test_total_internal_reflection(self):
-        """Steep angle from water to air causes TIR."""
-        # Critical angle ~48.6 degrees, use 60 degrees
-        angle = np.radians(60)
-        incident = np.array([np.sin(angle), 0, -np.cos(angle)])
-        normal = np.array([0, 0, -1])
-        n_ratio = 1.333 / 1.0
-
-        refracted = snells_law_3d(incident, normal, n_ratio)
-
-        assert refracted is None
-
-    def test_no_tir_air_to_water(self):
-        """TIR cannot occur when entering denser medium."""
-        # Even at grazing angle, should not get TIR
-        incident = np.array([0.99, 0, 0.14])  # Very steep
-        incident = incident / np.linalg.norm(incident)
-        normal = np.array([0, 0, -1])
-        n_ratio = 1.0 / 1.333
-
-        refracted = snells_law_3d(incident, normal, n_ratio)
-
-        assert refracted is not None
-
-    def test_output_is_unit_vector(self):
-        """Refracted direction should be unit vector."""
-        incident = np.array([0.3, 0.2, 0.8])
-        incident = incident / np.linalg.norm(incident)
-        normal = np.array([0, 0, -1])
-
-        refracted = snells_law_3d(incident, normal, 1.0 / 1.333)
-
-        assert refracted is not None
-        np.testing.assert_allclose(np.linalg.norm(refracted), 1.0, atol=1e-10)
+@pytest.fixture
+def sample_camera(sample_intrinsics, sample_extrinsics) -> CameraCalibration:
+    """Sample camera calibration."""
+    return CameraCalibration(
+        name="cam0",
+        intrinsics=sample_intrinsics,
+        extrinsics=sample_extrinsics,
+        interface_distance=0.15,
+    )
 
 
-class TestTraceRayAirToWater:
-    def test_center_pixel_goes_straight_down(self, simple_camera, simple_interface):
-        """Principal point ray goes straight down through interface."""
-        pixel = np.array([320, 240])
-
-        intersection, direction = trace_ray_air_to_water(
-            simple_camera, simple_interface, pixel
-        )
-
-        assert intersection is not None
-        # Intersection at interface height
-        np.testing.assert_allclose(intersection[2], 0.15, atol=1e-10)
-        # Intersection directly below camera (camera at origin)
-        np.testing.assert_allclose(intersection[:2], [0, 0], atol=1e-10)
-        # Direction straight down
-        np.testing.assert_allclose(direction, [0, 0, 1], atol=1e-10)
-
-    def test_offset_pixel_refracts(self, simple_camera, simple_interface):
-        """Off-center pixel refracts at interface."""
-        pixel = np.array([420, 240])  # Right of center
-
-        intersection, direction = trace_ray_air_to_water(
-            simple_camera, simple_interface, pixel
-        )
-
-        assert intersection is not None
-        # Intersection should be right of center
-        assert intersection[0] > 0
-        # Direction should point down-right, but more vertical than air ray
-        assert direction[0] > 0  # Has rightward component
-        assert direction[2] > 0  # Points into water (+Z)
-
-    def test_returns_unit_direction(self, simple_camera, simple_interface):
-        """Refracted direction should be unit vector."""
-        pixel = np.array([400, 300])
-
-        intersection, direction = trace_ray_air_to_water(
-            simple_camera, simple_interface, pixel
-        )
-
-        assert direction is not None
-        np.testing.assert_allclose(np.linalg.norm(direction), 1.0, atol=1e-10)
+@pytest.fixture
+def sample_interface() -> InterfaceParams:
+    """Sample interface parameters."""
+    return InterfaceParams(
+        normal=np.array([0.0, 0.0, -1.0], dtype=np.float64),
+        n_air=1.0,
+        n_water=1.333,
+    )
 
 
-class TestRefractiveBackProject:
-    def test_same_as_trace_ray(self, simple_camera, simple_interface):
-        """refractive_back_project should match trace_ray_air_to_water."""
-        pixel = np.array([350, 260])
-
-        trace_result = trace_ray_air_to_water(simple_camera, simple_interface, pixel)
-        back_result = refractive_back_project(simple_camera, simple_interface, pixel)
-
-        if trace_result[0] is not None:
-            np.testing.assert_allclose(back_result[0], trace_result[0])
-            np.testing.assert_allclose(back_result[1], trace_result[1])
-
-
-class TestRefractiveProject:
-    def test_point_on_optical_axis(self, simple_camera, simple_interface):
-        """Point directly below camera projects to principal point."""
-        point = np.array([0, 0, 0.5])  # Below interface at z=0.15
-
-        pixel = refractive_project(simple_camera, simple_interface, point)
-
-        assert pixel is not None
-        np.testing.assert_allclose(pixel, [320, 240], atol=0.1)
-
-    def test_offset_point(self, simple_camera, simple_interface):
-        """Offset underwater point projects away from principal point."""
-        point = np.array([0.1, 0, 0.5])  # Right of center, underwater
-
-        pixel = refractive_project(simple_camera, simple_interface, point)
-
-        assert pixel is not None
-        assert pixel[0] > 320  # Projects right of center
-
-    def test_point_above_interface_returns_none(self, simple_camera, simple_interface):
-        """Point above interface (in air) returns None."""
-        point = np.array([0, 0, 0.1])  # Above interface at z=0.15
-
-        pixel = refractive_project(simple_camera, simple_interface, point)
-
-        assert pixel is None
-
-    def test_round_trip_consistency(self, simple_camera, simple_interface):
-        """Project then back-project should give ray through original point."""
-        # Underwater point
-        point = np.array([0.05, 0.03, 0.4])
-
-        # Project to pixel
-        pixel = refractive_project(simple_camera, simple_interface, point)
-        assert pixel is not None
-
-        # Back-project to ray
-        origin, direction = refractive_back_project(
-            simple_camera, simple_interface, pixel
-        )
-        assert origin is not None
-
-        # Ray should pass near original point
-        # Find closest point on ray to original point
-        t = np.dot(point - origin, direction)
-        closest = origin + t * direction
-
-        np.testing.assert_allclose(closest, point, atol=1e-4)
+@pytest.fixture
+def sample_board() -> BoardConfig:
+    """Sample board configuration."""
+    return BoardConfig(
+        squares_x=8,
+        squares_y=6,
+        square_size=0.03,
+        marker_size=0.022,
+        dictionary="DICT_4X4_50",
+    )
 
 
-class TestRefractiveProjectEdgeCases:
-    def test_point_at_various_depths(self, simple_camera, simple_interface):
-        """Test projection at various water depths."""
-        for depth in [0.2, 0.5, 1.0, 2.0]:
-            point = np.array([0.05, 0.02, depth])
-            pixel = refractive_project(simple_camera, simple_interface, point)
-            assert pixel is not None, f"Failed at depth {depth}"
+@pytest.fixture
+def sample_diagnostics() -> DiagnosticsData:
+    """Sample diagnostics without optional fields."""
+    return DiagnosticsData(
+        reprojection_error_rms=0.45,
+        reprojection_error_per_camera={"cam0": 0.42, "cam1": 0.48},
+        validation_3d_error_mean=0.0015,
+        validation_3d_error_std=0.0008,
+    )
 
-    def test_point_at_various_offsets(self, simple_camera, simple_interface):
-        """Test projection at various lateral offsets."""
-        for offset in [0.0, 0.05, 0.1, 0.2]:
-            point = np.array([offset, 0, 0.5])
-            pixel = refractive_project(simple_camera, simple_interface, point)
-            assert pixel is not None, f"Failed at offset {offset}"
+
+@pytest.fixture
+def sample_diagnostics_full() -> DiagnosticsData:
+    """Sample diagnostics with all optional fields."""
+    return DiagnosticsData(
+        reprojection_error_rms=0.45,
+        reprojection_error_per_camera={"cam0": 0.42, "cam1": 0.48},
+        validation_3d_error_mean=0.0015,
+        validation_3d_error_std=0.0008,
+        per_corner_residuals=np.array([[0.1, 0.2], [-0.1, 0.15]], dtype=np.float64),
+        per_frame_errors={0: 0.4, 5: 0.5, 10: 0.45},
+    )
+
+
+@pytest.fixture
+def sample_metadata() -> CalibrationMetadata:
+    """Sample metadata."""
+    return CalibrationMetadata(
+        calibration_date="2024-01-15T10:30:00",
+        software_version="0.1.0",
+        config_hash="abc123def456",
+        num_frames_used=50,
+        num_frames_holdout=10,
+    )
+
+
+@pytest.fixture
+def sample_calibration_result(
+    sample_camera, sample_interface, sample_board, sample_diagnostics, sample_metadata
+) -> CalibrationResult:
+    """Complete sample calibration result."""
+    # Create a second camera with different extrinsics
+    cam1 = CameraCalibration(
+        name="cam1",
+        intrinsics=sample_camera.intrinsics,
+        extrinsics=CameraExtrinsics(
+            R=np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]], dtype=np.float64),
+            t=np.array([0.1, 0.0, 0.0], dtype=np.float64),
+        ),
+        interface_distance=0.16,
+    )
+    return CalibrationResult(
+        cameras={"cam0": sample_camera, "cam1": cam1},
+        interface=sample_interface,
+        board=sample_board,
+        diagnostics=sample_diagnostics,
+        metadata=sample_metadata,
+    )
 ```
+
+### Test Cases
+
+```python
+class TestSaveCalibration:
+    def test_creates_file(self, tmp_path, sample_calibration_result):
+        """save_calibration creates a JSON file."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+        assert path.exists()
+
+    def test_accepts_string_path(self, tmp_path, sample_calibration_result):
+        """Accepts string path argument."""
+        path = str(tmp_path / "calibration.json")
+        save_calibration(sample_calibration_result, path)
+        assert Path(path).exists()
+
+    def test_valid_json(self, tmp_path, sample_calibration_result):
+        """Output is valid JSON."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+
+        import json
+        with open(path) as f:
+            data = json.load(f)
+
+        assert "version" in data
+        assert "cameras" in data
+        assert "interface" in data
+
+    def test_includes_version(self, tmp_path, sample_calibration_result):
+        """Output includes version field."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+
+        import json
+        with open(path) as f:
+            data = json.load(f)
+
+        assert data["version"] == SERIALIZATION_VERSION
+
+
+class TestLoadCalibration:
+    def test_round_trip(self, tmp_path, sample_calibration_result):
+        """Save then load produces equivalent result."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+        loaded = load_calibration(path)
+
+        # Check cameras
+        assert set(loaded.cameras.keys()) == set(sample_calibration_result.cameras.keys())
+        for name in loaded.cameras:
+            orig = sample_calibration_result.cameras[name]
+            load = loaded.cameras[name]
+            assert load.name == orig.name
+            np.testing.assert_allclose(load.intrinsics.K, orig.intrinsics.K)
+            np.testing.assert_allclose(load.intrinsics.dist_coeffs, orig.intrinsics.dist_coeffs)
+            assert load.intrinsics.image_size == orig.intrinsics.image_size
+            np.testing.assert_allclose(load.extrinsics.R, orig.extrinsics.R)
+            np.testing.assert_allclose(load.extrinsics.t, orig.extrinsics.t)
+            assert load.interface_distance == orig.interface_distance
+
+        # Check interface
+        np.testing.assert_allclose(loaded.interface.normal, sample_calibration_result.interface.normal)
+        assert loaded.interface.n_air == sample_calibration_result.interface.n_air
+        assert loaded.interface.n_water == sample_calibration_result.interface.n_water
+
+        # Check board
+        assert loaded.board.squares_x == sample_calibration_result.board.squares_x
+        assert loaded.board.dictionary == sample_calibration_result.board.dictionary
+
+        # Check diagnostics
+        assert loaded.diagnostics.reprojection_error_rms == sample_calibration_result.diagnostics.reprojection_error_rms
+
+        # Check metadata
+        assert loaded.metadata.calibration_date == sample_calibration_result.metadata.calibration_date
+
+    def test_accepts_string_path(self, tmp_path, sample_calibration_result):
+        """Accepts string path argument."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+        loaded = load_calibration(str(path))
+        assert loaded is not None
+
+    def test_file_not_found(self, tmp_path):
+        """Raises FileNotFoundError for missing file."""
+        with pytest.raises(FileNotFoundError):
+            load_calibration(tmp_path / "nonexistent.json")
+
+    def test_version_mismatch(self, tmp_path):
+        """Raises ValueError for version mismatch."""
+        path = tmp_path / "calibration.json"
+        import json
+        with open(path, "w") as f:
+            json.dump({"version": "0.0"}, f)
+
+        with pytest.raises(ValueError, match="version"):
+            load_calibration(path)
+
+
+class TestOptionalFields:
+    def test_diagnostics_without_optional(self, tmp_path, sample_calibration_result):
+        """Handles diagnostics without optional fields."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+        loaded = load_calibration(path)
+
+        assert loaded.diagnostics.per_corner_residuals is None
+        assert loaded.diagnostics.per_frame_errors is None
+
+    def test_diagnostics_with_optional(
+        self, tmp_path, sample_calibration_result, sample_diagnostics_full
+    ):
+        """Handles diagnostics with optional fields."""
+        # Replace diagnostics with full version
+        result = CalibrationResult(
+            cameras=sample_calibration_result.cameras,
+            interface=sample_calibration_result.interface,
+            board=sample_calibration_result.board,
+            diagnostics=sample_diagnostics_full,
+            metadata=sample_calibration_result.metadata,
+        )
+
+        path = tmp_path / "calibration.json"
+        save_calibration(result, path)
+        loaded = load_calibration(path)
+
+        assert loaded.diagnostics.per_corner_residuals is not None
+        np.testing.assert_allclose(
+            loaded.diagnostics.per_corner_residuals,
+            sample_diagnostics_full.per_corner_residuals,
+        )
+
+        assert loaded.diagnostics.per_frame_errors is not None
+        assert loaded.diagnostics.per_frame_errors == sample_diagnostics_full.per_frame_errors
+
+
+class TestNumpyArrays:
+    def test_array_dtypes(self, tmp_path, sample_calibration_result):
+        """Numpy arrays have correct dtypes after round-trip."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+        loaded = load_calibration(path)
+
+        cam = loaded.cameras["cam0"]
+        assert cam.intrinsics.K.dtype == np.float64
+        assert cam.intrinsics.dist_coeffs.dtype == np.float64
+        assert cam.extrinsics.R.dtype == np.float64
+        assert cam.extrinsics.t.dtype == np.float64
+        assert loaded.interface.normal.dtype == np.float64
+
+    def test_array_shapes(self, tmp_path, sample_calibration_result):
+        """Numpy arrays have correct shapes after round-trip."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+        loaded = load_calibration(path)
+
+        cam = loaded.cameras["cam0"]
+        assert cam.intrinsics.K.shape == (3, 3)
+        assert cam.intrinsics.dist_coeffs.shape == (5,)
+        assert cam.extrinsics.R.shape == (3, 3)
+        assert cam.extrinsics.t.shape == (3,)
+        assert loaded.interface.normal.shape == (3,)
+
+
+class TestPerFrameErrorsIntKeys:
+    def test_int_keys_preserved(self, tmp_path, sample_calibration_result, sample_diagnostics_full):
+        """per_frame_errors dict keys are converted to int on load."""
+        result = CalibrationResult(
+            cameras=sample_calibration_result.cameras,
+            interface=sample_calibration_result.interface,
+            board=sample_calibration_result.board,
+            diagnostics=sample_diagnostics_full,
+            metadata=sample_calibration_result.metadata,
+        )
+
+        path = tmp_path / "calibration.json"
+        save_calibration(result, path)
+        loaded = load_calibration(path)
+
+        # Keys should be integers, not strings
+        for key in loaded.diagnostics.per_frame_errors.keys():
+            assert isinstance(key, int)
+```
+
+---
 
 ## Import Structure
 
-Update `core/__init__.py`:
+Update `src/aquacal/io/__init__.py`:
 
 ```python
-"""Core geometry modules."""
+"""Input/output modules."""
 
-from aquacal.core.board import BoardGeometry
-from aquacal.core.camera import Camera, undistort_points
-from aquacal.core.interface_model import Interface, ray_plane_intersection
-from aquacal.core.refractive_geometry import (
-    snells_law_3d,
-    trace_ray_air_to_water,
-    refractive_project,
-    refractive_back_project,
-)
+from aquacal.io.video import VideoSet
+from aquacal.io.detection import detect_charuco, detect_all_frames
+from aquacal.io.serialization import save_calibration, load_calibration
 
 __all__ = [
-    "BoardGeometry",
-    "Camera",
-    "undistort_points",
-    "Interface",
-    "ray_plane_intersection",
-    "snells_law_3d",
-    "trace_ray_air_to_water",
-    "refractive_project",
-    "refractive_back_project",
+    "VideoSet",
+    "detect_charuco",
+    "detect_all_frames",
+    "save_calibration",
+    "load_calibration",
 ]
 ```
 
+---
+
 ## Notes
 
-### Coordinate Frame Reminder (Z-down)
-
-- World frame: +Z points down (into water)
-- Camera at Z ≈ 0, interface at Z = 0.15, underwater points at Z > 0.15
-- Interface normal `[0, 0, -1]` points up (from water toward air)
-- Ray going into water has `direction[2] > 0`
-
-### refractive_project Algorithm Details
-
-The algorithm uses Brent's method (1D root finding) because:
-1. Cameras look nearly straight down, so the interface intersection is approximately along the line from camera to point
-2. The error function (cross product of refracted ray and camera direction) is smooth and monotonic in the valid region
-3. Brent's method is robust and fast for 1D problems
-
-The parameterization `P(s) = lerp(C_xy, Q_xy, s)` at `z=z_interface` means:
-- s=0: interface point directly below camera
-- s=1: interface point directly above underwater point
-- s∈(0,1): typical valid range
-- s>1: extrapolation for wide-angle views
+- JSON `indent=2` for human readability
+- Numpy `tolist()` automatically handles nested arrays
+- JSON doesn't support integer dict keys, so `per_frame_errors` keys are converted str↔int
+- `image_size` tuple is serialized as list, converted back to tuple on load
+- No need for `export_for_downstream` in this task; can be added later if needed
