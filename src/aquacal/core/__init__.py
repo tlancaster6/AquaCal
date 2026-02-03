@@ -1,5 +1,7 @@
 """Core geometry modules."""
 
+from aquacal.core.board import BoardGeometry
+
 # Public API - will be populated as modules are implemented
 __all__ = [
     # From camera.py (Task 2.1):
@@ -13,8 +15,8 @@ __all__ = [
     # "trace_ray_air_to_water",
     # "refractive_project",
     # "refractive_back_project",
-    # From board.py (Task 2.4):
-    # "BoardGeometry",
+    # From board.py (Task 1.3):
+    "BoardGeometry",
 ]
 
 # Imports will be added as modules are implemented:
@@ -26,4 +28,3 @@ __all__ = [
 #     refractive_project,
 #     refractive_back_project,
 # )
-# from aquacal.core.board import BoardGeometry

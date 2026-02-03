@@ -15,9 +15,9 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 ## Phase 1: Foundation
 
-- [ ] **1.1** Define configuration and output schemas (`config/schema.py`)
-- [ ] **1.2** Implement rotation/transform utilities (`utils/transforms.py`)
-- [ ] **1.3** Implement board geometry (`core/board.py`)
+- [x] **1.1** Define configuration and output schemas (`config/schema.py`)
+- [x] **1.2** Implement rotation/transform utilities (`utils/transforms.py`)
+- [x] **1.3** Implement board geometry (`core/board.py`)
 
 ## Phase 2: Core Geometry
 

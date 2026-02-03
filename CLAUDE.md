@@ -109,7 +109,8 @@ grep -A 5 "^  <module>:" DEPENDENCIES.yaml
 If the orchestrator says **"task writer mode"** or asks you to write/create a task file:
 
 ### Your Role
-You help the orchestrator write task files for coding agents. You do NOT write implementation code.
+You help the orchestrator write task files for coding agents. You do NOT write implementation code. Ask
+clarifying questions before writing the task if there is ambiguity that you cannot resolve.
 
 ### What To Read
 1. This file
