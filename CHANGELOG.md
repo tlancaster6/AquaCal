@@ -9,6 +9,37 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-03
+### Refactor to src Layout
+
+Reorganized the project from a flat layout to the standard Python `src/` layout.
+
+#### Directory Structure Changes
+- Created `src/aquacal/` package structure with all subpackages
+- Added `__init__.py` files to all packages (aquacal, calibration, config, core, io, triangulation, utils, validation)
+- Moved `config/example_config.yaml` to `src/aquacal/config/example_config.yaml`
+- Deleted old top-level package directories (calibration/, config/, core/, io/, triangulation/, utils/, validation/)
+
+#### [DEPENDENCIES.yaml]
+- Updated all module paths from flat layout (e.g., `config/schema.py`) to src layout (e.g., `src/aquacal/config/schema.py`)
+
+#### [docs/development_plan.md]
+- Updated architecture diagram to reflect new src/aquacal/ structure
+
+#### [docs/agent_implementation_spec.md]
+- Updated implementation order diagram paths
+- Updated all section headings to new paths
+- Updated all import statements to use `aquacal.` prefix
+
+#### [STRUCTURE.md]
+- Completely rewrote to reflect new src layout
+- Added import convention documentation
+
+#### [CLAUDE.md]
+- Updated test file path example to new src layout
+
+---
+
+## 2026-02-03
 ### Documentation Review and Consistency Fixes
 
 #### [docs/agent_implementation_spec.md]

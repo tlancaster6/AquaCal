@@ -5,161 +5,161 @@
 #   - "status" is one of: not_started, stub, in_progress, implemented
 #
 # Query example (find what to read for a module):
-#   grep -A 10 "^  core/camera.py:" DEPENDENCIES.yaml
+#   grep -A 10 "^  src/aquacal/core/camera.py:" DEPENDENCIES.yaml
 
 # === Project Setup (Phase 0) ===
 # These are not modules but required setup files:
 #   - pyproject.toml: Package configuration and dependencies
-#   - */__ init__.py: Package exports
+#   - src/aquacal/__init__.py: Package exports
 #   - requirements.txt: Pip dependencies
 
 modules:
 
   # === Config ===
-  config/schema.py:
+  src/aquacal/config/schema.py:
     depends_on: []
     status: not_started
     description: Type definitions, dataclasses, configuration schema
 
   # === Utils ===
-  utils/transforms.py:
+  src/aquacal/utils/transforms.py:
     depends_on: []
     status: not_started
     description: Rotation conversions, pose composition
 
-  utils/visualization.py:
+  src/aquacal/utils/visualization.py:
     depends_on:
-      - config/schema.py
+      - src/aquacal/config/schema.py
     status: not_started
     description: Plotting utilities for debugging
 
   # === Core ===
-  core/board.py:
+  src/aquacal/core/board.py:
     depends_on:
-      - config/schema.py
+      - src/aquacal/config/schema.py
     status: not_started
     description: ChArUco board geometry and 3D point generation
 
-  core/camera.py:
+  src/aquacal/core/camera.py:
     depends_on:
-      - config/schema.py
-      - utils/transforms.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/utils/transforms.py
     status: not_started
     description: Camera model, projection, back-projection (no refraction)
 
-  core/interface_model.py:
+  src/aquacal/core/interface_model.py:
     depends_on:
-      - config/schema.py
+      - src/aquacal/config/schema.py
     status: not_started
     description: Refractive interface model, ray-plane intersection
 
-  core/refractive_geometry.py:
+  src/aquacal/core/refractive_geometry.py:
     depends_on:
-      - config/schema.py
-      - core/camera.py
-      - core/interface_model.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/core/camera.py
+      - src/aquacal/core/interface_model.py
     status: not_started
     description: Snell's law, ray tracing, refractive projection
 
   # === IO ===
-  io/video.py:
+  src/aquacal/io/video.py:
     depends_on: []
     status: not_started
     description: Video loading, frame extraction
 
-  io/detection.py:
+  src/aquacal/io/detection.py:
     depends_on:
-      - config/schema.py
-      - core/board.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/core/board.py
     status: not_started
     description: ChArUco detection wrapper
 
-  io/serialization.py:
+  src/aquacal/io/serialization.py:
     depends_on:
-      - config/schema.py
+      - src/aquacal/config/schema.py
     status: not_started
     description: Save/load calibration results
 
   # === Calibration ===
-  calibration/intrinsics.py:
+  src/aquacal/calibration/intrinsics.py:
     depends_on:
-      - config/schema.py
-      - core/camera.py
-      - core/board.py
-      - io/detection.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/core/camera.py
+      - src/aquacal/core/board.py
+      - src/aquacal/io/detection.py
     status: not_started
     description: Stage 1 - per-camera intrinsic calibration
 
-  calibration/extrinsics.py:
+  src/aquacal/calibration/extrinsics.py:
     depends_on:
-      - config/schema.py
-      - core/camera.py
-      - core/board.py
-      - io/detection.py
-      - utils/transforms.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/core/camera.py
+      - src/aquacal/core/board.py
+      - src/aquacal/io/detection.py
+      - src/aquacal/utils/transforms.py
     status: not_started
     description: Stage 2 - extrinsic initialization via pose graph
 
-  calibration/interface_estimation.py:
+  src/aquacal/calibration/interface_estimation.py:
     depends_on:
-      - config/schema.py
-      - core/camera.py
-      - core/interface_model.py
-      - core/refractive_geometry.py
-      - core/board.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/core/camera.py
+      - src/aquacal/core/interface_model.py
+      - src/aquacal/core/refractive_geometry.py
+      - src/aquacal/core/board.py
     status: not_started
     description: Stage 3 - interface and board pose optimization
 
-  calibration/refinement.py:
+  src/aquacal/calibration/refinement.py:
     depends_on:
-      - config/schema.py
-      - calibration/interface_estimation.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/calibration/interface_estimation.py
     status: not_started
     description: Stage 4 - optional joint refinement
 
-  calibration/pipeline.py:
+  src/aquacal/calibration/pipeline.py:
     depends_on:
-      - config/schema.py
-      - io/video.py
-      - io/detection.py
-      - io/serialization.py
-      - calibration/intrinsics.py
-      - calibration/extrinsics.py
-      - calibration/interface_estimation.py
-      - calibration/refinement.py
-      - validation/reprojection.py
-      - validation/reconstruction.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/io/video.py
+      - src/aquacal/io/detection.py
+      - src/aquacal/io/serialization.py
+      - src/aquacal/calibration/intrinsics.py
+      - src/aquacal/calibration/extrinsics.py
+      - src/aquacal/calibration/interface_estimation.py
+      - src/aquacal/calibration/refinement.py
+      - src/aquacal/validation/reprojection.py
+      - src/aquacal/validation/reconstruction.py
     status: not_started
     description: End-to-end calibration orchestration
 
   # === Triangulation ===
-  triangulation/triangulate.py:
+  src/aquacal/triangulation/triangulate.py:
     depends_on:
-      - config/schema.py
-      - core/refractive_geometry.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/core/refractive_geometry.py
     status: not_started
     description: Refractive triangulation for 3D reconstruction
 
   # === Validation ===
-  validation/reprojection.py:
+  src/aquacal/validation/reprojection.py:
     depends_on:
-      - config/schema.py
-      - core/refractive_geometry.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/core/refractive_geometry.py
     status: not_started
     description: Reprojection error computation
 
-  validation/reconstruction.py:
+  src/aquacal/validation/reconstruction.py:
     depends_on:
-      - config/schema.py
-      - triangulation/triangulate.py
-      - core/board.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/triangulation/triangulate.py
+      - src/aquacal/core/board.py
     status: not_started
     description: 3D reconstruction metrics using ChArUco geometry
 
-  validation/diagnostics.py:
+  src/aquacal/validation/diagnostics.py:
     depends_on:
-      - config/schema.py
-      - validation/reprojection.py
-      - validation/reconstruction.py
+      - src/aquacal/config/schema.py
+      - src/aquacal/validation/reprojection.py
+      - src/aquacal/validation/reconstruction.py
     status: not_started
     description: Detailed error analysis and reporting

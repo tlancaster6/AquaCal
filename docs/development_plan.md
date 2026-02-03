@@ -46,40 +46,58 @@ cameras:
 ## Architecture Overview
 
 ```
-multicam_refractive/
+AquaCal/
 │
-├── config/
-│   └── schema.py                 # Configuration and output schema definitions
+├── src/
+│   └── aquacal/
+│       ├── __init__.py               # Package init with version
+│       │
+│       ├── config/
+│       │   ├── __init__.py
+│       │   └── schema.py             # Configuration and output schema definitions
+│       │
+│       ├── core/
+│       │   ├── __init__.py
+│       │   ├── camera.py             # Camera model (intrinsics, extrinsics, projection)
+│       │   ├── interface_model.py    # Refractive interface model
+│       │   ├── refractive_geometry.py # Ray tracing, Snell's law, refractive projection
+│       │   └── board.py              # ChArUco board geometry and 3D point generation
+│       │
+│       ├── io/
+│       │   ├── __init__.py
+│       │   ├── video.py              # Video loading, frame extraction, sync handling
+│       │   ├── detection.py          # ChArUco detection wrapper
+│       │   └── serialization.py      # Save/load calibration results
+│       │
+│       ├── calibration/
+│       │   ├── __init__.py
+│       │   ├── intrinsics.py         # Stage 1: Per-camera intrinsic calibration
+│       │   ├── extrinsics.py         # Stage 2: Multi-camera extrinsic calibration
+│       │   ├── interface_estimation.py # Stage 3: Interface + board pose estimation
+│       │   ├── refinement.py         # Stage 4: Optional joint refinement
+│       │   └── pipeline.py           # Orchestrates the full calibration workflow
+│       │
+│       ├── validation/
+│       │   ├── __init__.py
+│       │   ├── reprojection.py       # Reprojection error computation
+│       │   ├── reconstruction.py     # 3D reconstruction metrics (ChArUco distances)
+│       │   └── diagnostics.py        # Per-camera, per-frame, spatial error analysis
+│       │
+│       ├── triangulation/
+│       │   ├── __init__.py
+│       │   └── triangulate.py        # Refractive triangulation (for validation & downstream)
+│       │
+│       └── utils/
+│           ├── __init__.py
+│           ├── transforms.py         # Rotation conversions, coordinate transforms
+│           └── visualization.py      # Plotting utilities for debugging
 │
-├── core/
-│   ├── camera.py                 # Camera model (intrinsics, extrinsics, projection)
-│   ├── interface_model.py        # Refractive interface model
-│   ├── refractive_geometry.py    # Ray tracing, Snell's law, refractive projection
-│   └── board.py                  # ChArUco board geometry and 3D point generation
+├── tests/                            # Test suite (stays at top level)
+│   ├── unit/
+│   ├── integration/
+│   └── synthetic/
 │
-├── io/
-│   ├── video.py                  # Video loading, frame extraction, sync handling
-│   ├── detection.py              # ChArUco detection wrapper
-│   └── serialization.py          # Save/load calibration results
-│
-├── calibration/
-│   ├── intrinsics.py             # Stage 1: Per-camera intrinsic calibration
-│   ├── extrinsics.py             # Stage 2: Multi-camera extrinsic calibration
-│   ├── interface_estimation.py   # Stage 3: Interface + board pose estimation
-│   ├── refinement.py             # Stage 4: Optional joint refinement
-│   └── pipeline.py               # Orchestrates the full calibration workflow
-│
-├── validation/
-│   ├── reprojection.py           # Reprojection error computation
-│   ├── reconstruction.py         # 3D reconstruction metrics (ChArUco distances)
-│   └── diagnostics.py            # Per-camera, per-frame, spatial error analysis
-│
-├── triangulation/
-│   └── triangulate.py            # Refractive triangulation (for validation & downstream)
-│
-└── utils/
-    ├── transforms.py             # Rotation conversions, coordinate transforms
-    └── visualization.py          # Plotting utilities for debugging
+└── docs/                             # Documentation (stays at top level)
 ```
 
 ---

@@ -11,42 +11,42 @@ This document provides explicit specifications for AI agent (Claude Code) implem
 
 ```
 Phase 1 (no dependencies):
-  ├── config/schema.py
-  ├── utils/transforms.py
-  └── core/board.py
+  ├── src/aquacal/config/schema.py
+  ├── src/aquacal/utils/transforms.py
+  └── src/aquacal/core/board.py
 
 Phase 2 (depends on Phase 1):
-  ├── core/camera.py        (depends on: transforms)
-  └── core/interface_model.py     (depends on: nothing)
+  ├── src/aquacal/core/camera.py        (depends on: transforms)
+  └── src/aquacal/core/interface_model.py     (depends on: nothing)
 
 Phase 3 (depends on Phase 2):
-  └── core/refractive_geometry.py  (depends on: camera, interface, transforms)
+  └── src/aquacal/core/refractive_geometry.py  (depends on: camera, interface, transforms)
 
 Phase 4 (depends on Phase 1):
-  ├── io/video.py           (depends on: nothing)
-  └── io/detection.py       (depends on: board)
+  ├── src/aquacal/io/video.py           (depends on: nothing)
+  └── src/aquacal/io/detection.py       (depends on: board)
 
 Phase 5 (depends on Phases 3, 4):
-  └── io/serialization.py   (depends on: schema)
+  └── src/aquacal/io/serialization.py   (depends on: schema)
 
 Phase 6 (depends on Phases 3, 4):
-  ├── calibration/intrinsics.py    (depends on: camera, board, detection)
-  └── triangulation/triangulate.py (depends on: refractive_geometry)
+  ├── src/aquacal/calibration/intrinsics.py    (depends on: camera, board, detection)
+  └── src/aquacal/triangulation/triangulate.py (depends on: refractive_geometry)
 
 Phase 7 (depends on Phase 6):
-  └── calibration/extrinsics.py    (depends on: camera, board, detection, transforms)
+  └── src/aquacal/calibration/extrinsics.py    (depends on: camera, board, detection, transforms)
 
 Phase 8 (depends on Phase 7):
-  └── calibration/interface_estimation.py     (depends on: camera, interface, refractive_geometry, board)
+  └── src/aquacal/calibration/interface_estimation.py     (depends on: camera, interface, refractive_geometry, board)
 
 Phase 9 (depends on Phase 8):
-  ├── calibration/refinement.py    (depends on: interface stage)
-  ├── validation/reprojection.py   (depends on: refractive_geometry)
-  ├── validation/reconstruction.py (depends on: triangulate, board)
-  └── validation/diagnostics.py    (depends on: reprojection, reconstruction)
+  ├── src/aquacal/calibration/refinement.py    (depends on: interface stage)
+  ├── src/aquacal/validation/reprojection.py   (depends on: refractive_geometry)
+  ├── src/aquacal/validation/reconstruction.py (depends on: triangulate, board)
+  └── src/aquacal/validation/diagnostics.py    (depends on: reprojection, reconstruction)
 
 Phase 10 (depends on Phase 9):
-  └── calibration/pipeline.py      (depends on: all calibration and validation modules)
+  └── src/aquacal/calibration/pipeline.py      (depends on: all calibration and validation modules)
 ```
 
 ---
@@ -55,7 +55,7 @@ Phase 10 (depends on Phase 9):
 
 All types use dataclasses or numpy arrays. Use `from __future__ import annotations` for forward references.
 
-### `config/schema.py`
+### `src/aquacal/config/schema.py`
 
 ```python
 from __future__ import annotations
@@ -244,7 +244,7 @@ class ConnectivityError(CalibrationError):
 
 ## Module Specifications
 
-### `utils/transforms.py`
+### `src/aquacal/utils/transforms.py`
 
 ```python
 """Rotation and coordinate transform utilities."""
@@ -253,7 +253,7 @@ import numpy as np
 from numpy.typing import NDArray
 import cv2
 
-from config.schema import Vec3, Mat3  # Use canonical type definitions
+from aquacal.config.schema import Vec3, Mat3  # Use canonical type definitions
 
 
 def rvec_to_matrix(rvec: Vec3) -> Mat3:
@@ -363,7 +363,7 @@ def camera_center(R: Mat3, t: Vec3) -> Vec3:
 
 ---
 
-### `core/board.py`
+### `src/aquacal/core/board.py`
 
 ```python
 """ChArUco board geometry and utilities."""
@@ -373,7 +373,7 @@ from numpy.typing import NDArray
 import cv2
 
 # Import from schema
-from config.schema import BoardConfig, Vec3
+from aquacal.config.schema import BoardConfig, Vec3
 
 
 class BoardGeometry:
@@ -472,7 +472,7 @@ class BoardGeometry:
 
 ---
 
-### `core/camera.py`
+### `src/aquacal/core/camera.py`
 
 ```python
 """Camera model and projection operations (without refraction)."""
@@ -480,7 +480,7 @@ class BoardGeometry:
 import numpy as np
 from numpy.typing import NDArray
 
-from config.schema import CameraIntrinsics, CameraExtrinsics, Vec3, Vec2, Mat3
+from aquacal.config.schema import CameraIntrinsics, CameraExtrinsics, Vec3, Vec2, Mat3
 
 
 class Camera:
@@ -637,7 +637,7 @@ def undistort_points(
 
 ---
 
-### `core/interface_model.py`
+### `src/aquacal/core/interface_model.py`
 
 ```python
 """Refractive interface (water surface) model."""
@@ -645,7 +645,7 @@ def undistort_points(
 import numpy as np
 from numpy.typing import NDArray
 
-from config.schema import InterfaceParams, Vec3
+from aquacal.config.schema import InterfaceParams, Vec3
 
 
 class Interface:
@@ -758,7 +758,7 @@ def ray_plane_intersection(
 
 ---
 
-### `core/refractive_geometry.py`
+### `src/aquacal/core/refractive_geometry.py`
 
 ```python
 """
@@ -771,9 +771,9 @@ It is used by both calibration and downstream triangulation.
 import numpy as np
 from numpy.typing import NDArray
 
-from config.schema import Vec3, Vec2
-from core.camera import Camera
-from core.interface_model import Interface, ray_plane_intersection
+from aquacal.config.schema import Vec3, Vec2
+from aquacal.core.camera import Camera
+from aquacal.core.interface_model import Interface, ray_plane_intersection
 
 
 def snells_law_3d(
@@ -925,7 +925,7 @@ def refractive_back_project(
 
 ---
 
-### `io/detection.py`
+### `src/aquacal/io/detection.py`
 
 ```python
 """ChArUco detection wrapper."""
@@ -934,8 +934,8 @@ import numpy as np
 from numpy.typing import NDArray
 import cv2
 
-from config.schema import Detection, FrameDetections, DetectionResult
-from core.board import BoardGeometry
+from aquacal.config.schema import Detection, FrameDetections, DetectionResult
+from aquacal.core.board import BoardGeometry
 
 
 def detect_charuco(
@@ -1001,7 +1001,7 @@ def detect_all_frames(
 
 ---
 
-### `triangulation/triangulate.py`
+### `src/aquacal/triangulation/triangulate.py`
 
 ```python
 """Refractive triangulation for 3D reconstruction."""
@@ -1010,10 +1010,10 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import least_squares
 
-from config.schema import CalibrationResult, Vec3, Vec2
-from core.camera import Camera
-from core.interface_model import Interface
-from core.refractive_geometry import refractive_back_project
+from aquacal.config.schema import CalibrationResult, Vec3, Vec2
+from aquacal.core.camera import Camera
+from aquacal.core.interface_model import Interface
+from aquacal.core.refractive_geometry import refractive_back_project
 
 
 def triangulate_point(
@@ -1137,7 +1137,7 @@ Each module must have corresponding tests in `tests/` directory.
 
 import numpy as np
 import pytest
-from core.refractive_geometry import snells_law_3d, trace_ray_air_to_water
+from aquacal.core.refractive_geometry import snells_law_3d, trace_ray_air_to_water
 
 
 class TestSnellsLaw:

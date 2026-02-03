@@ -1,0 +1,47 @@
+# Example configuration for AquaCal calibration pipeline
+# Copy this file and modify for your setup
+
+board:
+  squares_x: 8           # Number of squares in X direction
+  squares_y: 6           # Number of squares in Y direction
+  square_size: 0.030     # Square size in meters (30mm)
+  marker_size: 0.022     # ArUco marker size in meters (22mm)
+  dictionary: "DICT_4X4_50"  # ArUco dictionary name
+
+cameras:
+  - cam0    # Reference camera (will be at world origin)
+  - cam1
+  - cam2
+  - cam3
+  # Add more cameras as needed (up to 14 supported)
+
+paths:
+  intrinsic_videos:
+    cam0: "/path/to/intrinsic/cam0.mp4"
+    cam1: "/path/to/intrinsic/cam1.mp4"
+    cam2: "/path/to/intrinsic/cam2.mp4"
+    cam3: "/path/to/intrinsic/cam3.mp4"
+  extrinsic_videos:
+    cam0: "/path/to/extrinsic/cam0.mp4"
+    cam1: "/path/to/extrinsic/cam1.mp4"
+    cam2: "/path/to/extrinsic/cam2.mp4"
+    cam3: "/path/to/extrinsic/cam3.mp4"
+  output_dir: "/path/to/calibration_output"
+
+interface:
+  n_air: 1.0             # Refractive index of air
+  n_water: 1.333         # Refractive index of water (fresh water at 20C)
+  normal_fixed: true     # If false, estimate interface tilt
+
+optimization:
+  robust_loss: "huber"   # Options: "huber", "soft_l1", "linear"
+  loss_scale: 1.0        # Residual scale for robust loss (pixels)
+
+detection:
+  min_corners: 8         # Minimum corners per frame to use detection
+  min_cameras: 2         # Minimum cameras seeing board to use frame
+  frame_step: 5          # Process every Nth frame (1 = all frames)
+
+validation:
+  holdout_fraction: 0.2  # Fraction of frames held out for validation
+  save_detailed_residuals: true  # Save per-corner residual data

@@ -70,7 +70,7 @@ Before ending your session:
 
 ## Testing Conventions
 
-- **Unit test files**: `tests/unit/test_<module_name>.py` (e.g., `test_transforms.py` for `utils/transforms.py`)
+- **Unit test files**: `tests/unit/test_<module_name>.py` (e.g., `test_transforms.py` for `src/aquacal/utils/transforms.py`)
 - **Test classes**: `TestClassName` (e.g., `TestSnellsLaw`)
 - **Test functions**: `test_<description>` (e.g., `test_normal_incidence`)
 - **Fixtures**: Place shared fixtures in `tests/conftest.py`
