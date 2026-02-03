@@ -9,6 +9,66 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-03
+### [src/aquacal/core/refractive_geometry.py]
+- Implemented snells_law_3d: 3D Snell's law with automatic normal orientation handling, returns None for TIR
+- Implemented trace_ray_air_to_water: traces ray from camera pixel through air-water interface into water
+- Implemented refractive_back_project: convenience wrapper for trace_ray_air_to_water with consistent API
+- Implemented refractive_project: forward projection using 1D Brent's method optimization to find interface point
+- Special handling for optical axis case (point directly below camera) to avoid degenerate parameterization
+
+### [tests/unit/test_refractive_geometry.py]
+- Created comprehensive test suite with 26 tests covering all functions
+- Tests verify: Snell's law physics (normal incidence, bending toward/away from normal, TIR, unit vectors, symmetry)
+- Tests verify: trace_ray_air_to_water (center pixel, offset pixel refraction, intersection on interface)
+- Tests verify: round-trip consistency (project then back-project recovers original point)
+- Tests verify: edge cases (various depths, offsets, interface boundary, grid of points)
+
+### [src/aquacal/core/__init__.py]
+- Added snells_law_3d, trace_ray_air_to_water, refractive_project, refractive_back_project imports and exports
+
+## 2026-02-03
+### [src/aquacal/core/interface_model.py]
+- Implemented Interface class for planar refractive interface (air-water boundary)
+- Added __init__ that normalizes normal vector and stores parameters (normal, base_height, camera_offsets, n_air, n_water)
+- Implemented get_interface_distance: returns base_height + camera_offset for a given camera
+- Implemented get_interface_point: returns 3D point on interface (uses XY from camera_center, Z from base_height + offset)
+- Added properties: n_ratio_air_to_water (n_air/n_water) and n_ratio_water_to_air (n_water/n_air) for Snell's law
+- Implemented ray_plane_intersection: computes ray-plane intersection using parametric equation, returns (point, t) or (None, None) if parallel
+- Function returns intersection for ANY t value (including negative), uses tolerance of 1e-10 for parallel check
+
+### [tests/unit/test_interface_model.py]
+- Created comprehensive test suite with 19 tests covering all Interface class and ray_plane_intersection functionality
+- Tests verify: normal normalization, parameter storage, interface distances (reference camera, positive/negative offsets), unknown camera KeyError
+- Tests verify: interface point XY matching, Z coordinate calculation, camera Z ignored, per-camera offsets
+- Tests verify: refractive index ratios (air-to-water and water-to-air)
+- Tests verify: ray_plane_intersection basic/angled intersections, negative t, parallel rays, non-unit direction/normal, offset planes
+- All tests pass with strict numerical tolerances
+
+### [src/aquacal/core/__init__.py]
+- Added Interface and ray_plane_intersection imports and exports
+- Cleaned up __all__ to remove outdated comments and organize exports alphabetically
+
+## 2026-02-03
+### [src/aquacal/core/camera.py]
+- Implemented Camera class with intrinsics and extrinsics parameters
+- Added properties: K, dist_coeffs, R, t, C (camera center), image_size, P (3x4 projection matrix)
+- Implemented world_to_camera: transforms 3D points from world to camera frame
+- Implemented project: projects 3D world points to 2D pixels with optional distortion, returns None if point behind camera (Z ≤ 0)
+- Implemented pixel_to_ray: back-projects pixels to unit rays in camera frame with optional undistortion
+- Implemented pixel_to_ray_world: back-projects pixels to rays in world frame (returns origin and direction)
+- Added undistort_points standalone function: wrapper around cv2.undistortPoints that preserves pixel coordinates
+- All OpenCV calls use proper float64 type casting for mypy compatibility
+
+### [tests/unit/test_camera.py]
+- Created comprehensive test suite with 16 tests covering all Camera class functionality
+- Tests verify: properties (camera center, projection matrix), world-to-camera transform, projection (with/without distortion, behind camera), back-projection (pixel-to-ray), round-trip consistency, undistort_points function
+- All tests pass with strict numerical tolerances (atol=1e-10)
+
+### [src/aquacal/core/__init__.py]
+- Added Camera and undistort_points imports and exports
+- Module now properly exports Camera class and undistort_points function
+
+## 2026-02-03
 ### [src/aquacal/core/board.py]
 - Implemented BoardGeometry class for ChArUco board 3D geometry
 - Includes __init__, corner_positions property, num_corners property, get_opencv_board(), transform_corners(), and get_corner_array() methods

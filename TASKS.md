@@ -21,8 +21,8 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 ## Phase 2: Core Geometry
 
-- [ ] **2.1** Implement camera model (`core/camera.py`)
-- [ ] **2.2** Implement interface model (`core/interface_model.py`)
+- [x] **2.1** Implement camera model (`core/camera.py`)
+- [x] **2.2** Implement interface model (`core/interface_model.py`)
 - [ ] **2.3** Implement refractive geometry (`core/refractive_geometry.py`)
 
 ## Phase 3: Data Pipeline
