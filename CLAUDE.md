@@ -35,9 +35,9 @@ Before ending your session:
 ## Conventions
 
 ### Coordinates
-- **World frame**: Z-up (out of water), X-Y horizontal, origin at reference camera or interface
-- **Camera frame**: Z-forward (into scene), X-right, Y-down
-- **Interface normal**: [0, 0, 1] points up (from water toward air)
+- **World frame**: Z-down (into water), X-Y horizontal, origin at reference camera optical center
+- **Camera frame**: Z-forward (into scene), X-right, Y-down (OpenCV convention)
+- **Interface normal**: [0, 0, -1] points up (from water toward air, opposite to +Z)
 - **Pixels**: (u, v) = (column, row), origin at top-left
 
 ### Code Style
