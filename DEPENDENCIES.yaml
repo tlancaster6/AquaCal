@@ -7,6 +7,12 @@
 # Query example (find what to read for a module):
 #   grep -A 10 "^  core/camera.py:" DEPENDENCIES.yaml
 
+# === Project Setup (Phase 0) ===
+# These are not modules but required setup files:
+#   - pyproject.toml: Package configuration and dependencies
+#   - */__ init__.py: Package exports
+#   - requirements.txt: Pip dependencies
+
 modules:
 
   # === Config ===
@@ -41,7 +47,7 @@ modules:
     status: not_started
     description: Camera model, projection, back-projection (no refraction)
 
-  core/interface.py:
+  core/interface_model.py:
     depends_on:
       - config/schema.py
     status: not_started
@@ -51,7 +57,7 @@ modules:
     depends_on:
       - config/schema.py
       - core/camera.py
-      - core/interface.py
+      - core/interface_model.py
     status: not_started
     description: Snell's law, ray tracing, refractive projection
 
@@ -94,11 +100,11 @@ modules:
     status: not_started
     description: Stage 2 - extrinsic initialization via pose graph
 
-  calibration/interface.py:
+  calibration/interface_estimation.py:
     depends_on:
       - config/schema.py
       - core/camera.py
-      - core/interface.py
+      - core/interface_model.py
       - core/refractive_geometry.py
       - core/board.py
     status: not_started
@@ -107,7 +113,7 @@ modules:
   calibration/refinement.py:
     depends_on:
       - config/schema.py
-      - calibration/interface.py
+      - calibration/interface_estimation.py
     status: not_started
     description: Stage 4 - optional joint refinement
 
@@ -119,7 +125,7 @@ modules:
       - io/serialization.py
       - calibration/intrinsics.py
       - calibration/extrinsics.py
-      - calibration/interface.py
+      - calibration/interface_estimation.py
       - calibration/refinement.py
       - validation/reprojection.py
       - validation/reconstruction.py

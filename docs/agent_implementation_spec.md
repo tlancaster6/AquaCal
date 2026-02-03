@@ -6,6 +6,9 @@ This document provides explicit specifications for AI agent (Claude Code) implem
 
 ## Implementation Order (Dependency Graph)
 
+> **Note**: This section describes the technical dependency order for implementation.
+> For task assignments and phase numbering, see `TASKS.md` which is the authoritative source.
+
 ```
 Phase 1 (no dependencies):
   ├── config/schema.py
@@ -14,7 +17,7 @@ Phase 1 (no dependencies):
 
 Phase 2 (depends on Phase 1):
   ├── core/camera.py        (depends on: transforms)
-  └── core/interface.py     (depends on: nothing)
+  └── core/interface_model.py     (depends on: nothing)
 
 Phase 3 (depends on Phase 2):
   └── core/refractive_geometry.py  (depends on: camera, interface, transforms)
@@ -34,7 +37,7 @@ Phase 7 (depends on Phase 6):
   └── calibration/extrinsics.py    (depends on: camera, board, detection, transforms)
 
 Phase 8 (depends on Phase 7):
-  └── calibration/interface.py     (depends on: camera, interface, refractive_geometry, board)
+  └── calibration/interface_estimation.py     (depends on: camera, interface, refractive_geometry, board)
 
 Phase 9 (depends on Phase 8):
   ├── calibration/refinement.py    (depends on: interface stage)
@@ -109,8 +112,12 @@ class CameraCalibration:
 
 @dataclass
 class InterfaceParams:
-    """Refractive interface (water surface) parameters."""
-    normal: Vec3  # unit vector, points from water toward air (typically [0, 0, 1])
+    """Refractive interface (water surface) parameters.
+
+    Note: Per-camera interface distances are stored in each CameraCalibration object,
+    not here. This dataclass holds only the shared interface properties.
+    """
+    normal: Vec3  # unit vector, points from water toward air (typically [0, 0, -1])
     n_air: float = 1.0
     n_water: float = 1.333
 
@@ -161,7 +168,7 @@ class CalibrationConfig:
     loss_scale: float = 1.0  # pixels
     min_corners_per_frame: int = 8
     min_cameras_per_frame: int = 2
-    holdout_fraction: float = 0.2
+    holdout_fraction: float = 0.2  # Random selection; frames are held out entirely (not per-detection)
     save_detailed_residuals: bool = True
 
 
@@ -209,6 +216,28 @@ class DetectionResult:
     def get_frames_with_min_cameras(self, min_cameras: int) -> list[int]:
         """Return frame indices where at least min_cameras see the board."""
         return [idx for idx, fd in self.frames.items() if fd.num_cameras >= min_cameras]
+
+
+# --- Custom Exceptions ---
+
+class CalibrationError(Exception):
+    """Base class for calibration-related errors."""
+    pass
+
+
+class InsufficientDataError(CalibrationError):
+    """Raised when there isn't enough data for calibration."""
+    pass
+
+
+class ConvergenceError(CalibrationError):
+    """Raised when optimization fails to converge."""
+    pass
+
+
+class ConnectivityError(CalibrationError):
+    """Raised when pose graph is not connected (cameras cannot be linked)."""
+    pass
 ```
 
 ---
@@ -224,8 +253,7 @@ import numpy as np
 from numpy.typing import NDArray
 import cv2
 
-Vec3 = NDArray[np.float64]
-Mat3 = NDArray[np.float64]
+from config.schema import Vec3, Mat3  # Use canonical type definitions
 
 
 def rvec_to_matrix(rvec: Vec3) -> Mat3:
@@ -351,9 +379,10 @@ from config.schema import BoardConfig, Vec3
 class BoardGeometry:
     """
     ChArUco board 3D geometry.
-    
+
     The board frame has origin at the top-left corner (when viewed from front),
-    with X pointing right, Y pointing down, and Z pointing into the board.
+    with X pointing right, Y pointing down, and Z pointing into the board
+    (away from viewer). This matches OpenCV 4.6+ CharucoBoard convention.
     
     Attributes:
         config: Board configuration
@@ -608,7 +637,7 @@ def undistort_points(
 
 ---
 
-### `core/interface.py`
+### `core/interface_model.py`
 
 ```python
 """Refractive interface (water surface) model."""
@@ -639,7 +668,7 @@ class Interface:
         Initialize interface.
         
         Args:
-            normal: Unit normal vector pointing from water to air (typically [0,0,1])
+            normal: Unit normal vector pointing from water to air (typically [0,0,-1])
             base_height: Base height of interface in world coordinates
             camera_offsets: Per-camera offset from base_height (reference camera should be 0)
             n_air: Refractive index of air
@@ -647,7 +676,7 @@ class Interface:
             
         Example:
             >>> interface = Interface(
-            ...     normal=np.array([0, 0, 1]),
+            ...     normal=np.array([0, 0, -1]),  # points up (from water toward air)
             ...     base_height=0.15,
             ...     camera_offsets={'cam0': 0.0, 'cam1': 0.01, 'cam2': -0.005},
             ...     n_air=1.0,
@@ -744,7 +773,7 @@ from numpy.typing import NDArray
 
 from config.schema import Vec3, Vec2
 from core.camera import Camera
-from core.interface import Interface, ray_plane_intersection
+from core.interface_model import Interface, ray_plane_intersection
 
 
 def snells_law_3d(
@@ -764,21 +793,21 @@ def snells_law_3d(
         Unit vector of refracted ray direction, or None if total internal reflection.
         
     Notes:
-        - incident_direction should point TOWARD the interface
-        - surface_normal should point from the incident medium to the transmitted medium
-        - For air-to-water: normal points "up" (from water to air), so negate it internally
-        
+        - incident_direction should point TOWARD the interface (into +Z for downward rays)
+        - surface_normal should point from water toward air (typically [0, 0, -1] in Z-down frame)
+        - For air-to-water: pass interface normal as-is; function handles orientation internally
+
     Example:
         >>> # Normal incidence: ray passes straight through
-        >>> incident = np.array([0, 0, -1])  # pointing down
-        >>> normal = np.array([0, 0, 1])     # pointing up
+        >>> incident = np.array([0, 0, 1])   # pointing down (+Z in Z-down frame)
+        >>> normal = np.array([0, 0, -1])    # pointing up (from water to air)
         >>> n_ratio = 1.0 / 1.333
         >>> refracted = snells_law_3d(incident, normal, n_ratio)
-        >>> np.allclose(refracted, np.array([0, 0, -1]))
+        >>> np.allclose(refracted, np.array([0, 0, 1]))  # continues down
         True
-        
+
         >>> # Oblique incidence
-        >>> incident = np.array([0.5, 0, -np.sqrt(0.75)])  # 30° from vertical
+        >>> incident = np.array([0.5, 0, np.sqrt(0.75)])  # angled down
         >>> incident = incident / np.linalg.norm(incident)
         >>> refracted = snells_law_3d(incident, normal, n_ratio)
         >>> # Ray should bend toward normal (steeper in water)
@@ -841,6 +870,13 @@ def refractive_project(
         intersect the interface and then refract into air toward the camera.
         It's the inverse of trace_ray_air_to_water, which is NOT analytically
         invertible, so this uses iterative refinement.
+
+        TODO: Specify algorithm details:
+        - Recommended method (e.g., Newton-Raphson on interface intersection point)
+        - Initial guess strategy (e.g., direct projection ignoring refraction)
+        - Convergence tolerance (e.g., 1e-6 pixels)
+        - Maximum iterations (e.g., 20)
+        - Failure behavior (return None if not converged)
         
     Example:
         >>> cam = Camera(...)
@@ -931,7 +967,7 @@ def detect_charuco(
 
 
 def detect_all_frames(
-    video_paths: dict[str, str],
+    video_paths: dict[str, str] | "VideoSet",
     board: BoardGeometry,
     intrinsics: dict[str, tuple[NDArray, NDArray]] | None = None,
     min_corners: int = 4,
@@ -940,18 +976,19 @@ def detect_all_frames(
 ) -> DetectionResult:
     """
     Detect ChArUco corners in all frames of synchronized videos.
-    
+
     Args:
-        video_paths: Dict mapping camera_name to video file path
+        video_paths: Dict mapping camera_name to video file path, or a VideoSet object.
+                     If VideoSet is passed, frame synchronization is handled automatically.
         board: Board geometry
         intrinsics: Optional dict mapping camera_name to (K, dist_coeffs)
         min_corners: Minimum corners required to keep a detection
         frame_step: Process every Nth frame (1 = all frames)
         progress_callback: Optional callback(current_frame, total_frames)
-        
+
     Returns:
         DetectionResult containing all valid detections organized by frame and camera.
-        
+
     Example:
         >>> paths = {'cam0': 'video0.mp4', 'cam1': 'video1.mp4'}
         >>> board = BoardGeometry(config)
@@ -975,7 +1012,7 @@ from scipy.optimize import least_squares
 
 from config.schema import CalibrationResult, Vec3, Vec2
 from core.camera import Camera
-from core.interface import Interface
+from core.interface_model import Interface
 from core.refractive_geometry import refractive_back_project
 
 
@@ -1104,44 +1141,45 @@ from core.refractive_geometry import snells_law_3d, trace_ray_air_to_water
 
 
 class TestSnellsLaw:
-    """Tests for Snell's law implementation."""
-    
+    """Tests for Snell's law implementation (Z-down world frame)."""
+
     def test_normal_incidence(self):
         """Ray perpendicular to surface should pass straight through."""
-        incident = np.array([0, 0, -1])
-        normal = np.array([0, 0, 1])
+        incident = np.array([0, 0, 1])   # pointing down (+Z)
+        normal = np.array([0, 0, -1])    # pointing up (from water to air)
         n_ratio = 1.0 / 1.333
-        
+
         refracted = snells_law_3d(incident, normal, n_ratio)
-        
+
         assert refracted is not None
         np.testing.assert_allclose(refracted, incident, atol=1e-10)
-    
+
     def test_bends_toward_normal_entering_denser_medium(self):
         """Ray entering water (denser) should bend toward normal."""
-        incident = np.array([0.5, 0, -np.sqrt(0.75)])
+        incident = np.array([0.5, 0, np.sqrt(0.75)])  # angled down
         incident = incident / np.linalg.norm(incident)
-        normal = np.array([0, 0, 1])
+        normal = np.array([0, 0, -1])  # pointing up
         n_ratio = 1.0 / 1.333  # air to water
-        
+
         refracted = snells_law_3d(incident, normal, n_ratio)
-        
+
         assert refracted is not None
         # Angle from vertical should be smaller after refraction
         cos_incident = abs(np.dot(incident, normal))
         cos_refracted = abs(np.dot(refracted, normal))
         assert cos_refracted > cos_incident
-    
+
     def test_total_internal_reflection(self):
         """Grazing angle from water to air should cause TIR."""
         # Critical angle for water->air is about 48.6°
         # Use 60° from normal (should cause TIR)
-        incident = np.array([np.sin(np.radians(60)), 0, np.cos(np.radians(60))])
-        normal = np.array([0, 0, 1])  # pointing up
+        # Ray going up from water toward air
+        incident = np.array([np.sin(np.radians(60)), 0, -np.cos(np.radians(60))])
+        normal = np.array([0, 0, -1])  # pointing up (from water to air)
         n_ratio = 1.333 / 1.0  # water to air
-        
+
         refracted = snells_law_3d(incident, normal, n_ratio)
-        
+
         assert refracted is None
 ```
 
@@ -1210,7 +1248,7 @@ JSON contains metadata and scalar values; NPZ contains arrays.
     "num_frames_holdout": 38
   },
   "interface": {
-    "normal": [0.0, 0.0, 1.0],
+    "normal": [0.0, 0.0, -1.0],
     "n_air": 1.0,
     "n_water": 1.333
   },
@@ -1272,9 +1310,9 @@ JSON contains metadata and scalar values; NPZ contains arrays.
    - Distortion coefficients order: `[k1, k2, p1, p2, k3]`
 
 4. **Coordinate frame conventions**:
-   - World frame: Z points up (out of water), X/Y horizontal
+   - World frame: Z points down (into water), X/Y horizontal
    - Camera frame: Z points forward (into scene), X right, Y down
-   - Interface normal: [0, 0, 1] means pointing up (from water to air)
+   - Interface normal: [0, 0, -1] points up (from water toward air, opposite to +Z)
 
 5. **Testing as you go**: After implementing each function, write a simple test before moving on.
 

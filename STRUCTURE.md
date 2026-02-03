@@ -25,7 +25,7 @@ repo/
 ├── core/
 │   ├── board.py                   # ChArUco board geometry
 │   ├── camera.py                  # Camera model (no refraction)
-│   ├── interface.py               # Refractive interface model
+│   ├── interface_model.py         # Refractive interface model
 │   └── refractive_geometry.py     # Ray tracing and Snell's law
 │
 ├── io/
@@ -36,7 +36,7 @@ repo/
 ├── calibration/
 │   ├── intrinsics.py              # Stage 1
 │   ├── extrinsics.py              # Stage 2
-│   ├── interface.py               # Stage 3
+│   ├── interface_estimation.py    # Stage 3
 │   ├── refinement.py              # Stage 4
 │   └── pipeline.py                # Orchestration
 │

@@ -1,8 +1,17 @@
 # Task List
 
+**This file is the authoritative source for task IDs and phase numbering.**
+Other documents (`development_plan.md`, `agent_implementation_spec.md`) may organize content by conceptual phases, but task assignments should reference the IDs below.
+
 Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 ---
+
+## Phase 0: Project Setup
+
+- [ ] **0.1** Create `pyproject.toml` with dependencies and package config
+- [ ] **0.2** Add `__init__.py` files to all packages with explicit exports
+- [ ] **0.3** Add `requirements.txt` for pip-only users
 
 ## Phase 1: Foundation
 
@@ -13,7 +22,7 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 ## Phase 2: Core Geometry
 
 - [ ] **2.1** Implement camera model (`core/camera.py`)
-- [ ] **2.2** Implement interface model (`core/interface.py`)
+- [ ] **2.2** Implement interface model (`core/interface_model.py`)
 - [ ] **2.3** Implement refractive geometry (`core/refractive_geometry.py`)
 
 ## Phase 3: Data Pipeline
@@ -26,7 +35,7 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [ ] **4.1** Implement intrinsic calibration (`calibration/intrinsics.py`)
 - [ ] **4.2** Implement extrinsic initialization (`calibration/extrinsics.py`)
-- [ ] **4.3** Implement interface/pose optimization (`calibration/interface.py`)
+- [ ] **4.3** Implement interface/pose optimization (`calibration/interface_estimation.py`)
 - [ ] **4.4** Implement joint refinement (`calibration/refinement.py`)
 
 ## Phase 5: Validation

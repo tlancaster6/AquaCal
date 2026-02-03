@@ -53,7 +53,7 @@ multicam_refractive/
 │
 ├── core/
 │   ├── camera.py                 # Camera model (intrinsics, extrinsics, projection)
-│   ├── interface.py              # Refractive interface model
+│   ├── interface_model.py        # Refractive interface model
 │   ├── refractive_geometry.py    # Ray tracing, Snell's law, refractive projection
 │   └── board.py                  # ChArUco board geometry and 3D point generation
 │
@@ -65,7 +65,7 @@ multicam_refractive/
 ├── calibration/
 │   ├── intrinsics.py             # Stage 1: Per-camera intrinsic calibration
 │   ├── extrinsics.py             # Stage 2: Multi-camera extrinsic calibration
-│   ├── interface.py              # Stage 3: Interface + board pose estimation
+│   ├── interface_estimation.py   # Stage 3: Interface + board pose estimation
 │   ├── refinement.py             # Stage 4: Optional joint refinement
 │   └── pipeline.py               # Orchestrates the full calibration workflow
 │
@@ -146,7 +146,7 @@ CalibrationConfig:
   interface:
     n_air: float
     n_water: float
-    normal_fixed: bool (if true, fix to [0,0,1])
+    normal_fixed: bool (if true, fix to [0,0,-1])
     
   optimization:
     robust_loss: str ("huber", "soft_l1", or "linear")
@@ -380,7 +380,7 @@ PoseGraph:
 **Process**:
 1. Initialize parameters:
    - Camera extrinsics: from Stage 2
-   - Interface normal: [0, 0, 1] (fixed or free based on config)
+   - Interface normal: [0, 0, -1] (fixed or free based on config)
    - Interface distances: initial guess (e.g., measured or estimated from Stage 2 residual patterns)
    - Board poses: from PnP estimates in Stage 2
 
@@ -571,6 +571,9 @@ Plotting for debugging and diagnostics.
 
 ## Development Phases
 
+> **Note**: The phases below are for conceptual organization of the implementation roadmap.
+> For canonical task IDs and status tracking, see `TASKS.md` which is the authoritative source.
+
 ### Phase 1: Foundation
 **Goal**: Core geometry and data structures working
 
@@ -578,7 +581,7 @@ Plotting for debugging and diagnostics.
 1. Define configuration and output schemas (`config/schema.py`)
 2. Implement camera model (`core/camera.py`)
 3. Implement refractive geometry (`core/refractive_geometry.py`)
-4. Implement interface model (`core/interface.py`)
+4. Implement interface model (`core/interface_model.py`)
 5. Implement board geometry (`core/board.py`)
 6. Write unit tests for ray tracing and projection
 
@@ -633,7 +636,7 @@ Plotting for debugging and diagnostics.
 **Tasks**:
 1. Implement parameter packing/unpacking
 2. Implement refractive cost function
-3. Implement optimization loop (`calibration/interface.py`)
+3. Implement optimization loop (`calibration/interface_estimation.py`)
 4. Tune convergence criteria and loss function
 
 **Validation Milestone**:

@@ -68,6 +68,13 @@ Before ending your session:
 | `DEPENDENCIES.yaml` | Module dependency graph |
 | `TASKS.md` | Overall task status (do not modify) |
 
+## Testing Conventions
+
+- **Unit test files**: `tests/unit/test_<module_name>.py` (e.g., `test_transforms.py` for `utils/transforms.py`)
+- **Test classes**: `TestClassName` (e.g., `TestSnellsLaw`)
+- **Test functions**: `test_<description>` (e.g., `test_normal_incidence`)
+- **Fixtures**: Place shared fixtures in `tests/conftest.py`
+
 ## Common Commands
 
 ```bash
