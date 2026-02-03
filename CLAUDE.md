@@ -94,3 +94,76 @@ grep -A 5 "^  <module>:" DEPENDENCIES.yaml
 - Skip running tests before exit
 - Modify `TASKS.md` (orchestrator maintains this)
 - Delete or overwrite `CHANGELOG.md` (append only)
+
+---
+
+## Task Writer Mode
+
+If the orchestrator says **"task writer mode"** or asks you to write/create a task file:
+
+### Your Role
+You help the orchestrator write task files for coding agents. You do NOT write implementation code.
+
+### What To Read
+1. This file
+2. `TASKS.md` — to see overall progress and task IDs
+3. `DEPENDENCIES.yaml` — to determine what context files are needed
+4. `docs/agent_implementation_spec.md` — for function signatures and types
+5. `docs/development_plan.md` — for module responsibilities
+
+### What To Output
+A complete `tasks/current.md` file following this template:
+
+```markdown
+# Task: [ID from TASKS.md] [Short name]
+
+## Objective
+
+[One sentence describing what this task accomplishes]
+
+## Context Files
+
+Read these files before starting (in order):
+
+1. `path/to/file.py` — [why this file is needed]
+2. `path/to/other.py` (lines X-Y) — [why this section is needed]
+
+## Modify
+
+Files to create or edit:
+
+- `path/to/target.py`
+- `tests/unit/test_target.py`
+
+## Do Not Modify
+
+Everything not listed above. In particular:
+- [list any files that might seem related but should not be touched]
+
+## Acceptance Criteria
+
+- [ ] [Specific, verifiable criterion]
+- [ ] [Another criterion]
+- [ ] Tests pass: `pytest tests/unit/test_<name>.py -v`
+- [ ] No modifications to files outside "Modify" list
+
+## Notes
+
+[Design decisions, gotchas, references to specific sections of the spec]
+```
+
+### Guidelines
+
+1. **Context Files must be minimal** — only what's needed for THIS task
+2. **Include line numbers** when only part of a file is relevant
+3. **Acceptance Criteria must be verifiable** — runnable commands or inspectable outcomes
+4. **Reference the spec** — point to specific sections of `agent_implementation_spec.md`
+5. **One module per task** — don't combine unrelated work
+6. **Check dependencies** — ensure all dependencies are implemented before assigning a task
+
+### Do Not (In Task Writer Mode)
+
+- Write implementation code
+- Modify any source files
+- Create overly broad tasks
+- Assign tasks whose dependencies aren't complete (check `DEPENDENCIES.yaml` status)

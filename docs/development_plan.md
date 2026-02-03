@@ -15,41 +15,18 @@ A Python library for calibrating a multi-camera array (up to 14 cameras) viewing
 
 The camera array has a specific physical arrangement that informs the calibration:
 
-```
-        ┌─────────────────────────────────────────┐
-        │           CAMERA ARRAY (top view)       │
-        │                                         │
-        │     [C1]    [C2]    [C3]    [C4]        │  All cameras point DOWN
-        │        ╲      │      │      ╱          │  (into the page in this view)
-        │         ╲     │      │     ╱           │
-        │     [C5]  ╲   │      │   ╱   [C6]      │  Each camera has unique ROLL
-        │             ╲ │      │ ╱               │  around its optical axis
-        │     [C7]     [C8]  [C9]     [C10]      │
-        │                    ...                  │
-        └─────────────────────────────────────────┘
-                           │
-                           ▼
-                   ══════════════════  ← Water surface (interface)
-                           │
-                           ▼
-                   ┌───────────────┐
-                   │  Underwater   │
-                   │    Volume     │
-                   └───────────────┘
-```
-
 **Geometric properties**:
 - All optical axes are approximately **parallel** (pointing straight down)
 - All optical axes are approximately **perpendicular** to water surface
 - Cameras are at approximately the **same height** above water (small variations exist)
-- Each camera has a **unique roll angle** around its optical axis (rotation about the down-vector)
-- Camera FOVs **do not overlap** — no two cameras see the same point simultaneously
+- Each camera has a **unique roll angle** around its optical axis
+- All point in the volume of interest are visible by 2+ cameras, but no point is visible to all cameras. 
 
 **Implications for calibration**:
 - Extrinsics between cameras: primarily differ in XY translation and roll (Z-rotation)
 - Small pitch/yaw variations exist and must be estimated, but are minor corrections
 - Interface distance variations between cameras are small but significant for accuracy
-- Pose graph must chain through board observations since direct camera-camera constraints don't exist
+- Pose graph must chain through board observations since there is no input where all cameras see the board simultaneously
 
 **Optional initialization hint**: If mechanical roll angles are approximately known (e.g., from CAD or mounting), they can be used to seed extrinsic initialization. The config can include:
 ```yaml
