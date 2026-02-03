@@ -6,7 +6,7 @@ Refractive multi-camera calibration library for an array of cameras in air viewi
 
 ## Workflow
 
-1. Read this file (you're doing that now)
+1. Read this file (you're doing that now), If in task writer mode, skip to task writer mode section.
 2. Read `tasks/current.md` for your specific task
 3. Read files listed in "Context Files" section of the task
 4. Implement changes to files listed in "Modify" section

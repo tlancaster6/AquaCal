@@ -9,9 +9,9 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 ## Phase 0: Project Setup
 
-- [ ] **0.1** Create `pyproject.toml` with dependencies and package config
-- [ ] **0.2** Add `__init__.py` files to all packages with explicit exports
-- [ ] **0.3** Add `requirements.txt` for pip-only users
+- [x] **0.1** Create `pyproject.toml` with dependencies and package config
+- [x] **0.2** Add `__init__.py` files to all packages with explicit exports
+- [x] **0.3** Add `requirements.txt` for pip-only users
 
 ## Phase 1: Foundation
 

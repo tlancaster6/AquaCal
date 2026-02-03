@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aquacal"
+version = "0.1.0"
+description = "Refractive multi-camera calibration library for underwater multi-camera arrays"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Tucker Taft", email = "tucker@example.com"}
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "opencv-python>=4.6",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "mypy",
+    "black",
+]
+viz = [
+    "matplotlib",
+    "pandas",
+]
+all = [
+    "aquacal[dev,viz]",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

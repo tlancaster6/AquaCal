@@ -9,6 +9,36 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-03
+### [requirements.txt]
+- Created requirements.txt mirroring dependencies from pyproject.toml
+- Includes core dependencies (numpy, scipy, opencv-python>=4.6, pyyaml)
+- Includes development dependencies (pytest, pytest-cov, mypy, black)
+- Includes visualization dependencies (matplotlib, pandas)
+- Added header comments explaining relationship to pyproject.toml and directing users to prefer pip install -e ".[dev,viz]"
+
+## 2026-02-03
+### [All __init__.py files]
+- Added __all__ declarations to all package __init__.py files documenting public API
+- Top-level src/aquacal/__init__.py: Added __all__ with __version__ and commented convenience re-exports
+- config/__init__.py: Documented all schema types (Vec2/3, Mat3, dataclasses, exceptions)
+- utils/__init__.py: Documented transform functions (rvec_to_matrix, compose_poses, etc.)
+- core/__init__.py: Documented Camera, Interface, BoardGeometry, and refractive functions
+- io/__init__.py: Documented VideoSet, detection, and serialization functions
+- calibration/__init__.py: Documented all calibration pipeline functions
+- validation/__init__.py: Documented error computation and diagnostic functions
+- triangulation/__init__.py: Documented triangulation functions
+- All imports commented out until modules are implemented (no import errors)
+
+## 2026-02-03
+### [pyproject.toml]
+- Created pyproject.toml with PEP 621 format and setuptools backend
+- Package name: aquacal, version: 0.1.0, Python >=3.10
+- Required dependencies: numpy, scipy, opencv-python>=4.6, pyyaml
+- Optional dependencies: [dev] (pytest, pytest-cov, mypy, black), [viz] (matplotlib, pandas)
+- Configured src layout with setuptools.packages.find
+- Verified installation and import work correctly
+
+## 2026-02-03
 ### Refactor to src Layout
 
 Reorganized the project from a flat layout to the standard Python `src/` layout.

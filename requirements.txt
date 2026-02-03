@@ -1,0 +1,22 @@
+# Requirements for AquaCal
+#
+# This file mirrors dependencies from pyproject.toml for pip-only users.
+# For development, prefer: pip install -e ".[dev,viz]"
+#
+# Authoritative source: pyproject.toml
+
+# Core dependencies
+numpy
+scipy
+opencv-python>=4.6
+pyyaml
+
+# Development
+pytest
+pytest-cov
+mypy
+black
+
+# Visualization
+matplotlib
+pandas
