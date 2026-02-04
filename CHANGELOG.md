@@ -9,6 +9,42 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-04
+### [src/aquacal/cli.py, src/aquacal/__main__.py]
+- Implemented command-line interface for running calibration pipeline from terminal
+- create_parser() creates ArgumentParser with "calibrate" subcommand, supporting --verbose, --output-dir, --dry-run flags
+- cmd_calibrate() executes calibration: validates config file exists, loads config, overrides output_dir if specified, dry-run validates without running, handles errors with appropriate exit codes (1=file not found, 2=invalid config, 3=calibration error, 130=keyboard interrupt)
+- main() entry point parses args and delegates to subcommand handler with top-level exception handling
+- __main__.py enables `python -m aquacal` execution
+
+### [pyproject.toml]
+- Added [project.scripts] section with aquacal = "aquacal.cli:main" for command-line entry point
+
+### [tests/unit/test_cli.py]
+- Created comprehensive test suite with 7 tests covering all CLI functionality
+- Tests verify: parser accepts calibrate subcommand and options, missing file returns exit code 1, dry-run validates config, help commands work, integration with mocked run_calibration
+- All tests pass
+
+## 2026-02-04
+### [src/aquacal/calibration/pipeline.py]
+- Implemented end-to-end calibration pipeline orchestration: load_config(), split_detections(), run_calibration(), run_calibration_from_config()
+- load_config() parses YAML config files with validation for required sections (board, cameras, paths) and applies defaults for optional settings
+- split_detections() randomly assigns entire frames to calibration or validation sets using deterministic seeding
+- run_calibration_from_config() orchestrates all stages: Stage 1 intrinsics, underwater detection, train/validation split, Stage 2 extrinsics, Stage 3 interface optimization, optional Stage 4 refinement, validation metrics, diagnostics, and final save
+- Progress printed to stdout at each stage; outputs calibration.json and diagnostics (JSON/CSV/PNG) to output_dir
+- Helper functions: _build_calibration_result() assembles final CalibrationResult, _compute_config_hash() generates deterministic 12-char hash for reproducibility tracking
+
+### [tests/unit/test_pipeline.py]
+- Created comprehensive test suite with 20 tests covering all pipeline functionality
+- Tests verify: load_config (valid YAML parsing, FileNotFoundError, ValueError for missing sections, defaults applied)
+- Tests verify: split_detections (reproducible with same seed, different with different seed, respects holdout fraction, preserves all frames, zero/full holdout edge cases)
+- Tests verify: _build_calibration_result (all cameras assembled, correct field propagation), _compute_config_hash (deterministic, different configs different hashes)
+- Tests verify: run_calibration (loads config and delegates), run_calibration_from_config (stages called in order, saves calibration.json, saves diagnostics, prints progress)
+- All tests pass using mock fixtures for calibration stage functions
+
+### [src/aquacal/calibration/__init__.py]
+- Added pipeline function imports and exports: load_config, split_detections, run_calibration, run_calibration_from_config
+
+## 2026-02-04
 ### [src/aquacal/validation/diagnostics.py]
 - Implemented comprehensive diagnostic reporting and error analysis for calibration quality assessment
 - Added DiagnosticReport dataclass: container for complete diagnostic analysis including reprojection/reconstruction errors, spatial error maps, depth-stratified errors, recommendations, and summary statistics

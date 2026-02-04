@@ -1,0 +1,627 @@
+"""Unit tests for calibration pipeline orchestration."""
+
+from pathlib import Path
+from unittest.mock import MagicMock, patch, call
+import tempfile
+
+import numpy as np
+import pytest
+import yaml
+
+from aquacal.calibration.pipeline import (
+    load_config,
+    split_detections,
+    run_calibration,
+    run_calibration_from_config,
+    _build_calibration_result,
+    _compute_config_hash,
+)
+from aquacal.config.schema import (
+    BoardConfig,
+    BoardPose,
+    CalibrationConfig,
+    CalibrationMetadata,
+    CalibrationResult,
+    CameraCalibration,
+    CameraExtrinsics,
+    CameraIntrinsics,
+    Detection,
+    DetectionResult,
+    DiagnosticsData,
+    FrameDetections,
+    InterfaceParams,
+)
+
+
+# --- Fixtures ---
+
+
+@pytest.fixture
+def sample_board_config():
+    """Create a sample BoardConfig."""
+    return BoardConfig(
+        squares_x=7,
+        squares_y=5,
+        square_size=0.03,
+        marker_size=0.022,
+        dictionary="DICT_4X4_50",
+    )
+
+
+@pytest.fixture
+def sample_intrinsics():
+    """Create sample CameraIntrinsics."""
+    return CameraIntrinsics(
+        K=np.array([[1000, 0, 640], [0, 1000, 360], [0, 0, 1]], dtype=np.float64),
+        dist_coeffs=np.zeros(5, dtype=np.float64),
+        image_size=(1280, 720),
+    )
+
+
+@pytest.fixture
+def sample_extrinsics():
+    """Create sample CameraExtrinsics."""
+    return CameraExtrinsics(
+        R=np.eye(3, dtype=np.float64),
+        t=np.zeros(3, dtype=np.float64),
+    )
+
+
+@pytest.fixture
+def sample_detection_result():
+    """Create a sample DetectionResult with 10 frames."""
+    frames = {}
+    for i in range(10):
+        detections = {}
+        for cam in ["cam0", "cam1"]:
+            detections[cam] = Detection(
+                corner_ids=np.array([0, 1, 2, 3], dtype=np.int32),
+                corners_2d=np.array(
+                    [[100, 100], [200, 100], [100, 200], [200, 200]], dtype=np.float64
+                ),
+            )
+        frames[i] = FrameDetections(frame_idx=i, detections=detections)
+
+    return DetectionResult(
+        frames=frames,
+        camera_names=["cam0", "cam1"],
+        total_frames=10,
+    )
+
+
+@pytest.fixture
+def valid_config_yaml():
+    """Generate valid YAML config content."""
+    return {
+        "board": {
+            "squares_x": 7,
+            "squares_y": 5,
+            "square_size": 0.03,
+            "marker_size": 0.022,
+            "dictionary": "DICT_4X4_50",
+        },
+        "cameras": ["cam0", "cam1"],
+        "paths": {
+            "intrinsic_videos": {"cam0": "/path/to/cam0_inair.mp4", "cam1": "/path/to/cam1_inair.mp4"},
+            "extrinsic_videos": {"cam0": "/path/to/cam0_uw.mp4", "cam1": "/path/to/cam1_uw.mp4"},
+            "output_dir": "/path/to/output",
+        },
+        "interface": {
+            "n_air": 1.0,
+            "n_water": 1.333,
+            "normal_fixed": True,
+        },
+        "optimization": {
+            "robust_loss": "huber",
+            "loss_scale": 1.0,
+        },
+        "detection": {
+            "min_corners": 8,
+            "min_cameras": 2,
+        },
+        "validation": {
+            "holdout_fraction": 0.2,
+            "save_detailed_residuals": True,
+        },
+    }
+
+
+# --- Test load_config ---
+
+
+class TestLoadConfig:
+    """Tests for load_config function."""
+
+    def test_load_config_valid(self, valid_config_yaml):
+        """Test loading a valid config file."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.board.squares_x == 7
+        assert config.board.squares_y == 5
+        assert config.board.square_size == 0.03
+        assert config.board.marker_size == 0.022
+        assert config.board.dictionary == "DICT_4X4_50"
+        assert config.camera_names == ["cam0", "cam1"]
+        assert config.n_air == 1.0
+        assert config.n_water == 1.333
+        assert config.robust_loss == "huber"
+        assert config.loss_scale == 1.0
+        assert config.min_corners_per_frame == 8
+        assert config.min_cameras_per_frame == 2
+        assert config.holdout_fraction == 0.2
+        assert config.save_detailed_residuals is True
+
+    def test_load_config_missing_file(self):
+        """Test that missing file raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="Config file not found"):
+            load_config("/nonexistent/path/config.yaml")
+
+    def test_load_config_missing_board_section(self, valid_config_yaml):
+        """Test that missing 'board' section raises ValueError."""
+        del valid_config_yaml["board"]
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            with pytest.raises(ValueError, match="Missing required config section: board"):
+                load_config(f.name)
+
+    def test_load_config_missing_cameras_section(self, valid_config_yaml):
+        """Test that missing 'cameras' section raises ValueError."""
+        del valid_config_yaml["cameras"]
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            with pytest.raises(ValueError, match="Missing required config section: cameras"):
+                load_config(f.name)
+
+    def test_load_config_missing_paths_section(self, valid_config_yaml):
+        """Test that missing 'paths' section raises ValueError."""
+        del valid_config_yaml["paths"]
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            with pytest.raises(ValueError, match="Missing required config section: paths"):
+                load_config(f.name)
+
+    def test_load_config_defaults(self):
+        """Test that defaults are applied for optional sections."""
+        minimal_config = {
+            "board": {
+                "squares_x": 7,
+                "squares_y": 5,
+                "square_size": 0.03,
+                "marker_size": 0.022,
+            },
+            "cameras": ["cam0"],
+            "paths": {
+                "intrinsic_videos": {"cam0": "/path/cam0.mp4"},
+                "extrinsic_videos": {"cam0": "/path/cam0_uw.mp4"},
+                "output_dir": "/output",
+            },
+        }
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(minimal_config, f)
+            f.flush()
+            config = load_config(f.name)
+
+        # Check defaults
+        assert config.board.dictionary == "DICT_4X4_50"
+        assert config.n_air == 1.0
+        assert config.n_water == 1.333
+        assert config.robust_loss == "huber"
+        assert config.loss_scale == 1.0
+        assert config.min_corners_per_frame == 8
+        assert config.min_cameras_per_frame == 2
+        assert config.holdout_fraction == 0.2
+        assert config.save_detailed_residuals is True
+
+
+# --- Test split_detections ---
+
+
+class TestSplitDetections:
+    """Tests for split_detections function."""
+
+    def test_split_detections_reproducible(self, sample_detection_result):
+        """Test that same seed produces same split."""
+        cal1, val1 = split_detections(sample_detection_result, 0.2, seed=42)
+        cal2, val2 = split_detections(sample_detection_result, 0.2, seed=42)
+
+        assert set(cal1.frames.keys()) == set(cal2.frames.keys())
+        assert set(val1.frames.keys()) == set(val2.frames.keys())
+
+    def test_split_detections_different_seed(self, sample_detection_result):
+        """Test that different seeds produce different splits."""
+        cal1, val1 = split_detections(sample_detection_result, 0.3, seed=42)
+        cal2, val2 = split_detections(sample_detection_result, 0.3, seed=123)
+
+        # With 10 frames and 30% holdout, different seeds should give different results
+        assert set(cal1.frames.keys()) != set(cal2.frames.keys())
+
+    def test_split_detections_fraction(self, sample_detection_result):
+        """Test that holdout fraction is approximately respected."""
+        cal, val = split_detections(sample_detection_result, 0.2, seed=42)
+
+        # With 10 frames and 0.2 holdout, expect ~2 in validation
+        total = len(cal.frames) + len(val.frames)
+        assert total == 10
+        assert len(val.frames) == 2
+        assert len(cal.frames) == 8
+
+    def test_split_detections_preserves_frames(self, sample_detection_result):
+        """Test that all frames are in exactly one of the two sets."""
+        cal, val = split_detections(sample_detection_result, 0.3, seed=42)
+
+        cal_indices = set(cal.frames.keys())
+        val_indices = set(val.frames.keys())
+        original_indices = set(sample_detection_result.frames.keys())
+
+        # No overlap
+        assert cal_indices.isdisjoint(val_indices)
+
+        # Union equals original
+        assert cal_indices.union(val_indices) == original_indices
+
+    def test_split_detections_zero_holdout(self, sample_detection_result):
+        """Test with zero holdout fraction."""
+        cal, val = split_detections(sample_detection_result, 0.0, seed=42)
+
+        assert len(cal.frames) == 10
+        assert len(val.frames) == 0
+
+    def test_split_detections_full_holdout(self, sample_detection_result):
+        """Test with full holdout fraction."""
+        cal, val = split_detections(sample_detection_result, 1.0, seed=42)
+
+        assert len(cal.frames) == 0
+        assert len(val.frames) == 10
+
+
+# --- Test _build_calibration_result ---
+
+
+class TestBuildCalibrationResult:
+    """Tests for _build_calibration_result function."""
+
+    def test_build_calibration_result(
+        self, sample_intrinsics, sample_extrinsics, sample_board_config
+    ):
+        """Test that components are assembled correctly."""
+        intrinsics = {"cam0": sample_intrinsics, "cam1": sample_intrinsics}
+        extrinsics = {"cam0": sample_extrinsics, "cam1": sample_extrinsics}
+        interface_distances = {"cam0": 0.15, "cam1": 0.16}
+        interface_params = InterfaceParams(
+            normal=np.array([0, 0, -1], dtype=np.float64),
+            n_air=1.0,
+            n_water=1.333,
+        )
+        diagnostics = DiagnosticsData(
+            reprojection_error_rms=0.5,
+            reprojection_error_per_camera={"cam0": 0.4, "cam1": 0.6},
+            validation_3d_error_mean=0.001,
+            validation_3d_error_std=0.0005,
+        )
+        metadata = CalibrationMetadata(
+            calibration_date="2025-01-01T00:00:00",
+            software_version="0.1.0",
+            config_hash="abc123",
+            num_frames_used=80,
+            num_frames_holdout=20,
+        )
+
+        result = _build_calibration_result(
+            intrinsics=intrinsics,
+            extrinsics=extrinsics,
+            interface_distances=interface_distances,
+            board_config=sample_board_config,
+            interface_params=interface_params,
+            diagnostics=diagnostics,
+            metadata=metadata,
+        )
+
+        assert len(result.cameras) == 2
+        assert "cam0" in result.cameras
+        assert "cam1" in result.cameras
+
+        # Check camera calibration assembly
+        cam0 = result.cameras["cam0"]
+        assert cam0.name == "cam0"
+        assert cam0.interface_distance == 0.15
+        assert np.allclose(cam0.intrinsics.K, sample_intrinsics.K)
+        assert np.allclose(cam0.extrinsics.R, sample_extrinsics.R)
+
+        # Check other fields
+        assert result.board.squares_x == 7
+        assert result.interface.n_water == 1.333
+        assert result.diagnostics.reprojection_error_rms == 0.5
+        assert result.metadata.num_frames_used == 80
+
+
+# --- Test _compute_config_hash ---
+
+
+class TestComputeConfigHash:
+    """Tests for _compute_config_hash function."""
+
+    def test_compute_config_hash_deterministic(self, sample_board_config):
+        """Test that same config produces same hash."""
+        config = CalibrationConfig(
+            board=sample_board_config,
+            camera_names=["cam0", "cam1"],
+            intrinsic_video_paths={"cam0": Path("/a"), "cam1": Path("/b")},
+            extrinsic_video_paths={"cam0": Path("/c"), "cam1": Path("/d")},
+            output_dir=Path("/out"),
+        )
+
+        hash1 = _compute_config_hash(config)
+        hash2 = _compute_config_hash(config)
+
+        assert hash1 == hash2
+        assert len(hash1) == 12  # Truncated to 12 hex chars
+
+    def test_compute_config_hash_different_config(self, sample_board_config):
+        """Test that different configs produce different hashes."""
+        config1 = CalibrationConfig(
+            board=sample_board_config,
+            camera_names=["cam0"],
+            intrinsic_video_paths={"cam0": Path("/a")},
+            extrinsic_video_paths={"cam0": Path("/c")},
+            output_dir=Path("/out"),
+            n_water=1.333,
+        )
+
+        config2 = CalibrationConfig(
+            board=sample_board_config,
+            camera_names=["cam0"],
+            intrinsic_video_paths={"cam0": Path("/a")},
+            extrinsic_video_paths={"cam0": Path("/c")},
+            output_dir=Path("/out"),
+            n_water=1.4,  # Different refractive index
+        )
+
+        hash1 = _compute_config_hash(config1)
+        hash2 = _compute_config_hash(config2)
+
+        assert hash1 != hash2
+
+
+# --- Test run_calibration ---
+
+
+class TestRunCalibration:
+    """Tests for run_calibration function."""
+
+    def test_run_calibration_loads_config_and_delegates(self, valid_config_yaml):
+        """Test that run_calibration loads config and calls run_calibration_from_config."""
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+
+            with patch(
+                "aquacal.calibration.pipeline.run_calibration_from_config"
+            ) as mock_run:
+                mock_run.return_value = MagicMock(spec=CalibrationResult)
+
+                result = run_calibration(f.name)
+
+                # Verify run_calibration_from_config was called
+                mock_run.assert_called_once()
+
+                # Verify the config was passed
+                called_config = mock_run.call_args[0][0]
+                assert isinstance(called_config, CalibrationConfig)
+                assert called_config.board.squares_x == 7
+
+
+# --- Test run_calibration_from_config (integration with mocks) ---
+
+
+class TestRunCalibrationFromConfig:
+    """Integration tests for run_calibration_from_config with mocked stages."""
+
+    @pytest.fixture
+    def mock_calibration_stages(
+        self, sample_intrinsics, sample_extrinsics, sample_detection_result
+    ):
+        """Create mocks for all calibration stage functions."""
+        with (
+            patch("aquacal.calibration.pipeline.calibrate_intrinsics_all") as mock_intr,
+            patch("aquacal.calibration.pipeline.detect_all_frames") as mock_detect,
+            patch("aquacal.calibration.pipeline.build_pose_graph") as mock_pose_graph,
+            patch("aquacal.calibration.pipeline.estimate_extrinsics") as mock_ext,
+            patch("aquacal.calibration.pipeline.optimize_interface") as mock_opt,
+            patch("aquacal.calibration.pipeline.compute_reprojection_errors") as mock_reproj,
+            patch("aquacal.calibration.pipeline.compute_3d_distance_errors") as mock_3d,
+            patch("aquacal.calibration.pipeline.generate_diagnostic_report") as mock_diag,
+            patch("aquacal.calibration.pipeline.save_diagnostic_report") as mock_save_diag,
+            patch("aquacal.calibration.pipeline.save_calibration") as mock_save_cal,
+        ):
+            # Setup return values
+            mock_intr.return_value = {
+                "cam0": (sample_intrinsics, 0.5),
+                "cam1": (sample_intrinsics, 0.6),
+            }
+            mock_detect.return_value = sample_detection_result
+            mock_pose_graph.return_value = MagicMock()
+            mock_ext.return_value = {
+                "cam0": sample_extrinsics,
+                "cam1": sample_extrinsics,
+            }
+            mock_opt.return_value = (
+                {"cam0": sample_extrinsics, "cam1": sample_extrinsics},  # extrinsics
+                {"cam0": 0.15, "cam1": 0.16},  # distances
+                [BoardPose(0, np.zeros(3), np.array([0, 0, 0.5]))],  # poses
+                0.8,  # rms
+            )
+
+            # Mock reprojection errors
+            mock_reproj_result = MagicMock()
+            mock_reproj_result.rms = 0.7
+            mock_reproj_result.per_camera = {"cam0": 0.6, "cam1": 0.8}
+            mock_reproj_result.per_frame = {0: 0.7}
+            mock_reproj_result.residuals = np.array([[0.1, 0.2]])
+            mock_reproj.return_value = mock_reproj_result
+
+            # Mock 3D errors
+            mock_3d_result = MagicMock()
+            mock_3d_result.mean = 0.001
+            mock_3d_result.std = 0.0005
+            mock_3d.return_value = mock_3d_result
+
+            # Mock diagnostic report
+            mock_diag.return_value = MagicMock()
+            mock_save_diag.return_value = {"json": Path("/out/diagnostics.json")}
+
+            yield {
+                "intrinsics": mock_intr,
+                "detect": mock_detect,
+                "pose_graph": mock_pose_graph,
+                "extrinsics": mock_ext,
+                "optimize": mock_opt,
+                "reproj": mock_reproj,
+                "3d": mock_3d,
+                "diag": mock_diag,
+                "save_diag": mock_save_diag,
+                "save_cal": mock_save_cal,
+            }
+
+    def test_run_calibration_from_config_stages_order(
+        self, mock_calibration_stages, sample_board_config
+    ):
+        """Test that all stages are called in correct order."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CalibrationConfig(
+                board=sample_board_config,
+                camera_names=["cam0", "cam1"],
+                intrinsic_video_paths={
+                    "cam0": Path("/path/cam0.mp4"),
+                    "cam1": Path("/path/cam1.mp4"),
+                },
+                extrinsic_video_paths={
+                    "cam0": Path("/path/cam0_uw.mp4"),
+                    "cam1": Path("/path/cam1_uw.mp4"),
+                },
+                output_dir=Path(tmpdir),
+            )
+
+            result = run_calibration_from_config(config)
+
+            # Verify all stages were called
+            mock_calibration_stages["intrinsics"].assert_called_once()
+            mock_calibration_stages["detect"].assert_called_once()
+            mock_calibration_stages["pose_graph"].assert_called_once()
+            mock_calibration_stages["extrinsics"].assert_called_once()
+            mock_calibration_stages["optimize"].assert_called_once()
+            mock_calibration_stages["reproj"].assert_called_once()
+            mock_calibration_stages["3d"].assert_called_once()
+            mock_calibration_stages["diag"].assert_called_once()
+            mock_calibration_stages["save_diag"].assert_called_once()
+            mock_calibration_stages["save_cal"].assert_called_once()
+
+            # Verify result
+            assert isinstance(result, CalibrationResult)
+            assert len(result.cameras) == 2
+
+    def test_run_calibration_from_config_saves_calibration(
+        self, mock_calibration_stages, sample_board_config
+    ):
+        """Test that calibration is saved to output_dir."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CalibrationConfig(
+                board=sample_board_config,
+                camera_names=["cam0", "cam1"],
+                intrinsic_video_paths={
+                    "cam0": Path("/path/cam0.mp4"),
+                    "cam1": Path("/path/cam1.mp4"),
+                },
+                extrinsic_video_paths={
+                    "cam0": Path("/path/cam0_uw.mp4"),
+                    "cam1": Path("/path/cam1_uw.mp4"),
+                },
+                output_dir=Path(tmpdir),
+            )
+
+            run_calibration_from_config(config)
+
+            # Verify save_calibration was called with correct path
+            mock_calibration_stages["save_cal"].assert_called_once()
+            call_args = mock_calibration_stages["save_cal"].call_args
+            saved_path = call_args[0][1]
+            assert str(saved_path).endswith("calibration.json")
+
+    def test_run_calibration_from_config_saves_diagnostics(
+        self, mock_calibration_stages, sample_board_config
+    ):
+        """Test that diagnostics are saved to output_dir."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CalibrationConfig(
+                board=sample_board_config,
+                camera_names=["cam0", "cam1"],
+                intrinsic_video_paths={
+                    "cam0": Path("/path/cam0.mp4"),
+                    "cam1": Path("/path/cam1.mp4"),
+                },
+                extrinsic_video_paths={
+                    "cam0": Path("/path/cam0_uw.mp4"),
+                    "cam1": Path("/path/cam1_uw.mp4"),
+                },
+                output_dir=Path(tmpdir),
+            )
+
+            run_calibration_from_config(config)
+
+            # Verify save_diagnostic_report was called
+            mock_calibration_stages["save_diag"].assert_called_once()
+            call_args = mock_calibration_stages["save_diag"].call_args
+            # Second positional arg is output_dir
+            assert call_args[0][1] == Path(tmpdir)
+            # save_images should be True
+            assert call_args[1]["save_images"] is True
+
+    def test_run_calibration_from_config_prints_progress(
+        self, mock_calibration_stages, sample_board_config, capsys
+    ):
+        """Test that progress is printed to stdout."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CalibrationConfig(
+                board=sample_board_config,
+                camera_names=["cam0", "cam1"],
+                intrinsic_video_paths={
+                    "cam0": Path("/path/cam0.mp4"),
+                    "cam1": Path("/path/cam1.mp4"),
+                },
+                extrinsic_video_paths={
+                    "cam0": Path("/path/cam0_uw.mp4"),
+                    "cam1": Path("/path/cam1_uw.mp4"),
+                },
+                output_dir=Path(tmpdir),
+            )
+
+            run_calibration_from_config(config)
+
+            captured = capsys.readouterr()
+
+            # Check for key progress messages
+            assert "AquaCal Calibration Pipeline" in captured.out
+            assert "[Stage 1]" in captured.out
+            assert "[Stage 2]" in captured.out
+            assert "[Stage 3]" in captured.out
+            assert "[Validation]" in captured.out
+            assert "[Diagnostics]" in captured.out
+            assert "[Save]" in captured.out
+            assert "Calibration complete!" in captured.out

@@ -34,5 +34,8 @@ all = [
     "aquacal[dev,viz]",
 ]
 
+[project.scripts]
+aquacal = "aquacal.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]

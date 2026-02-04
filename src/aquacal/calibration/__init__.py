@@ -17,6 +17,12 @@ from aquacal.calibration.interface_estimation import (
 from aquacal.calibration.refinement import (
     joint_refinement,
 )
+from aquacal.calibration.pipeline import (
+    load_config,
+    split_detections,
+    run_calibration,
+    run_calibration_from_config,
+)
 
 __all__ = [
     # intrinsics
@@ -32,4 +38,9 @@ __all__ = [
     "optimize_interface",
     # refinement
     "joint_refinement",
+    # pipeline
+    "load_config",
+    "split_detections",
+    "run_calibration",
+    "run_calibration_from_config",
 ]

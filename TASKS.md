@@ -47,8 +47,8 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 ## Phase 6: Integration
 
 - [x] **6.1** Implement triangulation module (`triangulation/triangulate.py`)
-- [ ] **6.2** Implement pipeline orchestration (`calibration/pipeline.py`)
-- [ ] **6.3** Add CLI entry point
+- [x] **6.2** Implement pipeline orchestration (`calibration/pipeline.py`)
+- [x] **6.3** Add CLI entry point
 
 ## Phase 7: Testing & Documentation
 
