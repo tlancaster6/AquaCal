@@ -1,398 +1,437 @@
-# Task: 3.3 Serialization (io/serialization.py)
+# Task: 4.4 Joint Refinement
 
 ## Objective
 
-Implement save/load functions for `CalibrationResult` using JSON format with numpy arrays converted to nested lists.
+Implement Stage 4 optional joint refinement that re-optimizes all parameters from Stage 3, with the option to also refine camera intrinsics (focal length and principal point).
 
 ## Context Files
 
 Read these files before starting (in order):
 
-1. `CLAUDE.md` — project conventions and error handling rules
-2. `docs/development_plan.md` (lines 283-296) — serialization responsibilities
-3. `src/aquacal/config/schema.py` (lines 26-168) — all dataclasses that need serialization
-4. `src/aquacal/__init__.py` — for `__version__` string
-
-## Dependencies
-
-- Task 1.1 (`config/schema.py`) — all dataclasses
+1. `src/aquacal/config/schema.py` — All dataclasses (CameraIntrinsics, CameraExtrinsics, BoardPose, DetectionResult, ConvergenceError)
+2. `src/aquacal/calibration/interface_estimation.py` — Stage 3 implementation (reference for cost function structure)
+3. `src/aquacal/core/camera.py` — Camera class
+4. `src/aquacal/core/interface_model.py` — Interface class
+5. `src/aquacal/core/refractive_geometry.py` — `refractive_project()` function
+6. `src/aquacal/core/board.py` — BoardGeometry class
+7. `docs/development_plan.md` (lines 446-465) — Stage 4 description
 
 ## Modify
 
 Files to create or edit:
 
-- `src/aquacal/io/serialization.py` (create)
-- `tests/unit/test_serialization.py` (create)
-- `src/aquacal/io/__init__.py` (add serialization imports/exports)
+- `src/aquacal/calibration/refinement.py`
+- `tests/unit/test_refinement.py`
+- `src/aquacal/calibration/__init__.py` (add exports)
 
 ## Do Not Modify
 
 Everything not listed above. In particular:
-- `src/aquacal/config/schema.py`
-- Any other io/ modules
+- `src/aquacal/calibration/interface_estimation.py` (do not import private functions)
+- `src/aquacal/config/schema.py` (no new dataclasses needed)
 
 ---
 
-## Function Signatures
-
-Implement the following in `src/aquacal/io/serialization.py`:
+## Main Function Signature
 
 ```python
-"""Save and load calibration results."""
-
-from __future__ import annotations
-
-import json
-from pathlib import Path
-from typing import Any
-
-import numpy as np
-from numpy.typing import NDArray
-
-from aquacal.config.schema import (
-    BoardConfig,
-    CalibrationMetadata,
-    CalibrationResult,
-    CameraCalibration,
-    CameraExtrinsics,
-    CameraIntrinsics,
-    DiagnosticsData,
-    InterfaceParams,
-)
-
-# Current serialization format version
-SERIALIZATION_VERSION = "1.0"
-
-
-def save_calibration(result: CalibrationResult, path: str | Path) -> None:
+def joint_refinement(
+    stage3_result: tuple[
+        dict[str, CameraExtrinsics],
+        dict[str, float],
+        list[BoardPose],
+        float,
+    ],
+    detections: DetectionResult,
+    intrinsics: dict[str, CameraIntrinsics],
+    board: BoardGeometry,
+    reference_camera: str,
+    refine_intrinsics: bool = False,
+    interface_normal: Vec3 | None = None,
+    n_air: float = 1.0,
+    n_water: float = 1.333,
+    loss: str = "huber",
+    loss_scale: float = 1.0,
+    min_corners: int = 4,
+) -> tuple[
+    dict[str, CameraExtrinsics],
+    dict[str, float],
+    list[BoardPose],
+    dict[str, CameraIntrinsics],
+    float,
+]:
     """
-    Save calibration result to JSON file.
+    Jointly refine all calibration parameters, optionally including intrinsics.
+
+    This is Stage 4 of the calibration pipeline. It takes the output of Stage 3
+    and performs additional optimization. When refine_intrinsics=True, it also
+    optimizes focal lengths and principal points.
 
     Args:
-        result: Complete calibration result to save
-        path: Output file path (should end in .json)
-
-    Raises:
-        OSError: If file cannot be written
-
-    Example:
-        >>> save_calibration(result, "calibration.json")
-    """
-    pass
-
-
-def load_calibration(path: str | Path) -> CalibrationResult:
-    """
-    Load calibration result from JSON file.
-
-    Args:
-        path: Path to calibration JSON file
+        stage3_result: Output tuple from optimize_interface:
+            (extrinsics, interface_distances, board_poses, rms_error)
+        detections: Underwater ChArUco detections
+        intrinsics: Per-camera intrinsic parameters (used as initial values)
+        board: ChArUco board geometry
+        reference_camera: Camera name fixed at origin
+        refine_intrinsics: If True, also optimize fx, fy, cx, cy per camera
+        interface_normal: Interface normal vector. If None, uses [0, 0, -1].
+        n_air: Refractive index of air
+        n_water: Refractive index of water
+        loss: Robust loss function ("linear", "huber", "soft_l1", "cauchy")
+        loss_scale: Scale parameter for robust loss in pixels
+        min_corners: Minimum corners per detection to include
 
     Returns:
-        CalibrationResult object
+        Tuple of:
+        - dict[str, CameraExtrinsics]: Refined extrinsics for all cameras
+        - dict[str, float]: Refined interface distances per camera
+        - list[BoardPose]: Refined board poses
+        - dict[str, CameraIntrinsics]: Refined intrinsics (modified if refine_intrinsics=True,
+          otherwise copies of input)
+        - float: Final RMS reprojection error in pixels
 
     Raises:
-        FileNotFoundError: If file does not exist
-        ValueError: If file format is invalid or version mismatch
+        ConvergenceError: If optimization fails to converge
+        ValueError: If reference_camera not in stage3_result extrinsics
 
-    Example:
-        >>> result = load_calibration("calibration.json")
-        >>> print(result.diagnostics.reprojection_error_rms)
+    Notes:
+        - When refine_intrinsics=False, this is essentially re-running Stage 3
+          optimization from the Stage 3 solution (useful for verifying convergence)
+        - Distortion coefficients are NOT refined (kept fixed)
+        - Intrinsic bounds: fx, fy in [0.5*initial, 2.0*initial],
+          cx, cy in [0, image_width] and [0, image_height]
     """
-    pass
 ```
 
 ---
 
-## Implementation Details
-
-### JSON Structure
-
-The output JSON should have this structure:
-
-```json
-{
-  "version": "1.0",
-  "cameras": {
-    "cam0": {
-      "name": "cam0",
-      "intrinsics": {
-        "K": [[fx, 0, cx], [0, fy, cy], [0, 0, 1]],
-        "dist_coeffs": [k1, k2, p1, p2, k3],
-        "image_size": [width, height]
-      },
-      "extrinsics": {
-        "R": [[r11, r12, r13], ...],
-        "t": [tx, ty, tz]
-      },
-      "interface_distance": 0.15
-    },
-    "cam1": { ... }
-  },
-  "interface": {
-    "normal": [0, 0, -1],
-    "n_air": 1.0,
-    "n_water": 1.333
-  },
-  "board": {
-    "squares_x": 8,
-    "squares_y": 6,
-    "square_size": 0.03,
-    "marker_size": 0.022,
-    "dictionary": "DICT_4X4_50"
-  },
-  "diagnostics": {
-    "reprojection_error_rms": 0.45,
-    "reprojection_error_per_camera": {"cam0": 0.42, "cam1": 0.48},
-    "validation_3d_error_mean": 0.0015,
-    "validation_3d_error_std": 0.0008
-  },
-  "metadata": {
-    "calibration_date": "2024-01-15T10:30:00",
-    "software_version": "0.1.0",
-    "config_hash": "abc123...",
-    "num_frames_used": 50,
-    "num_frames_holdout": 10
-  }
-}
-```
-
-### Serialization Helpers
+## Helper Functions
 
 ```python
-def _ndarray_to_list(arr: NDArray) -> list:
-    """Convert numpy array to nested Python list."""
-    return arr.tolist()
+def _pack_params_with_intrinsics(
+    extrinsics: dict[str, CameraExtrinsics],
+    interface_distances: dict[str, float],
+    board_poses: dict[int, BoardPose],
+    intrinsics: dict[str, CameraIntrinsics],
+    reference_camera: str,
+    camera_order: list[str],
+    frame_order: list[int],
+    refine_intrinsics: bool,
+) -> NDArray[np.float64]:
+    """
+    Pack optimization parameters into a 1D array.
+
+    Parameter layout:
+    - For each non-reference camera (in camera_order, skipping reference):
+        cam_rvec (3), cam_tvec (3)
+    - For each camera (in camera_order, including reference):
+        interface_distance (1)
+    - For each frame (in frame_order):
+        board_rvec (3), board_tvec (3)
+    - If refine_intrinsics, for each camera (in camera_order):
+        fx (1), fy (1), cx (1), cy (1)
+
+    Total length:
+    - Without intrinsics: 6*(N_cams-1) + N_cams + 6*N_frames
+    - With intrinsics: above + 4*N_cams
+    """
 
 
-def _list_to_ndarray(lst: list, dtype: type = np.float64) -> NDArray:
-    """Convert nested list to numpy array."""
-    return np.array(lst, dtype=dtype)
+def _unpack_params_with_intrinsics(
+    params: NDArray[np.float64],
+    reference_camera: str,
+    reference_extrinsics: CameraExtrinsics,
+    base_intrinsics: dict[str, CameraIntrinsics],
+    camera_order: list[str],
+    frame_order: list[int],
+    refine_intrinsics: bool,
+) -> tuple[
+    dict[str, CameraExtrinsics],
+    dict[str, float],
+    dict[int, BoardPose],
+    dict[str, CameraIntrinsics],
+]:
+    """
+    Unpack 1D parameter array into structured objects.
+
+    Args:
+        params: 1D parameter vector
+        reference_camera: Name of reference camera
+        reference_extrinsics: Fixed extrinsics for reference camera
+        base_intrinsics: Base intrinsics (for distortion coeffs and image_size)
+        camera_order: Ordered list of camera names
+        frame_order: Ordered list of frame indices
+        refine_intrinsics: Whether intrinsics are included in params
+
+    Returns:
+        Tuple of (extrinsics_dict, distances_dict, board_poses_dict, intrinsics_dict)
+    """
 
 
-def _serialize_camera_intrinsics(intrinsics: CameraIntrinsics) -> dict[str, Any]:
-    """Serialize CameraIntrinsics to dict."""
-    return {
-        "K": _ndarray_to_list(intrinsics.K),
-        "dist_coeffs": _ndarray_to_list(intrinsics.dist_coeffs),
-        "image_size": list(intrinsics.image_size),
-    }
+def _cost_function_with_intrinsics(
+    params: NDArray[np.float64],
+    detections: DetectionResult,
+    base_intrinsics: dict[str, CameraIntrinsics],
+    board: BoardGeometry,
+    reference_camera: str,
+    reference_extrinsics: CameraExtrinsics,
+    interface_normal: Vec3,
+    n_air: float,
+    n_water: float,
+    camera_order: list[str],
+    frame_order: list[int],
+    min_corners: int,
+    refine_intrinsics: bool,
+) -> NDArray[np.float64]:
+    """
+    Compute reprojection residuals for all observations.
 
+    Similar to Stage 3 cost function, but optionally uses refined intrinsics
+    from the parameter vector instead of fixed intrinsics.
 
-def _deserialize_camera_intrinsics(data: dict[str, Any]) -> CameraIntrinsics:
-    """Deserialize dict to CameraIntrinsics."""
-    return CameraIntrinsics(
-        K=_list_to_ndarray(data["K"]),
-        dist_coeffs=_list_to_ndarray(data["dist_coeffs"]),
-        image_size=tuple(data["image_size"]),
-    )
-
-
-def _serialize_camera_extrinsics(extrinsics: CameraExtrinsics) -> dict[str, Any]:
-    """Serialize CameraExtrinsics to dict."""
-    return {
-        "R": _ndarray_to_list(extrinsics.R),
-        "t": _ndarray_to_list(extrinsics.t),
-    }
-
-
-def _deserialize_camera_extrinsics(data: dict[str, Any]) -> CameraExtrinsics:
-    """Deserialize dict to CameraExtrinsics."""
-    return CameraExtrinsics(
-        R=_list_to_ndarray(data["R"]),
-        t=_list_to_ndarray(data["t"]),
-    )
-
-
-def _serialize_camera_calibration(cam: CameraCalibration) -> dict[str, Any]:
-    """Serialize CameraCalibration to dict."""
-    return {
-        "name": cam.name,
-        "intrinsics": _serialize_camera_intrinsics(cam.intrinsics),
-        "extrinsics": _serialize_camera_extrinsics(cam.extrinsics),
-        "interface_distance": cam.interface_distance,
-    }
-
-
-def _deserialize_camera_calibration(data: dict[str, Any]) -> CameraCalibration:
-    """Deserialize dict to CameraCalibration."""
-    return CameraCalibration(
-        name=data["name"],
-        intrinsics=_deserialize_camera_intrinsics(data["intrinsics"]),
-        extrinsics=_deserialize_camera_extrinsics(data["extrinsics"]),
-        interface_distance=data["interface_distance"],
-    )
-
-
-def _serialize_interface_params(interface: InterfaceParams) -> dict[str, Any]:
-    """Serialize InterfaceParams to dict."""
-    return {
-        "normal": _ndarray_to_list(interface.normal),
-        "n_air": interface.n_air,
-        "n_water": interface.n_water,
-    }
-
-
-def _deserialize_interface_params(data: dict[str, Any]) -> InterfaceParams:
-    """Deserialize dict to InterfaceParams."""
-    return InterfaceParams(
-        normal=_list_to_ndarray(data["normal"]),
-        n_air=data["n_air"],
-        n_water=data["n_water"],
-    )
-
-
-def _serialize_board_config(board: BoardConfig) -> dict[str, Any]:
-    """Serialize BoardConfig to dict."""
-    return {
-        "squares_x": board.squares_x,
-        "squares_y": board.squares_y,
-        "square_size": board.square_size,
-        "marker_size": board.marker_size,
-        "dictionary": board.dictionary,
-    }
-
-
-def _deserialize_board_config(data: dict[str, Any]) -> BoardConfig:
-    """Deserialize dict to BoardConfig."""
-    return BoardConfig(
-        squares_x=data["squares_x"],
-        squares_y=data["squares_y"],
-        square_size=data["square_size"],
-        marker_size=data["marker_size"],
-        dictionary=data["dictionary"],
-    )
-
-
-def _serialize_diagnostics(diag: DiagnosticsData) -> dict[str, Any]:
-    """Serialize DiagnosticsData to dict. Omits None fields."""
-    result = {
-        "reprojection_error_rms": diag.reprojection_error_rms,
-        "reprojection_error_per_camera": diag.reprojection_error_per_camera,
-        "validation_3d_error_mean": diag.validation_3d_error_mean,
-        "validation_3d_error_std": diag.validation_3d_error_std,
-    }
-    # Only include optional fields if not None
-    if diag.per_corner_residuals is not None:
-        result["per_corner_residuals"] = _ndarray_to_list(diag.per_corner_residuals)
-    if diag.per_frame_errors is not None:
-        # Convert int keys to strings for JSON compatibility
-        result["per_frame_errors"] = {str(k): v for k, v in diag.per_frame_errors.items()}
-    return result
-
-
-def _deserialize_diagnostics(data: dict[str, Any]) -> DiagnosticsData:
-    """Deserialize dict to DiagnosticsData."""
-    per_corner_residuals = None
-    if "per_corner_residuals" in data:
-        per_corner_residuals = _list_to_ndarray(data["per_corner_residuals"])
-
-    per_frame_errors = None
-    if "per_frame_errors" in data:
-        # Convert string keys back to int
-        per_frame_errors = {int(k): v for k, v in data["per_frame_errors"].items()}
-
-    return DiagnosticsData(
-        reprojection_error_rms=data["reprojection_error_rms"],
-        reprojection_error_per_camera=data["reprojection_error_per_camera"],
-        validation_3d_error_mean=data["validation_3d_error_mean"],
-        validation_3d_error_std=data["validation_3d_error_std"],
-        per_corner_residuals=per_corner_residuals,
-        per_frame_errors=per_frame_errors,
-    )
-
-
-def _serialize_metadata(meta: CalibrationMetadata) -> dict[str, Any]:
-    """Serialize CalibrationMetadata to dict."""
-    return {
-        "calibration_date": meta.calibration_date,
-        "software_version": meta.software_version,
-        "config_hash": meta.config_hash,
-        "num_frames_used": meta.num_frames_used,
-        "num_frames_holdout": meta.num_frames_holdout,
-    }
-
-
-def _deserialize_metadata(data: dict[str, Any]) -> CalibrationMetadata:
-    """Deserialize dict to CalibrationMetadata."""
-    return CalibrationMetadata(
-        calibration_date=data["calibration_date"],
-        software_version=data["software_version"],
-        config_hash=data["config_hash"],
-        num_frames_used=data["num_frames_used"],
-        num_frames_holdout=data["num_frames_holdout"],
-    )
+    Returns:
+        1D array of residuals [r0_x, r0_y, r1_x, r1_y, ...] in pixels
+    """
 ```
 
-### Main Functions
+---
+
+## Algorithm Details
+
+### Parameter Packing with Intrinsics
 
 ```python
-def save_calibration(result: CalibrationResult, path: str | Path) -> None:
-    """Save calibration result to JSON file."""
-    data = {
-        "version": SERIALIZATION_VERSION,
-        "cameras": {
-            name: _serialize_camera_calibration(cam)
-            for name, cam in result.cameras.items()
-        },
-        "interface": _serialize_interface_params(result.interface),
-        "board": _serialize_board_config(result.board),
-        "diagnostics": _serialize_diagnostics(result.diagnostics),
-        "metadata": _serialize_metadata(result.metadata),
-    }
+def _pack_params_with_intrinsics(...) -> NDArray[np.float64]:
+    params = []
 
-    path = Path(path)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+    # Camera extrinsics (skip reference)
+    for cam_name in camera_order:
+        if cam_name == reference_camera:
+            continue
+        ext = extrinsics[cam_name]
+        rvec = matrix_to_rvec(ext.R)
+        params.extend(rvec)
+        params.extend(ext.t)
 
+    # Interface distances (all cameras)
+    for cam_name in camera_order:
+        params.append(interface_distances[cam_name])
 
-def load_calibration(path: str | Path) -> CalibrationResult:
-    """Load calibration result from JSON file."""
-    path = Path(path)
+    # Board poses
+    for frame_idx in frame_order:
+        bp = board_poses[frame_idx]
+        params.extend(bp.rvec)
+        params.extend(bp.tvec)
 
-    if not path.exists():
-        raise FileNotFoundError(f"Calibration file not found: {path}")
+    # Intrinsics (if refining)
+    if refine_intrinsics:
+        for cam_name in camera_order:
+            K = intrinsics[cam_name].K
+            params.extend([K[0, 0], K[1, 1], K[0, 2], K[1, 2]])  # fx, fy, cx, cy
 
-    with open(path, "r") as f:
-        data = json.load(f)
+    return np.array(params, dtype=np.float64)
+```
 
-    # Version check
-    version = data.get("version")
-    if version != SERIALIZATION_VERSION:
-        raise ValueError(
-            f"Unsupported calibration file version: {version}. "
-            f"Expected: {SERIALIZATION_VERSION}"
-        )
+### Unpacking with Intrinsics
 
-    return CalibrationResult(
-        cameras={
-            name: _deserialize_camera_calibration(cam_data)
-            for name, cam_data in data["cameras"].items()
-        },
-        interface=_deserialize_interface_params(data["interface"]),
-        board=_deserialize_board_config(data["board"]),
-        diagnostics=_deserialize_diagnostics(data["diagnostics"]),
-        metadata=_deserialize_metadata(data["metadata"]),
+```python
+def _unpack_params_with_intrinsics(...) -> tuple[...]:
+    idx = 0
+    n_cams = len(camera_order)
+    n_frames = len(frame_order)
+
+    # Extrinsics
+    extrinsics_out = {}
+    for cam_name in camera_order:
+        if cam_name == reference_camera:
+            extrinsics_out[cam_name] = reference_extrinsics
+        else:
+            rvec = params[idx:idx+3]
+            tvec = params[idx+3:idx+6]
+            idx += 6
+            R = rvec_to_matrix(rvec)
+            extrinsics_out[cam_name] = CameraExtrinsics(R=R, t=tvec)
+
+    # Distances
+    distances_out = {}
+    for cam_name in camera_order:
+        distances_out[cam_name] = params[idx]
+        idx += 1
+
+    # Board poses
+    board_poses_out = {}
+    for frame_idx in frame_order:
+        rvec = params[idx:idx+3]
+        tvec = params[idx+3:idx+6]
+        idx += 6
+        board_poses_out[frame_idx] = BoardPose(frame_idx=frame_idx, rvec=rvec, tvec=tvec)
+
+    # Intrinsics
+    intrinsics_out = {}
+    if refine_intrinsics:
+        for cam_name in camera_order:
+            fx, fy, cx, cy = params[idx:idx+4]
+            idx += 4
+            base = base_intrinsics[cam_name]
+            K_new = np.array([
+                [fx, 0, cx],
+                [0, fy, cy],
+                [0, 0, 1],
+            ], dtype=np.float64)
+            intrinsics_out[cam_name] = CameraIntrinsics(
+                K=K_new,
+                dist_coeffs=base.dist_coeffs.copy(),  # Keep original distortion
+                image_size=base.image_size,
+            )
+    else:
+        # Return copies of base intrinsics
+        for cam_name in camera_order:
+            base = base_intrinsics[cam_name]
+            intrinsics_out[cam_name] = CameraIntrinsics(
+                K=base.K.copy(),
+                dist_coeffs=base.dist_coeffs.copy(),
+                image_size=base.image_size,
+            )
+
+    return extrinsics_out, distances_out, board_poses_out, intrinsics_out
+```
+
+### Parameter Bounds
+
+```python
+def _build_bounds(
+    camera_order: list[str],
+    frame_order: list[int],
+    reference_camera: str,
+    base_intrinsics: dict[str, CameraIntrinsics],
+    refine_intrinsics: bool,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Build lower and upper bounds for optimization."""
+    n_cams = len(camera_order)
+    n_frames = len(frame_order)
+    n_extrinsic_params = 6 * (n_cams - 1)
+    n_distance_params = n_cams
+    n_pose_params = 6 * n_frames
+    n_intrinsic_params = 4 * n_cams if refine_intrinsics else 0
+    total = n_extrinsic_params + n_distance_params + n_pose_params + n_intrinsic_params
+
+    lower = np.full(total, -np.inf)
+    upper = np.full(total, np.inf)
+
+    # Interface distances: [0.01, 2.0]
+    dist_start = n_extrinsic_params
+    dist_end = dist_start + n_distance_params
+    lower[dist_start:dist_end] = 0.01
+    upper[dist_start:dist_end] = 2.0
+
+    # Intrinsic bounds
+    if refine_intrinsics:
+        intr_start = n_extrinsic_params + n_distance_params + n_pose_params
+        for i, cam_name in enumerate(camera_order):
+            base = base_intrinsics[cam_name]
+            fx, fy = base.K[0, 0], base.K[1, 1]
+            w, h = base.image_size
+            offset = intr_start + i * 4
+
+            # fx, fy: [0.5*initial, 2.0*initial]
+            lower[offset] = 0.5 * fx
+            upper[offset] = 2.0 * fx
+            lower[offset + 1] = 0.5 * fy
+            upper[offset + 1] = 2.0 * fy
+
+            # cx: [0, width], cy: [0, height]
+            lower[offset + 2] = 0
+            upper[offset + 2] = w
+            lower[offset + 3] = 0
+            upper[offset + 3] = h
+
+    return lower, upper
+```
+
+### Main Function Implementation
+
+```python
+def joint_refinement(...) -> tuple[...]:
+    # Validate inputs
+    extrinsics_in, distances_in, poses_in, _ = stage3_result
+    if reference_camera not in extrinsics_in:
+        raise ValueError(f"reference_camera '{reference_camera}' not in stage3_result")
+
+    # Setup
+    if interface_normal is None:
+        interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
+
+    camera_order = sorted(extrinsics_in.keys())
+    board_poses_dict = {bp.frame_idx: bp for bp in poses_in}
+    frame_order = sorted(board_poses_dict.keys())
+
+    if not frame_order:
+        raise ConvergenceError("No board poses from Stage 3")
+
+    reference_extrinsics = extrinsics_in[reference_camera]
+
+    # Pack initial parameters
+    initial_params = _pack_params_with_intrinsics(
+        extrinsics_in, distances_in, board_poses_dict, intrinsics,
+        reference_camera, camera_order, frame_order, refine_intrinsics,
     )
+
+    # Build bounds
+    lower, upper = _build_bounds(
+        camera_order, frame_order, reference_camera,
+        intrinsics, refine_intrinsics,
+    )
+
+    # Run optimization
+    result = least_squares(
+        _cost_function_with_intrinsics,
+        x0=initial_params,
+        args=(
+            detections, intrinsics, board, reference_camera,
+            reference_extrinsics, interface_normal, n_air, n_water,
+            camera_order, frame_order, min_corners, refine_intrinsics,
+        ),
+        method='trf',
+        loss=loss,
+        f_scale=loss_scale,
+        bounds=(lower, upper),
+        verbose=0,
+    )
+
+    if result.status <= 0:
+        raise ConvergenceError(f"Optimization failed: {result.message}")
+
+    # Unpack results
+    ext_out, dist_out, poses_out, intr_out = _unpack_params_with_intrinsics(
+        result.x, reference_camera, reference_extrinsics, intrinsics,
+        camera_order, frame_order, refine_intrinsics,
+    )
+
+    # Convert board poses dict to sorted list
+    poses_list = [poses_out[idx] for idx in sorted(poses_out.keys())]
+
+    rms_error = np.sqrt(np.mean(result.fun**2))
+
+    return ext_out, dist_out, poses_list, intr_out, rms_error
 ```
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `save_calibration` writes valid JSON file
-- [ ] `load_calibration` reconstructs identical `CalibrationResult`
-- [ ] Round-trip test: save then load produces equivalent object
-- [ ] Numpy arrays are correctly serialized/deserialized with correct dtypes
-- [ ] Optional fields (`per_corner_residuals`, `per_frame_errors`) handled correctly
-- [ ] `per_frame_errors` dict keys converted int↔str for JSON compatibility
-- [ ] Version field is written and checked on load
-- [ ] `FileNotFoundError` raised for missing file
-- [ ] `ValueError` raised for version mismatch
-- [ ] Accepts both `str` and `Path` arguments
-- [ ] Tests pass: `pytest tests/unit/test_serialization.py -v`
-- [ ] Type check passes: `mypy src/aquacal/io/serialization.py --ignore-missing-imports`
-- [ ] `src/aquacal/io/__init__.py` exports `save_calibration` and `load_calibration`
+- [ ] `joint_refinement` returns refined extrinsics, distances, poses, intrinsics, and RMS error
+- [ ] Reference camera extrinsics remain fixed at input values
+- [ ] When `refine_intrinsics=False`, returned intrinsics are copies of input
+- [ ] When `refine_intrinsics=True`, fx/fy/cx/cy may change, dist_coeffs unchanged
+- [ ] Interface distances stay within bounds [0.01, 2.0]
+- [ ] Intrinsic bounds enforced: focal lengths within [0.5x, 2x], principal point within image
+- [ ] Raises `ConvergenceError` when optimization fails
+- [ ] Raises `ValueError` for invalid reference_camera
+- [ ] With `refine_intrinsics=False`, achieves similar or better RMS than Stage 3 input
+- [ ] With `refine_intrinsics=True`, can recover perturbed intrinsics in synthetic tests
+- [ ] Tests pass: `pytest tests/unit/test_refinement.py -v`
+- [ ] No modifications to files outside "Modify" list
 
 ---
 
@@ -403,340 +442,433 @@ def load_calibration(path: str | Path) -> CalibrationResult:
 ```python
 import pytest
 import numpy as np
-from pathlib import Path
 
 from aquacal.config.schema import (
     BoardConfig,
-    CalibrationMetadata,
-    CalibrationResult,
-    CameraCalibration,
-    CameraExtrinsics,
     CameraIntrinsics,
-    DiagnosticsData,
-    InterfaceParams,
+    CameraExtrinsics,
+    Detection,
+    FrameDetections,
+    DetectionResult,
+    BoardPose,
+    ConvergenceError,
 )
-from aquacal.io.serialization import (
-    save_calibration,
-    load_calibration,
-    SERIALIZATION_VERSION,
+from aquacal.core.board import BoardGeometry
+from aquacal.core.camera import Camera
+from aquacal.core.interface_model import Interface
+from aquacal.core.refractive_geometry import refractive_project
+from aquacal.calibration.refinement import (
+    joint_refinement,
+    _pack_params_with_intrinsics,
+    _unpack_params_with_intrinsics,
 )
 
 
 @pytest.fixture
-def sample_intrinsics() -> CameraIntrinsics:
-    """Sample camera intrinsics."""
-    return CameraIntrinsics(
-        K=np.array([[500.0, 0, 320], [0, 500.0, 240], [0, 0, 1]], dtype=np.float64),
-        dist_coeffs=np.array([0.1, -0.2, 0.001, 0.002, 0.05], dtype=np.float64),
-        image_size=(640, 480),
-    )
-
-
-@pytest.fixture
-def sample_extrinsics() -> CameraExtrinsics:
-    """Sample camera extrinsics."""
-    return CameraExtrinsics(
-        R=np.eye(3, dtype=np.float64),
-        t=np.array([0.0, 0.0, 0.0], dtype=np.float64),
-    )
-
-
-@pytest.fixture
-def sample_camera(sample_intrinsics, sample_extrinsics) -> CameraCalibration:
-    """Sample camera calibration."""
-    return CameraCalibration(
-        name="cam0",
-        intrinsics=sample_intrinsics,
-        extrinsics=sample_extrinsics,
-        interface_distance=0.15,
-    )
-
-
-@pytest.fixture
-def sample_interface() -> InterfaceParams:
-    """Sample interface parameters."""
-    return InterfaceParams(
-        normal=np.array([0.0, 0.0, -1.0], dtype=np.float64),
-        n_air=1.0,
-        n_water=1.333,
-    )
-
-
-@pytest.fixture
-def sample_board() -> BoardConfig:
-    """Sample board configuration."""
+def board_config() -> BoardConfig:
     return BoardConfig(
-        squares_x=8,
-        squares_y=6,
-        square_size=0.03,
-        marker_size=0.022,
-        dictionary="DICT_4X4_50",
+        squares_x=6, squares_y=5,
+        square_size=0.04, marker_size=0.03,
+        dictionary="DICT_4X4_50"
     )
 
 
 @pytest.fixture
-def sample_diagnostics() -> DiagnosticsData:
-    """Sample diagnostics without optional fields."""
-    return DiagnosticsData(
-        reprojection_error_rms=0.45,
-        reprojection_error_per_camera={"cam0": 0.42, "cam1": 0.48},
-        validation_3d_error_mean=0.0015,
-        validation_3d_error_std=0.0008,
-    )
+def board(board_config) -> BoardGeometry:
+    return BoardGeometry(board_config)
 
 
 @pytest.fixture
-def sample_diagnostics_full() -> DiagnosticsData:
-    """Sample diagnostics with all optional fields."""
-    return DiagnosticsData(
-        reprojection_error_rms=0.45,
-        reprojection_error_per_camera={"cam0": 0.42, "cam1": 0.48},
-        validation_3d_error_mean=0.0015,
-        validation_3d_error_std=0.0008,
-        per_corner_residuals=np.array([[0.1, 0.2], [-0.1, 0.15]], dtype=np.float64),
-        per_frame_errors={0: 0.4, 5: 0.5, 10: 0.45},
-    )
+def intrinsics() -> dict[str, CameraIntrinsics]:
+    """Ground truth intrinsics for 3 cameras."""
+    K = np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64)
+    dist = np.zeros(5, dtype=np.float64)
+    return {
+        'cam0': CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
+        'cam1': CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
+        'cam2': CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
+    }
 
 
 @pytest.fixture
-def sample_metadata() -> CalibrationMetadata:
-    """Sample metadata."""
-    return CalibrationMetadata(
-        calibration_date="2024-01-15T10:30:00",
-        software_version="0.1.0",
-        config_hash="abc123def456",
-        num_frames_used=50,
-        num_frames_holdout=10,
-    )
-
-
-@pytest.fixture
-def sample_calibration_result(
-    sample_camera, sample_interface, sample_board, sample_diagnostics, sample_metadata
-) -> CalibrationResult:
-    """Complete sample calibration result."""
-    # Create a second camera with different extrinsics
-    cam1 = CameraCalibration(
-        name="cam1",
-        intrinsics=sample_camera.intrinsics,
-        extrinsics=CameraExtrinsics(
-            R=np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]], dtype=np.float64),
-            t=np.array([0.1, 0.0, 0.0], dtype=np.float64),
+def ground_truth_extrinsics() -> dict[str, CameraExtrinsics]:
+    """Ground truth camera extrinsics."""
+    return {
+        'cam0': CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.zeros(3, dtype=np.float64),
         ),
-        interface_distance=0.16,
+        'cam1': CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.3, 0.0, 0.0], dtype=np.float64),
+        ),
+        'cam2': CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.0, 0.3, 0.0], dtype=np.float64),
+        ),
+    }
+
+
+@pytest.fixture
+def ground_truth_distances() -> dict[str, float]:
+    return {'cam0': 0.15, 'cam1': 0.16, 'cam2': 0.14}
+
+
+@pytest.fixture
+def synthetic_board_poses() -> list[BoardPose]:
+    """Board poses for 10 frames underwater."""
+    poses = []
+    for i in range(10):
+        x_offset = 0.05 * (i % 4 - 1.5)
+        y_offset = 0.05 * (i // 4 - 1)
+        poses.append(BoardPose(
+            frame_idx=i,
+            rvec=np.array([0.1 * (i % 3), 0.1 * (i % 2), 0.0], dtype=np.float64),
+            tvec=np.array([x_offset, y_offset, 0.4], dtype=np.float64),
+        ))
+    return poses
+
+
+def generate_synthetic_detections(
+    intrinsics: dict[str, CameraIntrinsics],
+    extrinsics: dict[str, CameraExtrinsics],
+    interface_distances: dict[str, float],
+    board: BoardGeometry,
+    board_poses: list[BoardPose],
+    noise_std: float = 0.0,
+) -> DetectionResult:
+    """Generate synthetic detections using refractive_project."""
+    interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
+    frames = {}
+
+    for bp in board_poses:
+        corners_3d = board.transform_corners(bp.rvec, bp.tvec)
+        detections_dict = {}
+
+        for cam_name in intrinsics:
+            camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
+            interface = Interface(
+                normal=interface_normal,
+                base_height=0.0,
+                camera_offsets={cam_name: interface_distances[cam_name]},
+            )
+
+            corner_ids = []
+            corners_2d = []
+
+            for corner_id in range(board.num_corners):
+                point_3d = corners_3d[corner_id]
+                projected = refractive_project(camera, interface, point_3d)
+
+                if projected is not None:
+                    w, h = intrinsics[cam_name].image_size
+                    if 0 <= projected[0] < w and 0 <= projected[1] < h:
+                        corner_ids.append(corner_id)
+                        px = projected.copy()
+                        if noise_std > 0:
+                            px += np.random.normal(0, noise_std, 2)
+                        corners_2d.append(px)
+
+            if len(corner_ids) >= 4:
+                detections_dict[cam_name] = Detection(
+                    corner_ids=np.array(corner_ids, dtype=np.int32),
+                    corners_2d=np.array(corners_2d, dtype=np.float64),
+                )
+
+        if detections_dict:
+            frames[bp.frame_idx] = FrameDetections(
+                frame_idx=bp.frame_idx,
+                detections=detections_dict,
+            )
+
+    return DetectionResult(
+        frames=frames,
+        camera_names=list(intrinsics.keys()),
+        total_frames=len(board_poses),
     )
-    return CalibrationResult(
-        cameras={"cam0": sample_camera, "cam1": cam1},
-        interface=sample_interface,
-        board=sample_board,
-        diagnostics=sample_diagnostics,
-        metadata=sample_metadata,
+
+
+@pytest.fixture
+def stage3_result(ground_truth_extrinsics, ground_truth_distances, synthetic_board_poses):
+    """Simulated Stage 3 output."""
+    return (
+        ground_truth_extrinsics,
+        ground_truth_distances,
+        synthetic_board_poses,
+        0.5,  # RMS error
     )
 ```
 
 ### Test Cases
 
 ```python
-class TestSaveCalibration:
-    def test_creates_file(self, tmp_path, sample_calibration_result):
-        """save_calibration creates a JSON file."""
-        path = tmp_path / "calibration.json"
-        save_calibration(sample_calibration_result, path)
-        assert path.exists()
-
-    def test_accepts_string_path(self, tmp_path, sample_calibration_result):
-        """Accepts string path argument."""
-        path = str(tmp_path / "calibration.json")
-        save_calibration(sample_calibration_result, path)
-        assert Path(path).exists()
-
-    def test_valid_json(self, tmp_path, sample_calibration_result):
-        """Output is valid JSON."""
-        path = tmp_path / "calibration.json"
-        save_calibration(sample_calibration_result, path)
-
-        import json
-        with open(path) as f:
-            data = json.load(f)
-
-        assert "version" in data
-        assert "cameras" in data
-        assert "interface" in data
-
-    def test_includes_version(self, tmp_path, sample_calibration_result):
-        """Output includes version field."""
-        path = tmp_path / "calibration.json"
-        save_calibration(sample_calibration_result, path)
-
-        import json
-        with open(path) as f:
-            data = json.load(f)
-
-        assert data["version"] == SERIALIZATION_VERSION
-
-
-class TestLoadCalibration:
-    def test_round_trip(self, tmp_path, sample_calibration_result):
-        """Save then load produces equivalent result."""
-        path = tmp_path / "calibration.json"
-        save_calibration(sample_calibration_result, path)
-        loaded = load_calibration(path)
-
-        # Check cameras
-        assert set(loaded.cameras.keys()) == set(sample_calibration_result.cameras.keys())
-        for name in loaded.cameras:
-            orig = sample_calibration_result.cameras[name]
-            load = loaded.cameras[name]
-            assert load.name == orig.name
-            np.testing.assert_allclose(load.intrinsics.K, orig.intrinsics.K)
-            np.testing.assert_allclose(load.intrinsics.dist_coeffs, orig.intrinsics.dist_coeffs)
-            assert load.intrinsics.image_size == orig.intrinsics.image_size
-            np.testing.assert_allclose(load.extrinsics.R, orig.extrinsics.R)
-            np.testing.assert_allclose(load.extrinsics.t, orig.extrinsics.t)
-            assert load.interface_distance == orig.interface_distance
-
-        # Check interface
-        np.testing.assert_allclose(loaded.interface.normal, sample_calibration_result.interface.normal)
-        assert loaded.interface.n_air == sample_calibration_result.interface.n_air
-        assert loaded.interface.n_water == sample_calibration_result.interface.n_water
-
-        # Check board
-        assert loaded.board.squares_x == sample_calibration_result.board.squares_x
-        assert loaded.board.dictionary == sample_calibration_result.board.dictionary
-
-        # Check diagnostics
-        assert loaded.diagnostics.reprojection_error_rms == sample_calibration_result.diagnostics.reprojection_error_rms
-
-        # Check metadata
-        assert loaded.metadata.calibration_date == sample_calibration_result.metadata.calibration_date
-
-    def test_accepts_string_path(self, tmp_path, sample_calibration_result):
-        """Accepts string path argument."""
-        path = tmp_path / "calibration.json"
-        save_calibration(sample_calibration_result, path)
-        loaded = load_calibration(str(path))
-        assert loaded is not None
-
-    def test_file_not_found(self, tmp_path):
-        """Raises FileNotFoundError for missing file."""
-        with pytest.raises(FileNotFoundError):
-            load_calibration(tmp_path / "nonexistent.json")
-
-    def test_version_mismatch(self, tmp_path):
-        """Raises ValueError for version mismatch."""
-        path = tmp_path / "calibration.json"
-        import json
-        with open(path, "w") as f:
-            json.dump({"version": "0.0"}, f)
-
-        with pytest.raises(ValueError, match="version"):
-            load_calibration(path)
-
-
-class TestOptionalFields:
-    def test_diagnostics_without_optional(self, tmp_path, sample_calibration_result):
-        """Handles diagnostics without optional fields."""
-        path = tmp_path / "calibration.json"
-        save_calibration(sample_calibration_result, path)
-        loaded = load_calibration(path)
-
-        assert loaded.diagnostics.per_corner_residuals is None
-        assert loaded.diagnostics.per_frame_errors is None
-
-    def test_diagnostics_with_optional(
-        self, tmp_path, sample_calibration_result, sample_diagnostics_full
+class TestPackUnpackWithIntrinsics:
+    def test_round_trip_without_intrinsics(
+        self, ground_truth_extrinsics, ground_truth_distances,
+        synthetic_board_poses, intrinsics
     ):
-        """Handles diagnostics with optional fields."""
-        # Replace diagnostics with full version
-        result = CalibrationResult(
-            cameras=sample_calibration_result.cameras,
-            interface=sample_calibration_result.interface,
-            board=sample_calibration_result.board,
-            diagnostics=sample_diagnostics_full,
-            metadata=sample_calibration_result.metadata,
+        """Pack/unpack round-trip without refining intrinsics."""
+        camera_order = ['cam0', 'cam1', 'cam2']
+        frame_order = [0, 1, 2]
+        board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
+
+        packed = _pack_params_with_intrinsics(
+            ground_truth_extrinsics, ground_truth_distances,
+            board_poses_dict, intrinsics, 'cam0',
+            camera_order, frame_order, refine_intrinsics=False,
         )
 
-        path = tmp_path / "calibration.json"
-        save_calibration(result, path)
-        loaded = load_calibration(path)
+        ext_out, dist_out, poses_out, intr_out = _unpack_params_with_intrinsics(
+            packed, 'cam0', ground_truth_extrinsics['cam0'], intrinsics,
+            camera_order, frame_order, refine_intrinsics=False,
+        )
 
-        assert loaded.diagnostics.per_corner_residuals is not None
+        for cam in camera_order:
+            np.testing.assert_allclose(ext_out[cam].R, ground_truth_extrinsics[cam].R)
+            np.testing.assert_allclose(ext_out[cam].t, ground_truth_extrinsics[cam].t)
+            assert abs(dist_out[cam] - ground_truth_distances[cam]) < 1e-10
+            np.testing.assert_allclose(intr_out[cam].K, intrinsics[cam].K)
+
+    def test_round_trip_with_intrinsics(
+        self, ground_truth_extrinsics, ground_truth_distances,
+        synthetic_board_poses, intrinsics
+    ):
+        """Pack/unpack round-trip with intrinsics."""
+        camera_order = ['cam0', 'cam1', 'cam2']
+        frame_order = [0, 1, 2]
+        board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
+
+        packed = _pack_params_with_intrinsics(
+            ground_truth_extrinsics, ground_truth_distances,
+            board_poses_dict, intrinsics, 'cam0',
+            camera_order, frame_order, refine_intrinsics=True,
+        )
+
+        ext_out, dist_out, poses_out, intr_out = _unpack_params_with_intrinsics(
+            packed, 'cam0', ground_truth_extrinsics['cam0'], intrinsics,
+            camera_order, frame_order, refine_intrinsics=True,
+        )
+
+        for cam in camera_order:
+            np.testing.assert_allclose(intr_out[cam].K, intrinsics[cam].K)
+            # Distortion coeffs should be preserved
+            np.testing.assert_allclose(
+                intr_out[cam].dist_coeffs, intrinsics[cam].dist_coeffs
+            )
+
+
+class TestJointRefinement:
+    def test_without_intrinsics_maintains_quality(
+        self, board, intrinsics, ground_truth_extrinsics,
+        ground_truth_distances, synthetic_board_poses, stage3_result
+    ):
+        """Refinement without intrinsics maintains or improves RMS."""
+        detections = generate_synthetic_detections(
+            intrinsics, ground_truth_extrinsics, ground_truth_distances,
+            board, synthetic_board_poses, noise_std=0.5,
+        )
+
+        ext_opt, dist_opt, poses_opt, intr_opt, rms = joint_refinement(
+            stage3_result=stage3_result,
+            detections=detections,
+            intrinsics=intrinsics,
+            board=board,
+            reference_camera='cam0',
+            refine_intrinsics=False,
+        )
+
+        assert rms < 2.0
+        # Intrinsics should be unchanged
+        for cam in intrinsics:
+            np.testing.assert_allclose(intr_opt[cam].K, intrinsics[cam].K)
+
+    def test_with_intrinsics_recovers_perturbed(
+        self, board, intrinsics, ground_truth_extrinsics,
+        ground_truth_distances, synthetic_board_poses
+    ):
+        """Refinement with intrinsics can recover perturbed focal lengths."""
+        # Create detections with ground truth intrinsics
+        detections = generate_synthetic_detections(
+            intrinsics, ground_truth_extrinsics, ground_truth_distances,
+            board, synthetic_board_poses, noise_std=0.3,
+        )
+
+        # Perturb intrinsics (5% error in focal length)
+        perturbed_intrinsics = {}
+        for cam, intr in intrinsics.items():
+            K_perturbed = intr.K.copy()
+            K_perturbed[0, 0] *= 1.05  # fx + 5%
+            K_perturbed[1, 1] *= 0.95  # fy - 5%
+            perturbed_intrinsics[cam] = CameraIntrinsics(
+                K=K_perturbed,
+                dist_coeffs=intr.dist_coeffs.copy(),
+                image_size=intr.image_size,
+            )
+
+        stage3_result = (
+            ground_truth_extrinsics,
+            ground_truth_distances,
+            synthetic_board_poses,
+            1.0,
+        )
+
+        ext_opt, dist_opt, poses_opt, intr_opt, rms = joint_refinement(
+            stage3_result=stage3_result,
+            detections=detections,
+            intrinsics=perturbed_intrinsics,
+            board=board,
+            reference_camera='cam0',
+            refine_intrinsics=True,
+        )
+
+        # Should achieve good RMS
+        assert rms < 2.0
+
+        # Refined intrinsics should be closer to ground truth than perturbed
+        for cam in intrinsics:
+            gt_fx = intrinsics[cam].K[0, 0]
+            perturbed_fx = perturbed_intrinsics[cam].K[0, 0]
+            refined_fx = intr_opt[cam].K[0, 0]
+
+            perturbed_error = abs(perturbed_fx - gt_fx)
+            refined_error = abs(refined_fx - gt_fx)
+            assert refined_error < perturbed_error, f"fx not improved for {cam}"
+
+    def test_reference_camera_unchanged(
+        self, board, intrinsics, ground_truth_extrinsics,
+        ground_truth_distances, synthetic_board_poses, stage3_result
+    ):
+        """Reference camera extrinsics remain fixed."""
+        detections = generate_synthetic_detections(
+            intrinsics, ground_truth_extrinsics, ground_truth_distances,
+            board, synthetic_board_poses, noise_std=0.5,
+        )
+
+        ext_opt, _, _, _, _ = joint_refinement(
+            stage3_result=stage3_result,
+            detections=detections,
+            intrinsics=intrinsics,
+            board=board,
+            reference_camera='cam0',
+        )
+
         np.testing.assert_allclose(
-            loaded.diagnostics.per_corner_residuals,
-            sample_diagnostics_full.per_corner_residuals,
+            ext_opt['cam0'].R, ground_truth_extrinsics['cam0'].R, atol=1e-10
+        )
+        np.testing.assert_allclose(
+            ext_opt['cam0'].t, ground_truth_extrinsics['cam0'].t, atol=1e-10
         )
 
-        assert loaded.diagnostics.per_frame_errors is not None
-        assert loaded.diagnostics.per_frame_errors == sample_diagnostics_full.per_frame_errors
+    def test_raises_for_invalid_reference(
+        self, board, intrinsics, stage3_result
+    ):
+        """Raises ValueError for invalid reference camera."""
+        detections = DetectionResult(frames={}, camera_names=['cam0'], total_frames=0)
 
+        with pytest.raises(ValueError, match="reference"):
+            joint_refinement(
+                stage3_result=stage3_result,
+                detections=detections,
+                intrinsics=intrinsics,
+                board=board,
+                reference_camera='camX',
+            )
 
-class TestNumpyArrays:
-    def test_array_dtypes(self, tmp_path, sample_calibration_result):
-        """Numpy arrays have correct dtypes after round-trip."""
-        path = tmp_path / "calibration.json"
-        save_calibration(sample_calibration_result, path)
-        loaded = load_calibration(path)
-
-        cam = loaded.cameras["cam0"]
-        assert cam.intrinsics.K.dtype == np.float64
-        assert cam.intrinsics.dist_coeffs.dtype == np.float64
-        assert cam.extrinsics.R.dtype == np.float64
-        assert cam.extrinsics.t.dtype == np.float64
-        assert loaded.interface.normal.dtype == np.float64
-
-    def test_array_shapes(self, tmp_path, sample_calibration_result):
-        """Numpy arrays have correct shapes after round-trip."""
-        path = tmp_path / "calibration.json"
-        save_calibration(sample_calibration_result, path)
-        loaded = load_calibration(path)
-
-        cam = loaded.cameras["cam0"]
-        assert cam.intrinsics.K.shape == (3, 3)
-        assert cam.intrinsics.dist_coeffs.shape == (5,)
-        assert cam.extrinsics.R.shape == (3, 3)
-        assert cam.extrinsics.t.shape == (3,)
-        assert loaded.interface.normal.shape == (3,)
-
-
-class TestPerFrameErrorsIntKeys:
-    def test_int_keys_preserved(self, tmp_path, sample_calibration_result, sample_diagnostics_full):
-        """per_frame_errors dict keys are converted to int on load."""
-        result = CalibrationResult(
-            cameras=sample_calibration_result.cameras,
-            interface=sample_calibration_result.interface,
-            board=sample_calibration_result.board,
-            diagnostics=sample_diagnostics_full,
-            metadata=sample_calibration_result.metadata,
+    def test_distances_within_bounds(
+        self, board, intrinsics, ground_truth_extrinsics,
+        ground_truth_distances, synthetic_board_poses, stage3_result
+    ):
+        """Interface distances stay within bounds."""
+        detections = generate_synthetic_detections(
+            intrinsics, ground_truth_extrinsics, ground_truth_distances,
+            board, synthetic_board_poses, noise_std=0.5,
         )
 
-        path = tmp_path / "calibration.json"
-        save_calibration(result, path)
-        loaded = load_calibration(path)
+        _, dist_opt, _, _, _ = joint_refinement(
+            stage3_result=stage3_result,
+            detections=detections,
+            intrinsics=intrinsics,
+            board=board,
+            reference_camera='cam0',
+        )
 
-        # Keys should be integers, not strings
-        for key in loaded.diagnostics.per_frame_errors.keys():
-            assert isinstance(key, int)
+        for cam, dist in dist_opt.items():
+            assert 0.01 <= dist <= 2.0
+
+    def test_intrinsic_bounds_enforced(
+        self, board, intrinsics, ground_truth_extrinsics,
+        ground_truth_distances, synthetic_board_poses, stage3_result
+    ):
+        """Intrinsic parameters stay within bounds."""
+        detections = generate_synthetic_detections(
+            intrinsics, ground_truth_extrinsics, ground_truth_distances,
+            board, synthetic_board_poses, noise_std=0.5,
+        )
+
+        _, _, _, intr_opt, _ = joint_refinement(
+            stage3_result=stage3_result,
+            detections=detections,
+            intrinsics=intrinsics,
+            board=board,
+            reference_camera='cam0',
+            refine_intrinsics=True,
+        )
+
+        for cam in intrinsics:
+            base = intrinsics[cam]
+            opt = intr_opt[cam]
+
+            # Focal lengths within [0.5x, 2x]
+            assert 0.5 * base.K[0, 0] <= opt.K[0, 0] <= 2.0 * base.K[0, 0]
+            assert 0.5 * base.K[1, 1] <= opt.K[1, 1] <= 2.0 * base.K[1, 1]
+
+            # Principal point within image
+            w, h = base.image_size
+            assert 0 <= opt.K[0, 2] <= w
+            assert 0 <= opt.K[1, 2] <= h
 ```
 
 ---
 
 ## Import Structure
 
-Update `src/aquacal/io/__init__.py`:
+Update `src/aquacal/calibration/__init__.py`:
 
 ```python
-"""Input/output modules."""
+"""Calibration pipeline modules."""
 
-from aquacal.io.video import VideoSet
-from aquacal.io.detection import detect_charuco, detect_all_frames
-from aquacal.io.serialization import save_calibration, load_calibration
+from aquacal.calibration.intrinsics import (
+    calibrate_intrinsics_single,
+    calibrate_intrinsics_all,
+)
+from aquacal.calibration.extrinsics import (
+    Observation,
+    PoseGraph,
+    estimate_board_pose,
+    build_pose_graph,
+    estimate_extrinsics,
+)
+from aquacal.calibration.interface_estimation import (
+    optimize_interface,
+)
+from aquacal.calibration.refinement import (
+    joint_refinement,
+)
 
 __all__ = [
-    "VideoSet",
-    "detect_charuco",
-    "detect_all_frames",
-    "save_calibration",
-    "load_calibration",
+    # intrinsics
+    "calibrate_intrinsics_single",
+    "calibrate_intrinsics_all",
+    # extrinsics
+    "Observation",
+    "PoseGraph",
+    "estimate_board_pose",
+    "build_pose_graph",
+    "estimate_extrinsics",
+    # interface_estimation
+    "optimize_interface",
+    # refinement
+    "joint_refinement",
 ]
 ```
 
@@ -744,8 +876,33 @@ __all__ = [
 
 ## Notes
 
-- JSON `indent=2` for human readability
-- Numpy `tolist()` automatically handles nested arrays
-- JSON doesn't support integer dict keys, so `per_frame_errors` keys are converted str↔int
-- `image_size` tuple is serialized as list, converted back to tuple on load
-- No need for `export_for_downstream` in this task; can be added later if needed
+1. **Code similarity to interface_estimation.py**: The cost function structure is nearly identical. This is intentional - keeping the module self-contained avoids coupling and makes each stage independently testable.
+
+2. **Intrinsic parameterization**: Only fx, fy, cx, cy are refined. Distortion coefficients are kept fixed because:
+   - They're well-determined by Stage 1 in-air calibration
+   - They rarely drift
+   - Adding 5+ more params per camera increases risk of overfitting
+
+3. **When to use Stage 4**:
+   - If Stage 3 RMS is higher than expected
+   - If you suspect intrinsics may have changed since Stage 1
+   - For maximum accuracy (diminishing returns if Stage 3 converged well)
+
+4. **Performance**: Similar to Stage 3. With intrinsics, adds 4*N_cams parameters (~12 for 3 cameras), negligible impact.
+
+5. **Imports needed**:
+   ```python
+   import numpy as np
+   from numpy.typing import NDArray
+   from scipy.optimize import least_squares
+
+   from aquacal.config.schema import (
+       CameraIntrinsics, CameraExtrinsics, BoardPose,
+       DetectionResult, ConvergenceError, Vec3,
+   )
+   from aquacal.core.board import BoardGeometry
+   from aquacal.core.camera import Camera
+   from aquacal.core.interface_model import Interface
+   from aquacal.core.refractive_geometry import refractive_project
+   from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
+   ```

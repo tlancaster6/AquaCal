@@ -33,10 +33,10 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 ## Phase 4: Calibration Stages
 
-- [ ] **4.1** Implement intrinsic calibration (`calibration/intrinsics.py`)
-- [ ] **4.2** Implement extrinsic initialization (`calibration/extrinsics.py`)
-- [ ] **4.3** Implement interface/pose optimization (`calibration/interface_estimation.py`)
-- [ ] **4.4** Implement joint refinement (`calibration/refinement.py`)
+- [x] **4.1** Implement intrinsic calibration (`calibration/intrinsics.py`)
+- [x] **4.2** Implement extrinsic initialization (`calibration/extrinsics.py`)
+- [x] **4.3** Implement interface/pose optimization (`calibration/interface_estimation.py`)
+- [x] **4.4** Implement joint refinement (`calibration/refinement.py`)
 
 ## Phase 5: Validation
 
@@ -55,3 +55,9 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 - [ ] **7.1** Synthetic data tests (full pipeline with known ground truth)
 - [ ] **7.2** Real data validation
 - [ ] **7.3** Documentation and examples
+
+---
+
+## Post-MVP: Simplifications & Refactoring
+
+- [ ] **P.1** Simplify `Interface` class: remove `base_height` parameter, store only per-camera distances directly. Currently the calibration stages set `base_height=0` and put the full distance in `camera_offsets`, making `base_height` redundant. Consider whether shared base + offsets is ever needed, or if per-camera distances are always independent.

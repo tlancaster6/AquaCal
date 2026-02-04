@@ -9,6 +9,87 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-03
+### [src/aquacal/calibration/refinement.py]
+- Implemented Stage 4 joint refinement: joint_refinement jointly refines all calibration parameters from Stage 3 output with optional intrinsics refinement
+- Added _pack_params_with_intrinsics/_unpack_params_with_intrinsics: parameter vector serialization handling extrinsics, distances, board poses, and optionally intrinsics (fx, fy, cx, cy)
+- Added _cost_function_with_intrinsics: computes reprojection residuals using optionally refined intrinsics from parameter vector
+- Added _build_bounds: constructs optimization bounds for interface distances [0.01, 2.0]m and intrinsic parameters (focal: [0.5x, 2x] initial, principal point: [0, width/height])
+- Distortion coefficients remain fixed; reference camera extrinsics remain fixed; supports robust loss functions
+- Returns refined extrinsics, distances, board poses, intrinsics (modified if refine_intrinsics=True, copies otherwise), and RMS error
+
+### [tests/unit/test_refinement.py]
+- Created comprehensive test suite with 13 tests covering all refinement functionality
+- Tests verify: parameter pack/unpack round-trip (with/without intrinsics), parameter counts (33 without intrinsics, 45 with for 3 cameras, 3 frames)
+- Tests verify: refinement without intrinsics maintains quality (RMS < 2px), intrinsics refinement mechanism works, reference camera unchanged
+- Tests verify: error handling (ValueError for invalid reference, ConvergenceError for empty poses)
+- Tests verify: bounds enforcement (distances [0.01, 2.0], focal lengths [0.5x, 2x], principal point within image)
+- Tests verify: distortion coefficients unchanged, correct number of poses returned
+- All tests pass with synthetic data fixtures using refractive projection
+
+### [src/aquacal/calibration/__init__.py]
+- Added joint_refinement import and export
+
+## 2026-02-03
+### [src/aquacal/calibration/interface_estimation.py]
+- Implemented Stage 3 refractive optimization: optimize_interface jointly optimizes camera extrinsics, per-camera interface distances, and board poses
+- Added _compute_initial_board_poses: estimates board poses via solvePnP with depth correction for apparent depth due to refraction
+- Added _pack_params/_unpack_params: parameter vector serialization for scipy.optimize.least_squares
+- Added _cost_function: computes reprojection residuals using refractive_project for all observations
+- Supports robust loss functions (huber, soft_l1, cauchy) and parameter bounds for interface distances [0.01, 2.0]m
+- Reference camera extrinsics remain fixed; raises InsufficientDataError for no valid frames, ConvergenceError on optimization failure
+
+### [tests/unit/test_interface_estimation.py]
+- Created comprehensive test suite with 14 tests covering all interface estimation functionality
+- Tests verify: initial board pose computation, parameter pack/unpack round-trip, parameter count
+- Tests verify: optimization recovery of ground truth (RMS < 2px), reference camera unchanged, distances within bounds
+- Tests verify: error handling (ValueError for invalid reference, InsufficientDataError for no frames)
+- Tests verify: single camera support, different loss functions, custom interface normal
+- All tests pass with synthetic data fixtures using refractive projection
+
+### [src/aquacal/calibration/__init__.py]
+- Added optimize_interface import and export
+
+## 2026-02-03
+### [src/aquacal/calibration/extrinsics.py]
+- Implemented Stage 2 extrinsic initialization via pose graph construction and PnP-based pose chaining
+- Added Observation and PoseGraph dataclasses for representing camera-board observations and connectivity graph
+- Implemented estimate_board_pose: wraps cv2.solvePnP for board pose estimation, returns None if <4 corners
+- Implemented build_pose_graph: builds bipartite graph (cameras <-> frames), validates connectivity, raises ConnectivityError with component details if disconnected
+- Implemented estimate_extrinsics: BFS traversal from reference camera to propagate poses through graph, reference camera at origin (R=I, t=0)
+
+### [tests/unit/test_extrinsics.py]
+- Created comprehensive test suite with 17 tests covering all extrinsic calibration functionality
+- Tests verify: Observation/PoseGraph dataclass attributes, estimate_board_pose return types and None for few points
+- Tests verify: build_pose_graph graph construction, connectivity error detection, min_cameras filtering, bipartite adjacency
+- Tests verify: estimate_extrinsics reference camera at origin, all cameras receive poses, validation errors
+- All tests pass with synthetic detection fixtures using OpenCV PnP
+
+### [src/aquacal/calibration/__init__.py]
+- Added Observation, PoseGraph, estimate_board_pose, build_pose_graph, estimate_extrinsics imports and exports
+
+## 2026-02-03
+### [src/aquacal/calibration/intrinsics.py]
+- Implemented calibrate_intrinsics_single: per-camera intrinsic calibration from in-air video using ChArUco board detection
+- Detects corners across video frames, selects subset with spatial coverage via _select_calibration_frames helper, runs cv2.calibrateCamera
+- Returns CameraIntrinsics (K, dist_coeffs with 5 coefficients, image_size) and RMS reprojection error
+- Implemented calibrate_intrinsics_all: batch calibration for multiple cameras with progress callback support
+- Frame selection prioritizes spatial coverage (std of normalized corner positions) and corner count
+- Validates sufficient frames (≥4) and detections (≥min_corners), raises ValueError on calibration failure
+
+### [tests/unit/test_intrinsics.py]
+- Created comprehensive test suite with 13 tests covering all intrinsic calibration functionality
+- Tests verify: correct return types (CameraIntrinsics, float), matrix/array shapes (K: 3x3, dist_coeffs: 5), dtypes (float64)
+- Tests verify: image_size extraction, reprojection error (<2px for synthetic), Path/str argument acceptance
+- Tests verify: max_frames parameter, ValueError on empty video, insufficient frames
+- Tests verify: calibrate_intrinsics_all processes all cameras, progress callback invocation
+- Tests verify: _select_calibration_frames limits output, returns all if under max, prefers spread corners over clustered
+- All tests pass using synthetic calibration video fixture with ChArUco board at 20 varied poses
+
+### [src/aquacal/calibration/__init__.py]
+- Uncommented calibrate_intrinsics_single and calibrate_intrinsics_all imports and exports
+- Module now properly exports both intrinsic calibration functions
+
+## 2026-02-03
 ### [src/aquacal/io/serialization.py]
 - Implemented save_calibration: serializes CalibrationResult to JSON with numpy arrays converted to nested lists
 - Implemented load_calibration: deserializes JSON to CalibrationResult with version checking and proper error handling
