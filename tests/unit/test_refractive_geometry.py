@@ -395,3 +395,132 @@ class TestRefractiveGeometryPhysics:
         # Both should be to the right of center
         assert pixel_small[0] > 320
         assert pixel_large[0] > pixel_small[0]
+
+
+class TestOffsetCameraRoundTrip:
+    """Regression tests for cameras at non-origin positions.
+
+    These tests verify that refractive_project and refractive_back_project
+    form a consistent round-trip for cameras with XY offsets from origin.
+    This was a bug fixed in 2026-02-04 where the TIR boundary was incorrectly
+    identified as the optimization solution.
+    """
+
+    def test_round_trip_offset_camera_x(self):
+        """Test round-trip with camera offset in X direction."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
+            dist_coeffs=np.zeros(5),
+            image_size=(640, 480)
+        )
+        # Camera at X=-0.3 (t=[0.3, 0, 0] means C=[-0.3, 0, 0])
+        extrinsics = CameraExtrinsics(R=np.eye(3), t=np.array([0.3, 0.0, 0.0]))
+        camera = Camera("cam_offset", intrinsics, extrinsics)
+        interface = Interface(
+            normal=np.array([0, 0, -1]),
+            base_height=0.0,
+            camera_offsets={'cam_offset': 0.15},
+            n_air=1.0,
+            n_water=1.333
+        )
+
+        point = np.array([0.05, 0.025, 0.30])
+
+        pixel = refractive_project(camera, interface, point)
+        assert pixel is not None
+
+        origin, direction = refractive_back_project(camera, interface, pixel)
+        assert origin is not None
+
+        # Check round-trip error
+        t = np.dot(point - origin, direction)
+        closest = origin + t * direction
+        error = np.linalg.norm(closest - point)
+
+        # Should have sub-micrometer accuracy
+        assert error < 1e-9, f"Round-trip error {error*1000:.6f} mm is too large"
+
+    def test_round_trip_offset_camera_xy(self):
+        """Test round-trip with camera offset in both X and Y."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
+            dist_coeffs=np.zeros(5),
+            image_size=(640, 480)
+        )
+        # Camera at X=0.2, Y=0.1
+        extrinsics = CameraExtrinsics(R=np.eye(3), t=np.array([-0.2, -0.1, 0.0]))
+        camera = Camera("cam_xy", intrinsics, extrinsics)
+        interface = Interface(
+            normal=np.array([0, 0, -1]),
+            base_height=0.0,
+            camera_offsets={'cam_xy': 0.15},
+            n_air=1.0,
+            n_water=1.333
+        )
+
+        point = np.array([0.05, 0.025, 0.30])
+
+        pixel = refractive_project(camera, interface, point)
+        assert pixel is not None
+
+        origin, direction = refractive_back_project(camera, interface, pixel)
+        assert origin is not None
+
+        t = np.dot(point - origin, direction)
+        closest = origin + t * direction
+        error = np.linalg.norm(closest - point)
+
+        assert error < 1e-9, f"Round-trip error {error*1000:.6f} mm is too large"
+
+    def test_round_trip_multiple_offset_cameras(self):
+        """Test round-trip consistency across multiple offset cameras."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
+            dist_coeffs=np.zeros(5),
+            image_size=(640, 480)
+        )
+
+        camera_offsets = [
+            np.array([0.0, 0.0, 0.0]),    # Origin
+            np.array([0.3, 0.0, 0.0]),    # X offset
+            np.array([0.0, 0.3, 0.0]),    # Y offset
+            np.array([0.15, 0.2, 0.0]),   # XY offset
+            np.array([-0.1, 0.25, 0.0]),  # Negative X
+        ]
+
+        test_points = [
+            np.array([0.05, 0.025, 0.30]),
+            np.array([0.0, 0.0, 0.25]),
+            np.array([-0.03, 0.04, 0.35]),
+        ]
+
+        max_error = 0.0
+        for i, t_offset in enumerate(camera_offsets):
+            camera = Camera(
+                f"cam{i}",
+                intrinsics,
+                CameraExtrinsics(R=np.eye(3), t=t_offset)
+            )
+            interface = Interface(
+                normal=np.array([0, 0, -1]),
+                base_height=0.0,
+                camera_offsets={f'cam{i}': 0.15},
+                n_air=1.0,
+                n_water=1.333
+            )
+
+            for point in test_points:
+                pixel = refractive_project(camera, interface, point)
+                if pixel is None:
+                    continue
+
+                origin, direction = refractive_back_project(camera, interface, pixel)
+                if origin is None:
+                    continue
+
+                t = np.dot(point - origin, direction)
+                closest = origin + t * direction
+                error = np.linalg.norm(closest - point)
+                max_error = max(max_error, error)
+
+        assert max_error < 1e-9, f"Max round-trip error {max_error*1000:.6f} mm"

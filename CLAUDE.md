@@ -13,6 +13,7 @@ Refractive multi-camera calibration library for an array of cameras in air viewi
 5. Run tests specified in "Acceptance Criteria"
 6. Update `CHANGELOG.md` (see Exit Protocol below)
 7. If task is incomplete, write `tasks/handoff.md`
+8. If you suspect a bug somewhere outside the current scope, pause and notify the user
 
 ## Exit Protocol
 
@@ -168,6 +169,7 @@ Everything not listed above. In particular:
 4. **Reference the spec** — point to specific sections of `agent_implementation_spec.md`
 5. **One module per task** — don't combine unrelated work
 6. **Check dependencies** — ensure all dependencies are implemented before assigning a task
+7. **Suggest Model** - after writing a task, suggest which model (sonnet or opus) should be used to execute it
 
 ### Do Not (In Task Writer Mode)
 

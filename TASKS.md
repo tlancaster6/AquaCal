@@ -40,13 +40,13 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 ## Phase 5: Validation
 
-- [ ] **5.1** Implement reprojection error computation (`validation/reprojection.py`)
-- [ ] **5.2** Implement 3D reconstruction metrics (`validation/reconstruction.py`)
-- [ ] **5.3** Implement diagnostics (`validation/diagnostics.py`)
+- [x] **5.1** Implement reprojection error computation (`validation/reprojection.py`)
+- [x] **5.2** Implement 3D reconstruction metrics (`validation/reconstruction.py`)
+- [x] **5.3** Implement diagnostics (`validation/diagnostics.py`)
 
 ## Phase 6: Integration
 
-- [ ] **6.1** Implement triangulation module (`triangulation/triangulate.py`)
+- [x] **6.1** Implement triangulation module (`triangulation/triangulate.py`)
 - [ ] **6.2** Implement pipeline orchestration (`calibration/pipeline.py`)
 - [ ] **6.3** Add CLI entry point
 

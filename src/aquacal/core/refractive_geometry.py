@@ -204,17 +204,19 @@ def refractive_project(
         d_water = d_water / d_water_norm
         return snells_law_3d(d_water, interface.normal, interface.n_ratio_water_to_air)
 
-    def error_function(t: float) -> float:
+    def error_function(t: float) -> float | None:
         """
         Signed error measuring deviation of refracted ray from camera direction.
         Uses the XY component of the cross product for sign.
+
+        Returns:
+            Error value, or None if TIR occurs (invalid configuration).
         """
         P = get_interface_point(t)
 
         d_air = compute_refracted_ray(P)
         if d_air is None:  # TIR
-            # Return large error with sign based on which side we're on
-            return 1e6 if t > xy_dist else -1e6
+            return None
 
         # Vector from P to camera
         to_camera = C - P
@@ -233,48 +235,59 @@ def refractive_project(
         # Use the component that gives a sign change
         return cross[0] * dir_xy[1] - cross[1] * dir_xy[0]
 
+    def error_function_for_brent(t: float) -> float:
+        """Wrapper for brentq that returns large values for TIR."""
+        err = error_function(t)
+        if err is None:
+            # Return large value with sign based on position
+            # (sign doesn't matter much since we bracket properly now)
+            return 1e6 if t > xy_dist else -1e6
+        return err
+
     # Search range: from near camera (t=0) to beyond point projection (t=2*xy_dist)
     t_max = 2.0 * xy_dist
 
     try:
-        # Sample to find bracket
-        e0 = error_function(0.0)
+        # Sample to find bracket, excluding TIR samples
+        # Collect valid (non-TIR) samples first
+        n_samples = 50
+        t_samples = np.linspace(0, t_max, n_samples)
+        valid_samples: list[tuple[float, float]] = []
 
-        # Check if e0 is already zero (degenerate case)
+        for t_test in t_samples:
+            e_test = error_function(t_test)
+            if e_test is not None:
+                valid_samples.append((t_test, e_test))
+
+        if len(valid_samples) < 2:
+            # Not enough valid samples (mostly TIR)
+            return None
+
+        # Check if any sample is already zero (degenerate case)
         t_solution = None
-        if abs(e0) < 1e-12:
-            t_solution = 0.0
-        else:
-            # Find a bracket with sign change
+        for t_test, e_test in valid_samples:
+            if abs(e_test) < 1e-12:
+                t_solution = t_test
+                break
+
+        if t_solution is None:
+            # Find a bracket with sign change among valid samples
             found_bracket = False
             t_lo, t_hi = 0.0, 0.0
 
-            # Sample points to find sign change
-            n_samples = 50
-            t_samples = np.linspace(0, t_max, n_samples)
-            e_prev = e0
-            t_prev = 0.0
-
-            for t_test in t_samples[1:]:
-                e_test = error_function(t_test)
+            for i in range(len(valid_samples) - 1):
+                t_prev, e_prev = valid_samples[i]
+                t_test, e_test = valid_samples[i + 1]
                 if e_prev * e_test < 0:
                     t_lo, t_hi = t_prev, t_test
                     found_bracket = True
                     break
-                # Also check if we found a root directly
-                if abs(e_test) < 1e-12:
-                    t_solution = t_test
-                    found_bracket = True
-                    break
-                e_prev = e_test
-                t_prev = t_test
 
             if not found_bracket:
                 return None
 
-            # If we didn't find t_solution directly, use brentq
-            if t_solution is None:
-                t_solution = brentq(error_function, t_lo, t_hi, xtol=1e-9)
+            # Use brentq to find exact root
+            t_solution = brentq(error_function_for_brent, t_lo, t_hi, xtol=1e-9)
 
     except (ValueError, RuntimeError):
         return None
