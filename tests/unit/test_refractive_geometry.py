@@ -11,6 +11,8 @@ from aquacal.core.refractive_geometry import (
     trace_ray_air_to_water,
     refractive_back_project,
     refractive_project,
+    refractive_project_fast,
+    refractive_project_fast_batch,
 )
 
 
@@ -524,3 +526,219 @@ class TestOffsetCameraRoundTrip:
                 max_error = max(max_error, error)
 
         assert max_error < 1e-9, f"Max round-trip error {max_error*1000:.6f} mm"
+
+
+class TestRefractiveProjectFast:
+    """Tests for fast Newton-based refractive projection."""
+
+    def test_matches_original(self, simple_camera, simple_interface):
+        """Fast projection matches original within tolerance."""
+        test_points = [
+            np.array([0.0, 0.0, 0.5]),
+            np.array([0.05, 0.02, 0.3]),
+            np.array([0.1, 0.0, 0.5]),
+            np.array([0.0, 0.1, 0.4]),
+            np.array([-0.05, 0.03, 0.6]),
+            np.array([0.08, -0.05, 0.35]),
+        ]
+
+        for point in test_points:
+            original = refractive_project(simple_camera, simple_interface, point)
+            fast = refractive_project_fast(simple_camera, simple_interface, point)
+
+            if original is not None:
+                assert fast is not None, f"Fast returned None for point {point}"
+                np.testing.assert_allclose(
+                    fast, original, atol=0.01,
+                    err_msg=f"Mismatch at point {point}"
+                )
+            else:
+                assert fast is None, f"Fast should return None for point {point}"
+
+    def test_matches_original_offset_cameras(self):
+        """Fast projection matches original for offset cameras."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
+            dist_coeffs=np.zeros(5),
+            image_size=(640, 480)
+        )
+
+        camera_translations = [
+            np.array([0.3, 0.0, 0.0]),
+            np.array([0.0, 0.25, 0.0]),
+            np.array([-0.2, 0.15, 0.0]),
+        ]
+
+        for t in camera_translations:
+            camera = Camera(
+                "cam_test",
+                intrinsics,
+                CameraExtrinsics(R=np.eye(3), t=t)
+            )
+            interface = Interface(
+                normal=np.array([0, 0, -1]),
+                base_height=0.0,
+                camera_offsets={"cam_test": 0.15},
+            )
+
+            test_points = [
+                np.array([0.05, 0.025, 0.30]),
+                np.array([0.0, 0.0, 0.25]),
+            ]
+
+            for point in test_points:
+                original = refractive_project(camera, interface, point)
+                fast = refractive_project_fast(camera, interface, point)
+
+                if original is not None:
+                    assert fast is not None
+                    np.testing.assert_allclose(fast, original, atol=0.01)
+
+    def test_point_on_optical_axis(self, simple_camera, simple_interface):
+        """Handles point directly below camera."""
+        # Camera is at origin
+        point = np.array([0.0, 0.0, 0.5])
+        result = refractive_project_fast(simple_camera, simple_interface, point)
+        assert result is not None
+        # Should project to principal point
+        np.testing.assert_allclose(result, [320, 240], atol=0.1)
+
+    def test_point_above_interface_returns_none(self, simple_camera, simple_interface):
+        """Returns None for point above interface."""
+        z_int = simple_interface.get_interface_distance(simple_camera.name)
+        point = np.array([0.0, 0.0, z_int - 0.05])
+        assert refractive_project_fast(simple_camera, simple_interface, point) is None
+
+    def test_point_at_interface_returns_none(self, simple_camera, simple_interface):
+        """Returns None for point exactly at interface."""
+        z_int = simple_interface.get_interface_distance(simple_camera.name)
+        point = np.array([0.05, 0.02, z_int])
+        assert refractive_project_fast(simple_camera, simple_interface, point) is None
+
+    def test_non_horizontal_interface_raises(self, simple_camera):
+        """Raises ValueError for tilted interface."""
+        tilted = Interface(
+            normal=np.array([0.1, 0, -0.995]),
+            base_height=0.15,
+            camera_offsets={"cam0": 0.0},
+        )
+        with pytest.raises(ValueError, match="horizontal"):
+            refractive_project_fast(simple_camera, tilted, np.array([0, 0, 0.5]))
+
+    def test_convergence_fast(self, simple_camera, simple_interface):
+        """Fast projection converges quickly (verified by matching original)."""
+        # The test is that it matches the original function which uses brentq
+        # If it matches, the Newton method converged correctly
+        points = [
+            np.array([0.1, 0.05, 0.4]),
+            np.array([-0.08, 0.06, 0.5]),
+        ]
+        for point in points:
+            original = refractive_project(simple_camera, simple_interface, point)
+            fast = refractive_project_fast(simple_camera, simple_interface, point)
+            assert fast is not None
+            np.testing.assert_allclose(fast, original, atol=0.01)
+
+    def test_various_depths(self, simple_camera, simple_interface):
+        """Test projection at various water depths."""
+        for depth in [0.2, 0.5, 1.0, 2.0]:
+            point = np.array([0.05, 0.02, depth])
+            result = refractive_project_fast(simple_camera, simple_interface, point)
+            assert result is not None, f"Failed at depth {depth}"
+
+    def test_round_trip_consistency(self, simple_camera, simple_interface):
+        """Project then back-project should give ray through original point."""
+        point = np.array([0.05, 0.03, 0.4])
+
+        pixel = refractive_project_fast(simple_camera, simple_interface, point)
+        assert pixel is not None
+
+        origin, direction = refractive_back_project(
+            simple_camera, simple_interface, pixel
+        )
+        assert origin is not None
+
+        t = np.dot(point - origin, direction)
+        closest = origin + t * direction
+
+        np.testing.assert_allclose(closest, point, atol=1e-4)
+
+
+class TestRefractiveProjectFastBatch:
+    """Tests for batch fast projection."""
+
+    def test_batch_matches_single(self, simple_camera, simple_interface):
+        """Batch projection matches single-point projection."""
+        points = np.array([
+            [0.0, 0.0, 0.5],
+            [0.05, 0.02, 0.3],
+            [0.1, 0.0, 0.5],
+            [-0.05, 0.03, 0.6],
+        ])
+
+        batch_result = refractive_project_fast_batch(
+            simple_camera, simple_interface, points
+        )
+
+        for i, point in enumerate(points):
+            single_result = refractive_project_fast(
+                simple_camera, simple_interface, point
+            )
+            if single_result is not None:
+                np.testing.assert_allclose(
+                    batch_result[i], single_result, atol=1e-6
+                )
+            else:
+                assert np.all(np.isnan(batch_result[i]))
+
+    def test_batch_handles_invalid_points(self, simple_camera, simple_interface):
+        """Batch returns NaN for invalid points."""
+        z_int = simple_interface.get_interface_distance(simple_camera.name)
+        points = np.array([
+            [0.0, 0.0, 0.5],  # valid
+            [0.0, 0.0, z_int - 0.05],  # above interface
+            [0.05, 0.02, 0.3],  # valid
+        ])
+
+        result = refractive_project_fast_batch(
+            simple_camera, simple_interface, points
+        )
+
+        assert not np.any(np.isnan(result[0]))  # valid
+        assert np.all(np.isnan(result[1]))  # invalid
+        assert not np.any(np.isnan(result[2]))  # valid
+
+    def test_batch_non_horizontal_raises(self, simple_camera):
+        """Raises ValueError for tilted interface in batch."""
+        tilted = Interface(
+            normal=np.array([0.1, 0, -0.995]),
+            base_height=0.15,
+            camera_offsets={"cam0": 0.0},
+        )
+        points = np.array([[0, 0, 0.5], [0.1, 0.1, 0.4]])
+        with pytest.raises(ValueError, match="horizontal"):
+            refractive_project_fast_batch(simple_camera, tilted, points)
+
+    def test_batch_empty_array(self, simple_camera, simple_interface):
+        """Handles empty input array."""
+        points = np.zeros((0, 3))
+        result = refractive_project_fast_batch(
+            simple_camera, simple_interface, points
+        )
+        assert result.shape == (0, 2)
+
+    def test_batch_point_on_axis(self, simple_camera, simple_interface):
+        """Handles point directly below camera in batch."""
+        points = np.array([
+            [0.0, 0.0, 0.5],  # on axis
+            [0.05, 0.02, 0.3],  # off axis
+        ])
+
+        result = refractive_project_fast_batch(
+            simple_camera, simple_interface, points
+        )
+
+        # On-axis should project to principal point
+        np.testing.assert_allclose(result[0], [320, 240], atol=0.1)
+        # Off-axis should be valid
+        assert not np.any(np.isnan(result[1]))

@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import least_squares
+from scipy.optimize._numdiff import approx_derivative, group_columns
 
 from aquacal.config.schema import (
     CameraIntrinsics,
@@ -21,7 +22,7 @@ from aquacal.config.schema import (
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project
+from aquacal.core.refractive_geometry import refractive_project, refractive_project_fast
 from aquacal.utils.transforms import (
     rvec_to_matrix,
     matrix_to_rvec,
@@ -230,6 +231,145 @@ def _unpack_params(
     return extrinsics, interface_distances, board_poses
 
 
+def _build_jacobian_sparsity(
+    detections: DetectionResult,
+    reference_camera: str,
+    camera_order: list[str],
+    frame_order: list[int],
+    min_corners: int,
+) -> NDArray[np.int8]:
+    """
+    Build sparse Jacobian structure matrix.
+
+    Each residual (x and y error for one corner observation) depends only on:
+    - Camera extrinsics: 6 params (or 0 if reference camera)
+    - Interface distance for that camera: 1 param
+    - Board pose for that frame: 6 params
+
+    This typically results in ~98% sparsity (each residual depends on ~13 params
+    out of ~685 total params for a real rig scenario).
+
+    Args:
+        detections: Detection results
+        reference_camera: Name of reference camera (no extrinsic params)
+        camera_order: Ordered list of camera names
+        frame_order: Ordered list of frame indices
+        min_corners: Minimum corners per detection
+
+    Returns:
+        Sparse matrix of shape (n_residuals, n_params) with 1s where
+        Jacobian may be non-zero.
+    """
+    n_cams = len(camera_order)
+    n_frames = len(frame_order)
+
+    # Parameter layout:
+    # [cam1_rvec(3), cam1_tvec(3), ..., camN_rvec(3), camN_tvec(3),  <- 6*(n_cams-1) params
+    #  dist_cam0, dist_cam1, ..., dist_camN,                         <- n_cams params
+    #  frame0_rvec(3), frame0_tvec(3), ..., frameM_rvec(3), frameM_tvec(3)]  <- 6*n_frames
+
+    n_extrinsic_params = 6 * (n_cams - 1)
+    n_distance_params = n_cams
+    n_pose_params = 6 * n_frames
+    n_params = n_extrinsic_params + n_distance_params + n_pose_params
+
+    # Build camera index mapping (for extrinsics block)
+    cam_to_ext_idx = {}
+    ext_idx = 0
+    for cam_name in camera_order:
+        if cam_name != reference_camera:
+            cam_to_ext_idx[cam_name] = ext_idx
+            ext_idx += 1
+
+    # Camera index for distance params
+    cam_to_dist_idx = {cam: i for i, cam in enumerate(camera_order)}
+
+    # Frame index for pose params
+    frame_to_pose_idx = {frame: i for i, frame in enumerate(frame_order)}
+
+    # Build sparsity pattern
+    residual_rows = []
+
+    for frame_idx in frame_order:
+        if frame_idx not in detections.frames:
+            continue
+
+        frame_det = detections.frames[frame_idx]
+        pose_idx = frame_to_pose_idx[frame_idx]
+
+        for cam_name in camera_order:
+            if cam_name not in frame_det.detections:
+                continue
+
+            detection = frame_det.detections[cam_name]
+            if detection.num_corners < min_corners:
+                continue
+
+            dist_idx = cam_to_dist_idx[cam_name]
+
+            # Each corner contributes 2 residuals (x, y)
+            for _ in range(detection.num_corners):
+                # This residual depends on:
+                row = np.zeros(n_params, dtype=np.int8)
+
+                # 1. Camera extrinsics (if not reference)
+                if cam_name in cam_to_ext_idx:
+                    ext_start = cam_to_ext_idx[cam_name] * 6
+                    row[ext_start : ext_start + 6] = 1
+
+                # 2. Interface distance for this camera
+                row[n_extrinsic_params + dist_idx] = 1
+
+                # 3. Board pose for this frame
+                pose_start = n_extrinsic_params + n_distance_params + pose_idx * 6
+                row[pose_start : pose_start + 6] = 1
+
+                # Two residuals (x and y) with same sparsity pattern
+                residual_rows.append(row)
+                residual_rows.append(row.copy())
+
+    return np.array(residual_rows, dtype=np.int8)
+
+
+def _make_sparse_jacobian_func(
+    cost_func,
+    cost_args: tuple,
+    jac_sparsity: NDArray[np.int8],
+    bounds: tuple[NDArray[np.float64], NDArray[np.float64]],
+):
+    """
+    Create a Jacobian callable that uses sparse finite differences.
+
+    scipy's jac_sparsity parameter forces the LSMR trust-region solver,
+    which can fail to converge on ill-conditioned problems. This function
+    creates a Jacobian callable that computes the Jacobian using sparse
+    column grouping (same efficiency) but returns a dense matrix, allowing
+    scipy to use the 'exact' trust-region solver.
+
+    Args:
+        cost_func: The cost function
+        cost_args: Arguments to pass to cost_func after params
+        jac_sparsity: Sparsity pattern matrix (n_residuals, n_params)
+        bounds: Tuple of (lower, upper) bound arrays
+
+    Returns:
+        Callable that takes (params, *args) and returns dense Jacobian
+    """
+    groups = group_columns(jac_sparsity)
+
+    def jac_func(params, *args):
+        J_sparse = approx_derivative(
+            lambda x: cost_func(x, *args),
+            params,
+            method="2-point",
+            sparsity=(jac_sparsity, groups),
+            bounds=bounds,
+        )
+        return J_sparse.toarray() if hasattr(J_sparse, "toarray") else np.asarray(J_sparse)
+
+    return jac_func
+
+
 def _cost_function(
     params: NDArray[np.float64],
     detections: DetectionResult,
@@ -243,6 +383,7 @@ def _cost_function(
     camera_order: list[str],
     frame_order: list[int],
     min_corners: int,
+    use_fast_projection: bool = True,
 ) -> NDArray[np.float64]:
     """
     Compute reprojection residuals for all observations.
@@ -265,6 +406,7 @@ def _cost_function(
         camera_order: Ordered list of camera names
         frame_order: Ordered list of frame indices
         min_corners: Minimum corners per detection
+        use_fast_projection: If True, use fast Newton-based projection (default True)
 
     Returns:
         1D array of residuals [r0_x, r0_y, r1_x, r1_y, ...] in pixels
@@ -310,7 +452,12 @@ def _cost_function(
                 point_3d = corners_3d[corner_id]
                 detected_px = detection.corners_2d[i]
 
-                projected = refractive_project(camera, interface, point_3d)
+                # Use fast projection for horizontal interface (default)
+                if use_fast_projection:
+                    projected = refractive_project_fast(camera, interface, point_3d)
+                else:
+                    projected = refractive_project(camera, interface, point_3d)
+
                 if projected is None:
                     # Use large residual for failed projections
                     residuals.extend([100.0, 100.0])
@@ -338,6 +485,8 @@ def optimize_interface(
     loss: str = "huber",
     loss_scale: float = 1.0,
     min_corners: int = 4,
+    use_fast_projection: bool = True,
+    use_sparse_jacobian: bool = True,
 ) -> tuple[dict[str, CameraExtrinsics], dict[str, float], list[BoardPose], float]:
     """
     Jointly optimize camera extrinsics, interface distances, and board poses.
@@ -360,6 +509,10 @@ def optimize_interface(
         loss: Robust loss function ("linear", "huber", "soft_l1", "cauchy")
         loss_scale: Scale parameter for robust loss in pixels
         min_corners: Minimum corners per detection to include in optimization
+        use_fast_projection: Use fast Newton-based projection (default True).
+            Only works with horizontal interface (normal = [0, 0, -1]).
+        use_sparse_jacobian: Use sparse Jacobian structure (default True).
+            Dramatically improves performance for large camera arrays.
 
     Returns:
         Tuple of:
@@ -440,27 +593,50 @@ def optimize_interface(
     # Reference extrinsics (fixed during optimization)
     reference_extrinsics = initial_extrinsics[reference_camera]
 
+    # Build sparse Jacobian if enabled.
+    # Note: We use a custom Jacobian callable instead of jac_sparsity parameter
+    # because jac_sparsity forces scipy to use the LSMR trust-region solver,
+    # which fails to converge on this problem. The custom callable computes
+    # the Jacobian using sparse column grouping (same efficiency as jac_sparsity)
+    # but returns a dense matrix, allowing the 'exact' trust-region solver.
+    cost_args = (
+        detections,
+        intrinsics,
+        board,
+        reference_camera,
+        reference_extrinsics,
+        interface_normal,
+        n_air,
+        n_water,
+        camera_order,
+        frame_order,
+        min_corners,
+        use_fast_projection,
+    )
+
+    jac = "2-point"  # Default: dense finite differences
+    if use_sparse_jacobian:
+        jac_sparsity = _build_jacobian_sparsity(
+            detections,
+            reference_camera,
+            camera_order,
+            frame_order,
+            min_corners,
+        )
+        jac = _make_sparse_jacobian_func(
+            _cost_function, cost_args, jac_sparsity, (lower, upper),
+        )
+
     # Run optimization
     result = least_squares(
         _cost_function,
         x0=initial_params,
-        args=(
-            detections,
-            intrinsics,
-            board,
-            reference_camera,
-            reference_extrinsics,
-            interface_normal,
-            n_air,
-            n_water,
-            camera_order,
-            frame_order,
-            min_corners,
-        ),
+        args=cost_args,
         method="trf",  # Trust Region Reflective (supports bounds)
         loss=loss,
         f_scale=loss_scale,
         bounds=(lower, upper),
+        jac=jac,
         verbose=0,
     )
 

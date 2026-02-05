@@ -9,6 +9,58 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-04
+### [tests/synthetic/ground_truth.py] (new file)
+- Created synthetic ground truth generation module with SyntheticScenario dataclass
+- Implemented generate_camera_intrinsics, generate_camera_array (grid/line/ring layouts), generate_real_rig_array (13-camera rig with inner/outer rings), generate_board_trajectory, generate_real_rig_trajectory, generate_synthetic_detections, create_scenario (ideal/minimal/realistic), compute_calibration_errors
+- Board config matches real hardware: 12x9 squares, 60mm square size, 45mm markers, DICT_5X5_100
+
+### [tests/synthetic/test_full_pipeline.py] (new file)
+- Created 27 integration tests validating synthetic data generation and calibration pipeline
+- Tests cover: intrinsics generation, camera array layouts, real rig geometry (13 cameras, ring radii, roll angles), scenario creation, synthetic detection format, ideal scenario recovery (0 noise), realistic scenario accuracy (13-camera rig, 0.5px noise), minimal 2-camera edge case, error metric computation
+
+### [tests/synthetic/conftest.py] (new file)
+- Pytest fixtures for ideal, minimal, and realistic scenarios
+
+### [tests/synthetic/README.md]
+- Updated with implementation documentation, scenario descriptions, and usage notes
+
+## 2026-02-04
+### [src/aquacal/calibration/interface_estimation.py]
+- Fixed sparse Jacobian convergence: scipy's `jac_sparsity` forces LSMR solver which diverges
+- Added `_make_sparse_jacobian_func()`: computes Jacobian via sparse column grouping, returns dense matrix for 'exact' trust-region solver
+- Enabled `use_sparse_jacobian=True` by default (was disabled pending debugging)
+- Sparsity pattern verified correct via dense Jacobian comparison (zero missing entries)
+
+### [tests/unit/test_interface_estimation.py]
+- Unskipped `test_sparse_jacobian_gives_same_result` — now passes
+
+## 2026-02-04
+### [pyproject.toml]
+- Registered `slow` pytest marker to eliminate unknown marker warning
+
+### [src/aquacal/core/refractive_geometry.py]
+- Added `refractive_project_fast()`: Newton-Raphson based projection (2-4 iterations vs ~60 brentq samples)
+- Added `refractive_project_fast_batch()`: Vectorized batch projection for multiple points
+- Matches original `refractive_project()` within 0.01 pixels, provides ~50x speedup
+- Requires horizontal interface (normal = [0,0,-1]), raises ValueError for tilted interfaces
+
+### [src/aquacal/calibration/interface_estimation.py]
+- Added `_build_jacobian_sparsity()`: Computes sparse Jacobian structure for optimization
+- Updated `_cost_function()`: Added `use_fast_projection` parameter (default True)
+- Updated `optimize_interface()`: Added `use_fast_projection` and `use_sparse_jacobian` parameters
+- Fast projection enabled by default; sparse Jacobian disabled pending pattern debugging
+- Performance: Test that took 240s now completes in 4.76s (~50x speedup)
+
+### [tests/unit/test_refractive_geometry.py]
+- Added TestRefractiveProjectFast class: 9 tests for fast projection accuracy and edge cases
+- Added TestRefractiveProjectFastBatch class: 5 tests for batch projection
+
+### [tests/unit/test_interface_estimation.py]
+- Added TestBuildJacobianSparsity class: 3 tests for sparsity matrix shape, pattern, and density
+- Added TestOptimizeInterfaceWithFastProjection class: 2 tests (1 skipped for sparse Jacobian)
+- Fixed camera position fixtures: Changed from 30cm to 10cm spacing for overlapping FOV
+
+## 2026-02-04
 ### [src/aquacal/cli.py, src/aquacal/__main__.py]
 - Implemented command-line interface for running calibration pipeline from terminal
 - create_parser() creates ArgumentParser with "calibrate" subcommand, supporting --verbose, --output-dir, --dry-run flags

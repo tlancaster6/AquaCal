@@ -23,6 +23,7 @@ from aquacal.calibration.interface_estimation import (
     _compute_initial_board_poses,
     _pack_params,
     _unpack_params,
+    _build_jacobian_sparsity,
 )
 
 
@@ -56,7 +57,12 @@ def intrinsics() -> dict[str, CameraIntrinsics]:
 
 @pytest.fixture
 def ground_truth_extrinsics() -> dict[str, CameraExtrinsics]:
-    """Ground truth camera extrinsics for testing."""
+    """Ground truth camera extrinsics for testing.
+
+    Camera positions are close enough together that all cameras can see
+    the board at the test positions (z=0.4m). With 10cm spacing and 500px
+    focal length, the cameras have overlapping fields of view.
+    """
     return {
         "cam0": CameraExtrinsics(
             R=np.eye(3, dtype=np.float64),
@@ -64,11 +70,11 @@ def ground_truth_extrinsics() -> dict[str, CameraExtrinsics]:
         ),
         "cam1": CameraExtrinsics(
             R=np.eye(3, dtype=np.float64),
-            t=np.array([0.3, 0.0, 0.0], dtype=np.float64),  # 30cm to the right
+            t=np.array([0.1, 0.0, 0.0], dtype=np.float64),  # 10cm to the right
         ),
         "cam2": CameraExtrinsics(
             R=np.eye(3, dtype=np.float64),
-            t=np.array([0.0, 0.3, 0.0], dtype=np.float64),  # 30cm down
+            t=np.array([0.0, 0.1, 0.0], dtype=np.float64),  # 10cm down
         ),
     }
 
@@ -664,3 +670,278 @@ class TestOptimizeInterface:
         )
 
         assert rms < 2.0
+
+
+class TestBuildJacobianSparsity:
+    """Tests for sparse Jacobian structure builder."""
+
+    def test_sparsity_shape(
+        self,
+        board,
+        intrinsics,
+        ground_truth_extrinsics,
+        ground_truth_distances,
+        synthetic_board_poses,
+    ):
+        """Sparsity matrix has correct shape."""
+        detections = generate_synthetic_detections(
+            intrinsics,
+            ground_truth_extrinsics,
+            ground_truth_distances,
+            board,
+            synthetic_board_poses,
+            noise_std=0.0,
+        )
+
+        camera_order = sorted(intrinsics.keys())
+        frame_order = [bp.frame_idx for bp in synthetic_board_poses]
+        min_corners = 4
+
+        sparsity = _build_jacobian_sparsity(
+            detections, "cam0", camera_order, frame_order, min_corners
+        )
+
+        # Count expected residuals
+        n_residuals = 0
+        for frame_idx in frame_order:
+            if frame_idx not in detections.frames:
+                continue
+            frame_det = detections.frames[frame_idx]
+            for cam_name in camera_order:
+                if cam_name not in frame_det.detections:
+                    continue
+                det = frame_det.detections[cam_name]
+                if det.num_corners >= min_corners:
+                    n_residuals += det.num_corners * 2
+
+        # Expected params
+        n_cams = len(camera_order)
+        n_frames = len(frame_order)
+        n_params = 6 * (n_cams - 1) + n_cams + 6 * n_frames
+
+        assert sparsity.shape == (n_residuals, n_params)
+
+    def test_sparsity_pattern_correct(
+        self,
+        board,
+        intrinsics,
+        ground_truth_extrinsics,
+        ground_truth_distances,
+        synthetic_board_poses,
+    ):
+        """Each residual only depends on correct params."""
+        detections = generate_synthetic_detections(
+            intrinsics,
+            ground_truth_extrinsics,
+            ground_truth_distances,
+            board,
+            synthetic_board_poses,
+            noise_std=0.0,
+        )
+
+        camera_order = sorted(intrinsics.keys())  # ["cam0", "cam1", "cam2"]
+        frame_order = [bp.frame_idx for bp in synthetic_board_poses]
+        min_corners = 4
+
+        sparsity = _build_jacobian_sparsity(
+            detections, "cam0", camera_order, frame_order, min_corners
+        )
+
+        # Parameter layout:
+        # cam1_rvec(0-2), cam1_tvec(3-5), cam2_rvec(6-8), cam2_tvec(9-11) = 12 extrinsic
+        # dist_cam0(12), dist_cam1(13), dist_cam2(14) = 3 distance
+        # frame0_pose(15-20), frame1_pose(21-26), frame2_pose(27-32) = 18 pose
+        # Total = 33 params
+
+        n_cams = len(camera_order)
+        n_frames = len(frame_order)
+        n_ext = 6 * (n_cams - 1)  # 12
+        n_dist = n_cams  # 3
+
+        # Check that reference camera has no extrinsic dependencies
+        # Find residuals from cam0 (reference)
+        residual_idx = 0
+        for frame_idx in frame_order:
+            if frame_idx not in detections.frames:
+                continue
+            frame_det = detections.frames[frame_idx]
+            pose_idx = frame_order.index(frame_idx)
+
+            for cam_name in camera_order:
+                if cam_name not in frame_det.detections:
+                    continue
+                det = frame_det.detections[cam_name]
+                if det.num_corners < min_corners:
+                    continue
+
+                cam_idx = camera_order.index(cam_name)
+
+                for _ in range(det.num_corners):
+                    row_x = sparsity[residual_idx]
+                    row_y = sparsity[residual_idx + 1]
+
+                    # Both rows should be identical
+                    np.testing.assert_array_equal(row_x, row_y)
+
+                    # Check extrinsics dependency
+                    if cam_name == "cam0":
+                        # Reference: no extrinsic dependencies (first 12 params)
+                        assert np.sum(row_x[:n_ext]) == 0
+                    else:
+                        # Non-reference: 6 extrinsic params set
+                        ext_idx = (camera_order.index(cam_name) - 1) * 6
+                        assert np.sum(row_x[:n_ext]) == 6
+                        assert np.sum(row_x[ext_idx : ext_idx + 6]) == 6
+
+                    # Check distance dependency: exactly 1 distance param
+                    dist_start = n_ext
+                    dist_end = n_ext + n_dist
+                    assert np.sum(row_x[dist_start:dist_end]) == 1
+                    assert row_x[n_ext + cam_idx] == 1
+
+                    # Check pose dependency: exactly 6 pose params
+                    pose_start = n_ext + n_dist + pose_idx * 6
+                    assert row_x[pose_start : pose_start + 6].sum() == 6
+
+                    residual_idx += 2
+
+    def test_sparsity_is_sparse(
+        self,
+        board,
+        intrinsics,
+        ground_truth_extrinsics,
+        ground_truth_distances,
+        synthetic_board_poses,
+    ):
+        """Verify that the matrix is actually sparse."""
+        detections = generate_synthetic_detections(
+            intrinsics,
+            ground_truth_extrinsics,
+            ground_truth_distances,
+            board,
+            synthetic_board_poses,
+            noise_std=0.0,
+        )
+
+        camera_order = sorted(intrinsics.keys())
+        frame_order = [bp.frame_idx for bp in synthetic_board_poses]
+
+        sparsity = _build_jacobian_sparsity(
+            detections, "cam0", camera_order, frame_order, min_corners=4
+        )
+
+        # Calculate sparsity ratio
+        total_elements = sparsity.size
+        nonzero_elements = np.sum(sparsity != 0)
+        sparsity_ratio = 1.0 - (nonzero_elements / total_elements)
+
+        # Should be at least 50% sparse (typical is 90%+)
+        assert sparsity_ratio > 0.5, f"Sparsity ratio only {sparsity_ratio:.2%}"
+
+
+class TestOptimizeInterfaceWithFastProjection:
+    """Test optimization with fast projection enabled."""
+
+    @pytest.mark.slow
+    def test_fast_projection_gives_same_result(
+        self,
+        board,
+        intrinsics,
+        ground_truth_extrinsics,
+        ground_truth_distances,
+        synthetic_board_poses,
+    ):
+        """Optimization with fast projection gives same result as original."""
+        np.random.seed(42)
+
+        detections = generate_synthetic_detections(
+            intrinsics,
+            ground_truth_extrinsics,
+            ground_truth_distances,
+            board,
+            synthetic_board_poses,
+            noise_std=0.5,
+        )
+
+        # Run with fast projection (sparse jacobian disabled - has issues)
+        _, dist_fast, _, rms_fast = optimize_interface(
+            detections=detections,
+            intrinsics=intrinsics,
+            initial_extrinsics=ground_truth_extrinsics,
+            board=board,
+            reference_camera="cam0",
+            use_fast_projection=True,
+            use_sparse_jacobian=False,
+        )
+
+        # Run with original projection
+        np.random.seed(42)
+        _, dist_orig, _, rms_orig = optimize_interface(
+            detections=detections,
+            intrinsics=intrinsics,
+            initial_extrinsics=ground_truth_extrinsics,
+            board=board,
+            reference_camera="cam0",
+            use_fast_projection=False,
+            use_sparse_jacobian=False,
+        )
+
+        # Results should be similar (not identical due to numerical differences)
+        assert abs(rms_fast - rms_orig) < 0.5, (
+            f"RMS difference too large: fast={rms_fast}, orig={rms_orig}"
+        )
+
+        for cam in intrinsics:
+            assert abs(dist_fast[cam] - dist_orig[cam]) < 0.01, (
+                f"Distance for {cam} differs: "
+                f"fast={dist_fast[cam]}, orig={dist_orig[cam]}"
+            )
+
+    def test_sparse_jacobian_gives_same_result(
+        self,
+        board,
+        intrinsics,
+        ground_truth_extrinsics,
+        ground_truth_distances,
+        synthetic_board_poses,
+    ):
+        """Optimization with sparse Jacobian gives same result as dense."""
+        np.random.seed(42)
+
+        detections = generate_synthetic_detections(
+            intrinsics,
+            ground_truth_extrinsics,
+            ground_truth_distances,
+            board,
+            synthetic_board_poses,
+            noise_std=0.5,
+        )
+
+        # Run with sparse Jacobian
+        _, dist_sparse, _, rms_sparse = optimize_interface(
+            detections=detections,
+            intrinsics=intrinsics,
+            initial_extrinsics=ground_truth_extrinsics,
+            board=board,
+            reference_camera="cam0",
+            use_fast_projection=True,
+            use_sparse_jacobian=True,
+        )
+
+        # Run with dense Jacobian
+        np.random.seed(42)
+        _, dist_dense, _, rms_dense = optimize_interface(
+            detections=detections,
+            intrinsics=intrinsics,
+            initial_extrinsics=ground_truth_extrinsics,
+            board=board,
+            reference_camera="cam0",
+            use_fast_projection=True,
+            use_sparse_jacobian=False,
+        )
+
+        # Results should be identical (same cost function, just different Jacobian)
+        assert abs(rms_sparse - rms_dense) < 0.1
+
+        for cam in intrinsics:
+            assert abs(dist_sparse[cam] - dist_dense[cam]) < 0.005

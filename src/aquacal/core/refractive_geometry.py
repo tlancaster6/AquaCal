@@ -313,3 +313,229 @@ def refractive_project(
     point_for_projection = C + ray_to_interface
 
     return camera.project(point_for_projection, apply_distortion=True)
+
+
+def refractive_project_fast(
+    camera: Camera,
+    interface: Interface,
+    point_3d: Vec3,
+    max_iterations: int = 10,
+    tolerance: float = 1e-9,
+) -> Vec2 | None:
+    """
+    Project 3D underwater point to 2D pixel through flat refractive interface.
+
+    Uses Newton-Raphson iteration for fast convergence (typically 2-4 iterations).
+    Assumes interface is horizontal (normal = [0, 0, -1]).
+
+    Args:
+        camera: Camera object
+        interface: Interface object (must have horizontal normal)
+        point_3d: 3D point in water (world coordinates, Z > interface_z)
+        max_iterations: Maximum Newton iterations (default 10)
+        tolerance: Convergence tolerance for r_p (default 1e-9 meters)
+
+    Returns:
+        2D pixel coordinates, or None if projection fails.
+
+    Raises:
+        ValueError: If interface normal is not horizontal [0, 0, -1]
+    """
+    # Validate horizontal interface
+    normal = interface.normal
+    if abs(normal[0]) > 1e-6 or abs(normal[1]) > 1e-6 or abs(normal[2] + 1) > 1e-6:
+        raise ValueError(
+            "refractive_project_fast requires horizontal interface (normal = [0,0,-1])"
+        )
+
+    C = camera.C
+    Q = np.asarray(point_3d, dtype=np.float64)
+    z_int = interface.get_interface_distance(camera.name)
+    n_air = interface.n_air
+    n_water = interface.n_water
+
+    # Camera should be above interface (smaller Z in Z-down coords)
+    h_c = z_int - C[2]  # vertical distance camera to interface
+    if h_c <= 0:
+        return None  # Camera at or below interface
+
+    # Point should be below interface (larger Z)
+    h_q = Q[2] - z_int  # vertical distance interface to point
+    if h_q <= 0:
+        return None  # Point at or above interface
+
+    # Horizontal distance from camera to point
+    dx = Q[0] - C[0]
+    dy = Q[1] - C[1]
+    r_q = np.sqrt(dx * dx + dy * dy)
+
+    # Special case: point directly below camera
+    if r_q < 1e-10:
+        P = np.array([C[0], C[1], z_int], dtype=np.float64)
+        return camera.project(P, apply_distortion=True)
+
+    # Direction unit vector in XY plane (from camera toward point)
+    dir_x = dx / r_q
+    dir_y = dy / r_q
+
+    # Initial guess: pinhole projection (straight line intersection)
+    r_p = r_q * h_c / (h_c + h_q)
+
+    # Newton-Raphson iteration
+    for _ in range(max_iterations):
+        # Compute f(r_p) and f'(r_p)
+        d_air_sq = r_p * r_p + h_c * h_c
+        d_air = np.sqrt(d_air_sq)
+
+        r_q_minus_r_p = r_q - r_p
+        d_water_sq = r_q_minus_r_p * r_q_minus_r_p + h_q * h_q
+        d_water = np.sqrt(d_water_sq)
+
+        sin_air = r_p / d_air
+        sin_water = r_q_minus_r_p / d_water
+
+        f = n_air * sin_air - n_water * sin_water
+
+        # Derivative: f' = n_air * h_c² / d_air³ + n_water * h_q² / d_water³
+        f_prime = n_air * h_c * h_c / (d_air_sq * d_air) + n_water * h_q * h_q / (
+            d_water_sq * d_water
+        )
+
+        # Newton step
+        delta = f / f_prime
+        r_p = r_p - delta
+
+        # Clamp to valid range
+        r_p = max(0.0, min(r_p, r_q))
+
+        if abs(delta) < tolerance:
+            break
+
+    # Compute interface point P
+    px = C[0] + r_p * dir_x
+    py = C[1] + r_p * dir_y
+    P = np.array([px, py, z_int], dtype=np.float64)
+
+    # Project P to pixel (the ray from C through P is the observed ray)
+    return camera.project(P, apply_distortion=True)
+
+
+def refractive_project_fast_batch(
+    camera: Camera,
+    interface: Interface,
+    points_3d: NDArray[np.float64],
+    max_iterations: int = 10,
+    tolerance: float = 1e-9,
+) -> NDArray[np.float64]:
+    """
+    Project multiple 3D underwater points to 2D pixels (vectorized).
+
+    Args:
+        camera: Camera object
+        interface: Interface object (must have horizontal normal)
+        points_3d: Array of shape (N, 3) with 3D points
+        max_iterations: Maximum Newton iterations
+        tolerance: Convergence tolerance
+
+    Returns:
+        Array of shape (N, 2) with pixel coordinates.
+        Invalid projections have NaN values.
+
+    Raises:
+        ValueError: If interface normal is not horizontal [0, 0, -1]
+    """
+    # Validate horizontal interface
+    normal = interface.normal
+    if abs(normal[0]) > 1e-6 or abs(normal[1]) > 1e-6 or abs(normal[2] + 1) > 1e-6:
+        raise ValueError(
+            "refractive_project_fast_batch requires horizontal interface (normal = [0,0,-1])"
+        )
+
+    points = np.asarray(points_3d, dtype=np.float64)
+    n_points = len(points)
+    result = np.full((n_points, 2), np.nan, dtype=np.float64)
+
+    C = camera.C
+    z_int = interface.get_interface_distance(camera.name)
+    n_air = interface.n_air
+    n_water = interface.n_water
+
+    # Camera should be above interface
+    h_c = z_int - C[2]
+    if h_c <= 0:
+        return result
+
+    # Compute per-point values
+    Q = points
+    h_q = Q[:, 2] - z_int  # (N,)
+    dx = Q[:, 0] - C[0]  # (N,)
+    dy = Q[:, 1] - C[1]  # (N,)
+    r_q = np.sqrt(dx * dx + dy * dy)  # (N,)
+
+    # Valid points mask: below interface and not directly below camera
+    valid = (h_q > 0) & (r_q >= 1e-10)
+
+    # Handle points directly below camera separately
+    on_axis = (h_q > 0) & (r_q < 1e-10)
+    if np.any(on_axis):
+        axis_indices = np.where(on_axis)[0]
+        for idx in axis_indices:
+            P = np.array([C[0], C[1], z_int], dtype=np.float64)
+            px = camera.project(P, apply_distortion=True)
+            if px is not None:
+                result[idx] = px
+
+    # Process valid off-axis points
+    valid_indices = np.where(valid)[0]
+    if len(valid_indices) == 0:
+        return result
+
+    # Extract valid subset
+    h_q_v = h_q[valid]
+    dx_v = dx[valid]
+    dy_v = dy[valid]
+    r_q_v = r_q[valid]
+
+    # Direction unit vectors
+    dir_x_v = dx_v / r_q_v
+    dir_y_v = dy_v / r_q_v
+
+    # Initial guess: pinhole projection
+    r_p_v = r_q_v * h_c / (h_c + h_q_v)
+
+    # Newton-Raphson iteration (vectorized)
+    for _ in range(max_iterations):
+        d_air_sq = r_p_v * r_p_v + h_c * h_c
+        d_air = np.sqrt(d_air_sq)
+
+        r_diff = r_q_v - r_p_v
+        d_water_sq = r_diff * r_diff + h_q_v * h_q_v
+        d_water = np.sqrt(d_water_sq)
+
+        sin_air = r_p_v / d_air
+        sin_water = r_diff / d_water
+
+        f = n_air * sin_air - n_water * sin_water
+        f_prime = n_air * h_c * h_c / (d_air_sq * d_air) + n_water * h_q_v * h_q_v / (
+            d_water_sq * d_water
+        )
+
+        delta = f / f_prime
+        r_p_v = r_p_v - delta
+        r_p_v = np.clip(r_p_v, 0.0, r_q_v)
+
+        if np.all(np.abs(delta) < tolerance):
+            break
+
+    # Compute interface points
+    px_v = C[0] + r_p_v * dir_x_v
+    py_v = C[1] + r_p_v * dir_y_v
+
+    # Project each point
+    for i, idx in enumerate(valid_indices):
+        P = np.array([px_v[i], py_v[i], z_int], dtype=np.float64)
+        projected = camera.project(P, apply_distortion=True)
+        if projected is not None:
+            result[idx] = projected
+
+    return result
