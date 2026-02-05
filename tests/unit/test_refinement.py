@@ -17,11 +17,8 @@ from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
 from aquacal.core.refractive_geometry import refractive_project
-from aquacal.calibration.refinement import (
-    joint_refinement,
-    _pack_params_with_intrinsics,
-    _unpack_params_with_intrinsics,
-)
+from aquacal.calibration.refinement import joint_refinement
+from aquacal.calibration._optim_common import pack_params, unpack_params
 
 
 @pytest.fixture
@@ -189,24 +186,24 @@ class TestPackUnpackWithIntrinsics:
         frame_order = [0, 1, 2]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
 
-        packed = _pack_params_with_intrinsics(
+        packed = pack_params(
             ground_truth_extrinsics,
             ground_truth_distances,
             board_poses_dict,
-            intrinsics,
             "cam0",
             camera_order,
             frame_order,
+            intrinsics=intrinsics,
             refine_intrinsics=False,
         )
 
-        ext_out, dist_out, poses_out, intr_out = _unpack_params_with_intrinsics(
+        ext_out, dist_out, poses_out, intr_out = unpack_params(
             packed,
             "cam0",
             ground_truth_extrinsics["cam0"],
-            intrinsics,
             camera_order,
             frame_order,
+            base_intrinsics=intrinsics,
             refine_intrinsics=False,
         )
 
@@ -238,24 +235,24 @@ class TestPackUnpackWithIntrinsics:
         frame_order = [0, 1, 2]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
 
-        packed = _pack_params_with_intrinsics(
+        packed = pack_params(
             ground_truth_extrinsics,
             ground_truth_distances,
             board_poses_dict,
-            intrinsics,
             "cam0",
             camera_order,
             frame_order,
+            intrinsics=intrinsics,
             refine_intrinsics=True,
         )
 
-        ext_out, dist_out, poses_out, intr_out = _unpack_params_with_intrinsics(
+        ext_out, dist_out, poses_out, intr_out = unpack_params(
             packed,
             "cam0",
             ground_truth_extrinsics["cam0"],
-            intrinsics,
             camera_order,
             frame_order,
+            base_intrinsics=intrinsics,
             refine_intrinsics=True,
         )
 
@@ -279,11 +276,10 @@ class TestPackUnpackWithIntrinsics:
         frame_order = [0, 1, 2]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
 
-        packed = _pack_params_with_intrinsics(
+        packed = pack_params(
             ground_truth_extrinsics,
             ground_truth_distances,
             board_poses_dict,
-            intrinsics,
             "cam0",
             camera_order,
             frame_order,
@@ -308,14 +304,14 @@ class TestPackUnpackWithIntrinsics:
         frame_order = [0, 1, 2]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
 
-        packed = _pack_params_with_intrinsics(
+        packed = pack_params(
             ground_truth_extrinsics,
             ground_truth_distances,
             board_poses_dict,
-            intrinsics,
             "cam0",
             camera_order,
             frame_order,
+            intrinsics=intrinsics,
             refine_intrinsics=True,
         )
 

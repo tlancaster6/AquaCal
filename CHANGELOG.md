@@ -9,6 +9,28 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-04
+### [src/aquacal/calibration/_optim_common.py] (new file)
+- Extracted shared optimization utilities from interface_estimation.py and refinement.py
+- Contains: pack_params, unpack_params, build_jacobian_sparsity, build_bounds, compute_residuals, make_sparse_jacobian_func
+- Unified functions support optional intrinsics refinement via refine_intrinsics parameter
+
+### [src/aquacal/calibration/refinement.py]
+- Switched from slow refractive_project (50-sample bracket + brentq) to refractive_project_fast (Newton-Raphson)
+- Added sparse Jacobian support (was using dense finite differences on 87 params)
+- Replaced all local pack/unpack/cost/sparsity/bounds functions with imports from _optim_common
+- Module reduced from ~680 lines to ~210 lines
+
+### [src/aquacal/calibration/interface_estimation.py]
+- Replaced local _pack_params, _unpack_params, _build_jacobian_sparsity, _make_sparse_jacobian_func, _cost_function with imports from _optim_common
+- Module reduced from ~660 lines to ~310 lines
+
+### [tests/unit/test_refinement.py]
+- Updated imports: pack_params and unpack_params now from _optim_common
+
+### [tests/unit/test_interface_estimation.py]
+- Updated imports: pack_params, unpack_params, build_jacobian_sparsity now from _optim_common
+
+## 2026-02-04
 ### [tests/synthetic/ground_truth.py] (new file)
 - Created synthetic ground truth generation module with SyntheticScenario dataclass
 - Implemented generate_camera_intrinsics, generate_camera_array (grid/line/ring layouts), generate_real_rig_array (13-camera rig with inner/outer rings), generate_board_trajectory, generate_real_rig_trajectory, generate_synthetic_detections, create_scenario (ideal/minimal/realistic), compute_calibration_errors

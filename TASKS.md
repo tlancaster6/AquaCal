@@ -68,6 +68,8 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [ ] **P.4** Intelligent frame selection: Add a frame selection step before Stage 3 optimization that caps the number of frames at a configurable budget (~50-80) while maximizing camera coverage, pose graph connectivity, and spatial/angular diversity of board poses. Ensures bounded optimization time regardless of input video length.
 
+- [ ] **P.5** Standardize synthetic pipeline tests: Make test structure consistent across all scenarios in `test_full_pipeline.py`. Each scenario (ideal, realistic, minimal) should test calibration accuracy (rotation, translation, interface distance errors) and RMS reprojection error with scenario-appropriate thresholds. Remove misplaced ground-truth fixture tests (camera count, geometry checks) from calibration test classes — these already exist in `TestGenerateRealRigArray`.
+
 ---
 
 ## Future: Advanced Optimization

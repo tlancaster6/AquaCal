@@ -21,9 +21,11 @@ from aquacal.core.refractive_geometry import refractive_project
 from aquacal.calibration.interface_estimation import (
     optimize_interface,
     _compute_initial_board_poses,
-    _pack_params,
-    _unpack_params,
-    _build_jacobian_sparsity,
+)
+from aquacal.calibration._optim_common import (
+    pack_params,
+    unpack_params,
+    build_jacobian_sparsity,
 )
 
 
@@ -237,7 +239,7 @@ class TestPackUnpackParams:
         frame_order = [bp.frame_idx for bp in synthetic_board_poses[:3]]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
 
-        packed = _pack_params(
+        packed = pack_params(
             ground_truth_extrinsics,
             ground_truth_distances,
             board_poses_dict,
@@ -246,7 +248,7 @@ class TestPackUnpackParams:
             frame_order=frame_order,
         )
 
-        ext_out, dist_out, poses_out = _unpack_params(
+        ext_out, dist_out, poses_out, _ = unpack_params(
             packed,
             reference_camera="cam0",
             reference_extrinsics=ground_truth_extrinsics["cam0"],
@@ -285,7 +287,7 @@ class TestPackUnpackParams:
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses}
         n_frames = len(synthetic_board_poses)
 
-        packed = _pack_params(
+        packed = pack_params(
             ground_truth_extrinsics,
             ground_truth_distances,
             board_poses_dict,
@@ -312,7 +314,7 @@ class TestPackUnpackParams:
             t=np.array([1, 2, 3], dtype=np.float64),
         )
 
-        packed = _pack_params(
+        packed = pack_params(
             ground_truth_extrinsics,
             ground_truth_distances,
             board_poses_dict,
@@ -322,7 +324,7 @@ class TestPackUnpackParams:
         )
 
         # Unpack with different reference extrinsics
-        ext_out, _, _ = _unpack_params(
+        ext_out, _, _, _ = unpack_params(
             packed,
             reference_camera="cam0",
             reference_extrinsics=modified_ref,
@@ -697,7 +699,7 @@ class TestBuildJacobianSparsity:
         frame_order = [bp.frame_idx for bp in synthetic_board_poses]
         min_corners = 4
 
-        sparsity = _build_jacobian_sparsity(
+        sparsity = build_jacobian_sparsity(
             detections, "cam0", camera_order, frame_order, min_corners
         )
 
@@ -743,7 +745,7 @@ class TestBuildJacobianSparsity:
         frame_order = [bp.frame_idx for bp in synthetic_board_poses]
         min_corners = 4
 
-        sparsity = _build_jacobian_sparsity(
+        sparsity = build_jacobian_sparsity(
             detections, "cam0", camera_order, frame_order, min_corners
         )
 
@@ -826,7 +828,7 @@ class TestBuildJacobianSparsity:
         camera_order = sorted(intrinsics.keys())
         frame_order = [bp.frame_idx for bp in synthetic_board_poses]
 
-        sparsity = _build_jacobian_sparsity(
+        sparsity = build_jacobian_sparsity(
             detections, "cam0", camera_order, frame_order, min_corners=4
         )
 
