@@ -82,6 +82,8 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.11** Add progress feedback to pipeline: Wire up existing `progress_callback` parameters in `calibrate_intrinsics_all()` and `detect_all_frames()`, and set `verbose=1` for Stage 3/4 optimizers. Provides per-camera and per-frame progress during the longest-running pipeline stages.
 
+- [x] **P.12** Add legacy ChArUco board pattern support: Add `legacy_pattern: bool = False` to `BoardConfig`, call `setLegacyPattern(True)` in `get_opencv_board()` when set. Parse from both `board` and `intrinsic_board` config sections. Needed for older printed boards that have a marker in the top-left cell instead of a solid square.
+
 ---
 
 ## Future: Advanced Optimization

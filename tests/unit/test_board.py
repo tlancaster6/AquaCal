@@ -203,3 +203,23 @@ class TestBoardGeometry:
         # Z is zero for all corners (planar board)
         for pos in board.corner_positions.values():
             assert pos[2] == 0.0
+
+    def test_legacy_pattern_false(self, board_config):
+        """OpenCV board with default config should have legacy_pattern=False."""
+        board = BoardGeometry(board_config)
+        cv_board = board.get_opencv_board()
+        assert cv_board.getLegacyPattern() is False
+
+    def test_legacy_pattern_true(self):
+        """OpenCV board with legacy_pattern=True should return True from getLegacyPattern()."""
+        config = BoardConfig(
+            squares_x=8,
+            squares_y=6,
+            square_size=0.03,
+            marker_size=0.022,
+            dictionary="DICT_4X4_50",
+            legacy_pattern=True,
+        )
+        board = BoardGeometry(config)
+        cv_board = board.get_opencv_board()
+        assert cv_board.getLegacyPattern() is True

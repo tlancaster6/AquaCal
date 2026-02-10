@@ -9,6 +9,38 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-10
+### [src/aquacal/config/schema.py]
+- Added `legacy_pattern: bool = False` field to `BoardConfig` dataclass
+- Allows users to specify boards with legacy ChArUco pattern (marker in top-left cell instead of solid square)
+- Backward compatible: defaults to False (new OpenCV 4.6+ pattern)
+
+### [src/aquacal/core/board.py]
+- Updated `get_opencv_board()` to call `setLegacyPattern(True)` when `config.legacy_pattern=True`
+- Enables detection on pre-OpenCV 4.6 printed boards without requiring board regeneration
+
+### [src/aquacal/calibration/pipeline.py]
+- Updated `load_config()` to parse `legacy_pattern` from both `board` and `intrinsic_board` sections
+- Uses `.get("legacy_pattern", False)` for backward compatibility with existing configs
+- Allows each board (extrinsic and intrinsic) to have independent legacy pattern settings
+
+### [src/aquacal/config/example_config.yaml]
+- Added commented-out `legacy_pattern: false` option to both `board` and `intrinsic_board` sections
+- Documentation guides users to enable for pre-OpenCV 4.6 printed boards
+
+### [tests/unit/test_board.py]
+- Added `test_legacy_pattern_false`: verifies default config has `getLegacyPattern() == False`
+- Added `test_legacy_pattern_true`: verifies explicit `legacy_pattern=True` sets OpenCV flag correctly
+
+### [tests/unit/test_pipeline.py]
+- Added `test_load_config_with_legacy_pattern_true`: verifies parsing `legacy_pattern: true`
+- Added `test_load_config_with_legacy_pattern_false`: verifies parsing `legacy_pattern: false`
+- Added `test_load_config_without_legacy_pattern_defaults_false`: verifies default when omitted
+- Added `test_load_config_with_intrinsic_board_legacy_pattern`: verifies intrinsic board parsing
+- Added `test_load_config_intrinsic_board_legacy_pattern_defaults_false`: verifies intrinsic default
+
+All 20 board tests and 44 pipeline tests pass.
+
+## 2026-02-10
 ### [src/aquacal/calibration/intrinsics.py]
 - **BUG FIX**: Added collinearity check to filter out frames where all detected ChArUco corners lie on a single board row
 - Check uses `np.linalg.matrix_rank()` on object point positions (x,y only); skips frames with rank < 2

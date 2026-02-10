@@ -33,12 +33,15 @@ class BoardConfig:
         square_size: Size of each square in meters
         marker_size: Size of ArUco markers in meters
         dictionary: ArUco dictionary name (e.g., "DICT_4X4_50")
+        legacy_pattern: If True, board uses legacy ChArUco pattern with marker in top-left cell.
+            Default False (new pattern with solid square in top-left cell)
     """
     squares_x: int
     squares_y: int
     square_size: float  # meters
     marker_size: float  # meters
     dictionary: str  # e.g., "DICT_4X4_50"
+    legacy_pattern: bool = False
 
 
 @dataclass

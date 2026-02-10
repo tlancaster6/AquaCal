@@ -76,6 +76,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         square_size=board_data["square_size"],
         marker_size=board_data["marker_size"],
         dictionary=board_data.get("dictionary", "DICT_4X4_50"),
+        legacy_pattern=board_data.get("legacy_pattern", False),
     )
 
     # Build optional intrinsic BoardConfig (if provided)
@@ -88,6 +89,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
             square_size=intrinsic_data["square_size"],
             marker_size=intrinsic_data["marker_size"],
             dictionary=intrinsic_data.get("dictionary", "DICT_4X4_50"),
+            legacy_pattern=intrinsic_data.get("legacy_pattern", False),
         )
 
     # Build paths

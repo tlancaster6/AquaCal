@@ -7,6 +7,7 @@ board:
   square_size: 0.030     # Square size in meters (30mm)
   marker_size: 0.022     # ArUco marker size in meters (22mm)
   dictionary: "DICT_4X4_50"  # ArUco dictionary name
+  # legacy_pattern: false  # Set to true if board has marker in top-left cell (pre-OpenCV 4.6)
 
 # Optional: use a different board for in-air intrinsic calibration
 # If omitted, the board above is used for both intrinsic and extrinsic steps
@@ -16,6 +17,7 @@ board:
 #   square_size: 0.025
 #   marker_size: 0.018
 #   dictionary: "DICT_4X4_100"
+#   # legacy_pattern: false  # Set to true if board has marker in top-left cell
 
 cameras:
   - cam0    # Reference camera (will be at world origin)

@@ -100,6 +100,8 @@ class BoardGeometry:
             self.config.marker_size,
             dictionary
         )
+        if self.config.legacy_pattern:
+            board.setLegacyPattern(True)
         return board
 
     def transform_corners(self, rvec: Vec3, tvec: Vec3) -> dict[int, Vec3]:

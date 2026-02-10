@@ -441,6 +441,85 @@ class TestLoadConfig:
 
         assert config.frame_step == 1
 
+    def test_load_config_with_legacy_pattern_true(self, valid_config_yaml):
+        """Test loading config with legacy_pattern: true."""
+        valid_config_yaml["board"]["legacy_pattern"] = True
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.board.legacy_pattern is True
+
+    def test_load_config_with_legacy_pattern_false(self, valid_config_yaml):
+        """Test loading config with legacy_pattern: false."""
+        valid_config_yaml["board"]["legacy_pattern"] = False
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.board.legacy_pattern is False
+
+    def test_load_config_without_legacy_pattern_defaults_false(self, valid_config_yaml):
+        """Test that legacy_pattern defaults to False when omitted."""
+        # Ensure legacy_pattern is not in the config
+        if "legacy_pattern" in valid_config_yaml["board"]:
+            del valid_config_yaml["board"]["legacy_pattern"]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.board.legacy_pattern is False
+
+    def test_load_config_with_intrinsic_board_legacy_pattern(self, valid_config_yaml):
+        """Test loading config with legacy_pattern in intrinsic_board section."""
+        valid_config_yaml["intrinsic_board"] = {
+            "squares_x": 12,
+            "squares_y": 9,
+            "square_size": 0.025,
+            "marker_size": 0.018,
+            "dictionary": "DICT_4X4_100",
+            "legacy_pattern": True,
+        }
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.intrinsic_board.legacy_pattern is True
+
+    def test_load_config_intrinsic_board_legacy_pattern_defaults_false(self, valid_config_yaml):
+        """Test that intrinsic_board legacy_pattern defaults to False when omitted."""
+        valid_config_yaml["intrinsic_board"] = {
+            "squares_x": 12,
+            "squares_y": 9,
+            "square_size": 0.025,
+            "marker_size": 0.018,
+        }
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.intrinsic_board.legacy_pattern is False
+
 
 # --- Test split_detections ---
 
