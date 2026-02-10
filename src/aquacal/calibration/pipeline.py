@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import random
+import time
 from datetime import datetime
 from pathlib import Path
 
+import cv2
 import numpy as np
 import yaml
 
@@ -66,7 +68,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         if key not in data:
             raise ValueError(f"Missing required config section: {key}")
 
-    # Build BoardConfig
+    # Build BoardConfig (extrinsic/underwater board)
     board_data = data["board"]
     board = BoardConfig(
         squares_x=board_data["squares_x"],
@@ -75,6 +77,18 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         marker_size=board_data["marker_size"],
         dictionary=board_data.get("dictionary", "DICT_4X4_50"),
     )
+
+    # Build optional intrinsic BoardConfig (if provided)
+    intrinsic_board = None
+    if "intrinsic_board" in data:
+        intrinsic_data = data["intrinsic_board"]
+        intrinsic_board = BoardConfig(
+            squares_x=intrinsic_data["squares_x"],
+            squares_y=intrinsic_data["squares_y"],
+            square_size=intrinsic_data["square_size"],
+            marker_size=intrinsic_data["marker_size"],
+            dictionary=intrinsic_data.get("dictionary", "DICT_4X4_50"),
+        )
 
     # Build paths
     paths = data["paths"]
@@ -88,6 +102,53 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     n_water = interface.get("n_water", 1.333)
     normal_fixed = interface.get("normal_fixed", True)
 
+    # Parse initial_interface_distances (optional)
+    initial_interface_distances = None
+    if "initial_distances" in interface:
+        raw_distances = interface["initial_distances"]
+
+        # Handle scalar format (apply to all cameras)
+        if isinstance(raw_distances, (int, float)):
+            if raw_distances <= 0:
+                raise ValueError(
+                    f"initial_distances must be positive, got {raw_distances}"
+                )
+            initial_interface_distances = {
+                cam: float(raw_distances) for cam in data["cameras"]
+            }
+        # Handle dict format (per-camera)
+        elif isinstance(raw_distances, dict):
+            # Validate all cameras are covered
+            missing_cameras = set(data["cameras"]) - set(raw_distances.keys())
+            if missing_cameras:
+                raise ValueError(
+                    f"initial_distances dict must cover all cameras. "
+                    f"Missing: {sorted(missing_cameras)}"
+                )
+
+            # Validate all distances are positive
+            for cam, dist in raw_distances.items():
+                if dist <= 0:
+                    raise ValueError(
+                        f"initial_distances['{cam}'] must be positive, got {dist}"
+                    )
+
+            # Warn about extra cameras (not in cameras list)
+            extra_cameras = set(raw_distances.keys()) - set(data["cameras"])
+            if extra_cameras:
+                import sys
+                print(
+                    f"Warning: initial_distances contains cameras not in cameras list: "
+                    f"{sorted(extra_cameras)}",
+                    file=sys.stderr,
+                )
+
+            initial_interface_distances = {k: float(v) for k, v in raw_distances.items()}
+        else:
+            raise ValueError(
+                f"initial_distances must be a number or dict, got {type(raw_distances).__name__}"
+            )
+
     # Optimization settings
     opt = data.get("optimization", {})
     robust_loss = opt.get("robust_loss", "huber")
@@ -97,6 +158,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     det = data.get("detection", {})
     min_corners = det.get("min_corners", 8)
     min_cameras = det.get("min_cameras", 2)
+    frame_step = det.get("frame_step", 1)
 
     # Validation settings
     val = data.get("validation", {})
@@ -109,6 +171,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         intrinsic_video_paths=intrinsic_paths,
         extrinsic_video_paths=extrinsic_paths,
         output_dir=output_dir,
+        intrinsic_board=intrinsic_board,
         n_air=n_air,
         n_water=n_water,
         interface_normal_fixed=normal_fixed,
@@ -116,8 +179,10 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         loss_scale=loss_scale,
         min_corners_per_frame=min_corners,
         min_cameras_per_frame=min_cameras,
+        frame_step=frame_step,
         holdout_fraction=holdout_fraction,
         save_detailed_residuals=save_detailed,
+        initial_interface_distances=initial_interface_distances,
     )
 
 
@@ -163,6 +228,35 @@ def split_detections(
     )
 
     return cal_detections, val_detections
+
+
+def _save_board_reference_images(
+    board: BoardGeometry,
+    intrinsic_board: BoardGeometry | None,
+    output_dir: Path,
+) -> None:
+    """
+    Save reference PNG images of configured board(s) for visual verification.
+
+    Generates grayscale ChArUco board images at 800x600 resolution with 50px
+    margin. Saves extrinsic board always; saves intrinsic board only if it
+    differs from extrinsic board.
+
+    Args:
+        board: Extrinsic board geometry
+        intrinsic_board: Intrinsic board geometry (may be same as board)
+        output_dir: Directory to save images
+    """
+    # Generate and save extrinsic board image
+    cv_board = board.get_opencv_board()
+    board_img = cv_board.generateImage((800, 600), marginSize=50)
+    cv2.imwrite(str(output_dir / "board_extrinsic.png"), board_img)
+
+    # Save intrinsic board image only if it differs from extrinsic board
+    if intrinsic_board is not board:
+        cv_intr_board = intrinsic_board.get_opencv_board()
+        intr_img = cv_intr_board.generateImage((800, 600), marginSize=50)
+        cv2.imwrite(str(output_dir / "board_intrinsic.png"), intr_img)
 
 
 def run_calibration(config_path: str | Path) -> CalibrationResult:
@@ -214,8 +308,14 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
     """
     board = BoardGeometry(config.board)
 
+    # Intrinsic board: use separate board if provided, else fall back to extrinsic board
+    intrinsic_board = BoardGeometry(config.intrinsic_board) if config.intrinsic_board else board
+
     # Create output directory
     config.output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save board reference images for visual verification
+    _save_board_reference_images(board, intrinsic_board, config.output_dir)
 
     print("=" * 60)
     print("AquaCal Calibration Pipeline")
@@ -225,8 +325,10 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
     print("\n[Stage 1] Intrinsic calibration (in-air)...")
     intrinsics_results = calibrate_intrinsics_all(
         video_paths={k: str(v) for k, v in config.intrinsic_video_paths.items()},
-        board=board,
+        board=intrinsic_board,
         min_corners=config.min_corners_per_frame,
+        frame_step=config.frame_step,
+        progress_callback=lambda name, cur, total: print(f"  Calibrating {name} ({cur}/{total})..."),
     )
     # Extract just intrinsics from (intrinsics, error) tuples
     intrinsics = {name: result[0] for name, result in intrinsics_results.items()}
@@ -234,11 +336,19 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
 
     # --- Detect in underwater videos ---
     print("\n[Detection] Detecting ChArUco in underwater videos...")
+
+    def _detection_progress(current: int, total: int) -> None:
+        """Print detection progress at ~10% intervals."""
+        if total > 0 and (current % max(1, total // 10) == 0 or current == total):
+            print(f"  Frame {current}/{total} ({100 * current // total}%)")
+
     all_detections = detect_all_frames(
         video_paths={k: str(v) for k, v in config.extrinsic_video_paths.items()},
         board=board,
         intrinsics={k: (v.K, v.dist_coeffs) for k, v in intrinsics.items()},
         min_corners=config.min_corners_per_frame,
+        frame_step=config.frame_step,
+        progress_callback=_detection_progress,
     )
     usable_frames = all_detections.get_frames_with_min_cameras(
         config.min_cameras_per_frame
@@ -264,12 +374,14 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
     print("\n[Stage 3] Interface and pose optimization...")
     interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
 
+    t0 = time.perf_counter()
     stage3_extrinsics, stage3_distances, stage3_poses, stage3_rms = optimize_interface(
         detections=cal_detections,
         intrinsics=intrinsics,
         initial_extrinsics=extrinsics,
         board=board,
         reference_camera=reference_camera,
+        initial_interface_distances=config.initial_interface_distances,
         interface_normal=interface_normal,
         n_air=config.n_air,
         n_water=config.n_water,
@@ -277,7 +389,8 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
         loss_scale=config.loss_scale,
         min_corners=config.min_corners_per_frame,
     )
-    print(f"  Stage 3 RMS: {stage3_rms:.3f} pixels")
+    elapsed = time.perf_counter() - t0
+    print(f"  Stage 3 RMS: {stage3_rms:.3f} pixels ({elapsed:.1f}s)")
 
     # --- Stage 4: Optional Joint Refinement ---
     # Check if config has refine_intrinsics attribute (may not exist in base schema)
@@ -286,6 +399,7 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
     if refine_intrinsics:
         print("\n[Stage 4] Joint refinement with intrinsics...")
         stage3_result = (stage3_extrinsics, stage3_distances, stage3_poses, stage3_rms)
+        t0 = time.perf_counter()
         (
             final_extrinsics,
             final_distances,
@@ -305,7 +419,8 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
             loss=config.robust_loss,
             loss_scale=config.loss_scale,
         )
-        print(f"  Stage 4 RMS: {final_rms:.3f} pixels")
+        elapsed = time.perf_counter() - t0
+        print(f"  Stage 4 RMS: {final_rms:.3f} pixels ({elapsed:.1f}s)")
     else:
         print("\n[Stage 4] Skipped (refine_intrinsics=False)")
         final_extrinsics = stage3_extrinsics
@@ -374,6 +489,8 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
     # Save diagnostics
     save_diagnostic_report(
         diagnostic_report,
+        temp_result,
+        val_detections,
         config.output_dir,
         save_images=True,
     )
@@ -489,4 +606,21 @@ def _compute_config_hash(config: CalibrationConfig) -> str:
         f"{config.robust_loss},{config.loss_scale},"
         f"{config.holdout_fraction}"
     )
+
+    # Include intrinsic_board if provided
+    if config.intrinsic_board is not None:
+        hash_input += (
+            f",intrinsic:{config.intrinsic_board.squares_x},"
+            f"{config.intrinsic_board.squares_y},"
+            f"{config.intrinsic_board.square_size},"
+            f"{config.intrinsic_board.marker_size}"
+        )
+
+    # Include initial_interface_distances if provided
+    if config.initial_interface_distances is not None:
+        # Sort by camera name for deterministic hash
+        sorted_distances = sorted(config.initial_interface_distances.items())
+        distance_str = ",".join(f"{cam}:{dist}" for cam, dist in sorted_distances)
+        hash_input += f",init_dist:{distance_str}"
+
     return hashlib.md5(hash_input.encode()).hexdigest()[:12]

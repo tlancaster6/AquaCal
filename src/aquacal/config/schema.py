@@ -172,11 +172,12 @@ class CalibrationConfig:
     """Input configuration for calibration pipeline.
 
     Attributes:
-        board: ChArUco board specification
+        board: ChArUco board specification (extrinsic/underwater board)
         camera_names: List of camera identifiers
         intrinsic_video_paths: Dict mapping camera names to intrinsic calibration videos
         extrinsic_video_paths: Dict mapping camera names to extrinsic calibration videos
         output_dir: Directory for output files
+        intrinsic_board: Optional separate board for in-air intrinsic calibration (defaults to None, uses board)
         n_air: Refractive index of air (default 1.0)
         n_water: Refractive index of water (default 1.333)
         interface_normal_fixed: Whether to fix interface normal to [0, 0, -1]
@@ -184,14 +185,20 @@ class CalibrationConfig:
         loss_scale: Scale parameter for robust loss in pixels
         min_corners_per_frame: Minimum corners required to use a detection
         min_cameras_per_frame: Minimum cameras required to use a frame
+        frame_step: Process every Nth frame (1 = all frames, default 1)
         holdout_fraction: Fraction of frames to hold out for validation
         save_detailed_residuals: Whether to save per-corner residuals
+        initial_interface_distances: Optional dict mapping camera names to approximate
+            camera-to-water-surface distances in meters. When None, all cameras default
+            to 0.15m. Doesn't need to be exact — within 2-3x of the true value is
+            sufficient for good initialization in Stage 3.
     """
     board: BoardConfig
     camera_names: list[str]
     intrinsic_video_paths: dict[str, Path]
     extrinsic_video_paths: dict[str, Path]
     output_dir: Path
+    intrinsic_board: BoardConfig | None = None
     n_air: float = 1.0
     n_water: float = 1.333
     interface_normal_fixed: bool = True
@@ -199,8 +206,10 @@ class CalibrationConfig:
     loss_scale: float = 1.0  # pixels
     min_corners_per_frame: int = 8
     min_cameras_per_frame: int = 2
+    frame_step: int = 1  # Process every Nth frame (1 = all frames)
     holdout_fraction: float = 0.2  # Random selection; frames are held out entirely (not per-detection)
     save_detailed_residuals: bool = True
+    initial_interface_distances: dict[str, float] | None = None
 
 
 @dataclass

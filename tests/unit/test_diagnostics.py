@@ -499,7 +499,9 @@ class TestSaveDiagnosticReport:
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = save_diagnostic_report(report, Path(tmpdir), save_images=True)
+            result = save_diagnostic_report(
+                report, calibration_result, simple_detections, Path(tmpdir), save_images=True
+            )
 
             # Check JSON file
             assert "json" in result
@@ -543,7 +545,9 @@ class TestSaveDiagnosticReport:
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = save_diagnostic_report(report, Path(tmpdir), save_images=False)
+            result = save_diagnostic_report(
+                report, calibration_result, simple_detections, Path(tmpdir), save_images=False
+            )
 
             # Should have JSON and CSV
             assert "json" in result
@@ -584,9 +588,341 @@ class TestSaveDiagnosticReport:
             nested_dir = Path(tmpdir) / "nested" / "output" / "dir"
             assert not nested_dir.exists()
 
-            result = save_diagnostic_report(report, nested_dir, save_images=False)
+            result = save_diagnostic_report(
+                report, calibration_result, simple_detections, nested_dir, save_images=False
+            )
 
             # Directory should be created
             assert nested_dir.exists()
             assert result["json"].exists()
             assert result["csv"].exists()
+
+
+class TestPlotCameraRig:
+    """Tests for plot_camera_rig()."""
+
+    def test_single_camera(self, calibration_result):
+        """Test that plot_camera_rig works with one camera."""
+        from aquacal.validation.diagnostics import plot_camera_rig
+
+        fig = plot_camera_rig(calibration_result)
+
+        assert fig is not None
+        # Check that figure has 3D axes
+        assert len(fig.axes) == 1
+        assert fig.axes[0].name == "3d"
+
+    def test_multiple_cameras(self, board_config):
+        """Test that plot_camera_rig works with multiple cameras."""
+        from aquacal.validation.diagnostics import plot_camera_rig
+
+        # Create calibration with 3 cameras
+        cameras = {}
+        for i in range(3):
+            K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            R = np.eye(3)
+            t = np.array([i * 0.1, 0.0, 0.0])  # Cameras spaced along X
+            extrinsics = CameraExtrinsics(R=R, t=t)
+            cameras[f"cam{i}"] = CameraCalibration(
+                name=f"cam{i}",
+                intrinsics=intrinsics,
+                extrinsics=extrinsics,
+                interface_distance=0.5,
+            )
+
+        interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
+        diagnostics = DiagnosticsData(
+            reprojection_error_rms=0.5,
+            reprojection_error_per_camera={f"cam{i}": 0.5 for i in range(3)},
+            validation_3d_error_mean=0.001,
+            validation_3d_error_std=0.0005,
+        )
+        metadata = CalibrationMetadata(
+            calibration_date="2026-01-01",
+            software_version="0.1.0",
+            config_hash="abc123",
+            num_frames_used=10,
+            num_frames_holdout=2,
+        )
+        calibration = CalibrationResult(
+            cameras=cameras,
+            interface=interface,
+            board=board_config,
+            diagnostics=diagnostics,
+            metadata=metadata,
+        )
+
+        fig = plot_camera_rig(calibration)
+
+        assert fig is not None
+        assert len(fig.axes) == 1
+        assert fig.axes[0].name == "3d"
+
+    def test_custom_arrow_length(self, calibration_result):
+        """Test that arrow_length parameter is accepted."""
+        from aquacal.validation.diagnostics import plot_camera_rig
+
+        fig = plot_camera_rig(calibration_result, arrow_length=0.1)
+
+        assert fig is not None
+
+
+class TestPlotReprojectionQuiver:
+    """Tests for plot_reprojection_quiver()."""
+
+    def test_basic_quiver(
+        self, calibration_result, simple_detections, simple_reprojection_errors
+    ):
+        """Test that plot_reprojection_quiver produces a figure."""
+        from aquacal.validation.diagnostics import plot_reprojection_quiver
+
+        fig = plot_reprojection_quiver(
+            calibration_result,
+            simple_detections,
+            simple_reprojection_errors,
+            "cam0",
+        )
+
+        assert fig is not None
+        assert len(fig.axes) >= 1  # At least one axes (may have colorbar axes too)
+
+    def test_nonexistent_camera(
+        self, calibration_result, simple_detections, simple_reprojection_errors
+    ):
+        """Test that nonexistent camera raises ValueError."""
+        from aquacal.validation.diagnostics import plot_reprojection_quiver
+
+        with pytest.raises(ValueError, match="not in calibration"):
+            plot_reprojection_quiver(
+                calibration_result,
+                simple_detections,
+                simple_reprojection_errors,
+                "cam999",
+            )
+
+    def test_camera_with_no_detections(
+        self, board_config, simple_detections, simple_reprojection_errors
+    ):
+        """Test that camera with no detections produces empty plot."""
+        from aquacal.validation.diagnostics import plot_reprojection_quiver
+
+        # Create calibration with two cameras
+        K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+        intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+        R = np.eye(3)
+        t = np.array([0.0, 0.0, 0.5])
+        extrinsics = CameraExtrinsics(R=R, t=t)
+
+        cam0 = CameraCalibration(
+            name="cam0", intrinsics=intrinsics, extrinsics=extrinsics, interface_distance=0.5
+        )
+        cam1 = CameraCalibration(
+            name="cam1", intrinsics=intrinsics, extrinsics=extrinsics, interface_distance=0.5
+        )
+
+        cameras = {"cam0": cam0, "cam1": cam1}
+        interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
+        diagnostics = DiagnosticsData(
+            reprojection_error_rms=0.5,
+            reprojection_error_per_camera={"cam0": 0.5, "cam1": 0.5},
+            validation_3d_error_mean=0.001,
+            validation_3d_error_std=0.0005,
+        )
+        metadata = CalibrationMetadata(
+            calibration_date="2026-01-01",
+            software_version="0.1.0",
+            config_hash="abc123",
+            num_frames_used=10,
+            num_frames_holdout=2,
+        )
+        calibration = CalibrationResult(
+            cameras=cameras,
+            interface=interface,
+            board=board_config,
+            diagnostics=diagnostics,
+            metadata=metadata,
+        )
+
+        # simple_detections only has cam0, not cam1
+        fig = plot_reprojection_quiver(
+            calibration,
+            simple_detections,
+            simple_reprojection_errors,
+            "cam1",
+        )
+
+        assert fig is not None
+        assert "No detections" in fig.axes[0].get_title()
+
+    def test_custom_scale(
+        self, calibration_result, simple_detections, simple_reprojection_errors
+    ):
+        """Test that scale parameter is accepted."""
+        from aquacal.validation.diagnostics import plot_reprojection_quiver
+
+        fig = plot_reprojection_quiver(
+            calibration_result,
+            simple_detections,
+            simple_reprojection_errors,
+            "cam0",
+            scale=2.0,
+        )
+
+        assert fig is not None
+
+
+class TestSaveDiagnosticReportWithNewPlots:
+    """Tests for save_diagnostic_report() with new camera rig and quiver plots."""
+
+    def test_creates_new_plot_files(
+        self,
+        calibration_result,
+        simple_detections,
+        board_poses,
+        simple_reprojection_errors,
+        board_geometry,
+    ):
+        """Test that camera_rig.png and quiver_{cam}.png are created."""
+        recon_errors = DistanceErrors(
+            mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20
+        )
+
+        report = generate_diagnostic_report(
+            calibration=calibration_result,
+            detections=simple_detections,
+            board_poses=board_poses,
+            reprojection_errors=simple_reprojection_errors,
+            reconstruction_errors=recon_errors,
+            board=board_geometry,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = save_diagnostic_report(
+                report, calibration_result, simple_detections, Path(tmpdir), save_images=True
+            )
+
+            # Check rig plot
+            assert "rig" in result
+            assert result["rig"].exists()
+            assert result["rig"].name == "camera_rig.png"
+
+            # Check quiver plots
+            assert "quiver" in result
+            assert "cam0" in result["quiver"]
+            assert result["quiver"]["cam0"].exists()
+            assert result["quiver"]["cam0"].name == "quiver_cam0.png"
+
+            # Also check that existing files are still created
+            assert "json" in result
+            assert "csv" in result
+            assert "images" in result
+
+    def test_no_new_plots_when_save_images_false(
+        self,
+        calibration_result,
+        simple_detections,
+        board_poses,
+        simple_reprojection_errors,
+        board_geometry,
+    ):
+        """Test that no new plots are created when save_images=False."""
+        recon_errors = DistanceErrors(
+            mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20
+        )
+
+        report = generate_diagnostic_report(
+            calibration=calibration_result,
+            detections=simple_detections,
+            board_poses=board_poses,
+            reprojection_errors=simple_reprojection_errors,
+            reconstruction_errors=recon_errors,
+            board=board_geometry,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = save_diagnostic_report(
+                report, calibration_result, simple_detections, Path(tmpdir), save_images=False
+            )
+
+            # Should have JSON and CSV
+            assert "json" in result
+            assert "csv" in result
+
+            # Should NOT have images, rig, or quiver
+            assert "images" not in result
+            assert "rig" not in result
+            assert "quiver" not in result
+
+            # Verify no PNG files in directory
+            png_files = list(Path(tmpdir).glob("*.png"))
+            assert len(png_files) == 0
+
+    def test_multiple_cameras_all_get_quiver_plots(
+        self, board_config, simple_detections, board_poses, simple_reprojection_errors, board_geometry
+    ):
+        """Test that all cameras get quiver plots."""
+        # Create calibration with 3 cameras
+        cameras = {}
+        per_camera_rms = {}
+        for i in range(3):
+            K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            R = np.eye(3)
+            t = np.array([i * 0.1, 0.0, 0.0])
+            extrinsics = CameraExtrinsics(R=R, t=t)
+            cam_name = f"cam{i}"
+            cameras[cam_name] = CameraCalibration(
+                name=cam_name,
+                intrinsics=intrinsics,
+                extrinsics=extrinsics,
+                interface_distance=0.5,
+            )
+            per_camera_rms[cam_name] = 0.5
+
+        interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
+        diagnostics = DiagnosticsData(
+            reprojection_error_rms=0.5,
+            reprojection_error_per_camera=per_camera_rms,
+            validation_3d_error_mean=0.001,
+            validation_3d_error_std=0.0005,
+        )
+        metadata = CalibrationMetadata(
+            calibration_date="2026-01-01",
+            software_version="0.1.0",
+            config_hash="abc123",
+            num_frames_used=10,
+            num_frames_holdout=2,
+        )
+        calibration = CalibrationResult(
+            cameras=cameras,
+            interface=interface,
+            board=board_config,
+            diagnostics=diagnostics,
+            metadata=metadata,
+        )
+
+        recon_errors = DistanceErrors(
+            mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20
+        )
+
+        report = generate_diagnostic_report(
+            calibration=calibration,
+            detections=simple_detections,
+            board_poses=board_poses,
+            reprojection_errors=simple_reprojection_errors,
+            reconstruction_errors=recon_errors,
+            board=board_geometry,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = save_diagnostic_report(
+                report, calibration, simple_detections, Path(tmpdir), save_images=True
+            )
+
+            # All cameras should have quiver plots
+            assert "quiver" in result
+            for i in range(3):
+                cam_name = f"cam{i}"
+                assert cam_name in result["quiver"]
+                assert result["quiver"][cam_name].exists()

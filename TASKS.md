@@ -58,7 +58,7 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 ---
 
-## Post-MVP: Simplifications & Refactoring
+## Post-MVP: Optimization and Feature Expansions
 
 - [ ] **P.1** Simplify `Interface` class: remove `base_height` parameter, store only per-camera distances directly. Currently the calibration stages set `base_height=0` and put the full distance in `camera_offsets`, making `base_height` redundant. Consider whether shared base + offsets is ever needed, or if per-camera distances are always independent.
 
@@ -66,12 +66,26 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.3** Performance optimization for refractive projection: Implement closed-form Newton-Raphson projection for flat interfaces (~10-20x speedup) and sparse Jacobian structure for `optimize_interface()` (~5-10x speedup). Required for practical calibration of large camera arrays (13+ cameras, 100+ frames).
 
-- [ ] **P.4** Intelligent frame selection: Add a frame selection step before Stage 3 optimization that caps the number of frames at a configurable budget (~50-80) while maximizing camera coverage, pose graph connectivity, and spatial/angular diversity of board poses. Ensures bounded optimization time regardless of input video length.
+- [x] **P.4** Expose `frame_step` in config and pipeline: Add `frame_step` to `CalibrationConfig`, parse from `detection.frame_step` in YAML, and pass through to `detect_all_frames()` and `calibrate_intrinsics_all()`. The parameter already exists in those functions but is never wired up from the pipeline. Essential for real-world videos (5 min × 30 FPS = 9,000 frames).
 
 - [ ] **P.5** Standardize synthetic pipeline tests: Make test structure consistent across all scenarios in `test_full_pipeline.py`. Each scenario (ideal, realistic, minimal) should test calibration accuracy (rotation, translation, interface distance errors) and RMS reprojection error with scenario-appropriate thresholds. Remove misplaced ground-truth fixture tests (camera count, geometry checks) from calibration test classes — these already exist in `TestGenerateRealRigArray`.
+
+- [x] **P.6** Support separate intrinsic board configuration: Allow users to specify a different ChArUco board for intrinsic (in-air) calibration vs extrinsic (underwater) calibration. Add optional `intrinsic_board` field to `CalibrationConfig`, parse it in `load_config()`, and pass it to Stage 1. Falls back to `board` when not set.
+
+- [x] **P.7** Add `aquacal init` CLI command: Auto-generate config YAML by scanning intrinsic and extrinsic video directories. Extracts camera names from filenames via user-provided regex (default: full stem). Warns on camera name mismatches between directories. Also fix `example_config.yaml` to include `intrinsic_board` option.
+
+- [x] **P.8** Add camera rig and reprojection quiver visualizations: 3D plot of camera positions, optical axes, and water surface plane; per-camera quiver plots of reprojection residuals at detected corner positions, colored by magnitude.
+
+- [x] **P.9** Expose initial interface distances in config: Allow users to provide approximate camera-to-water-surface distances (per-camera dict or single scalar) via `interface.initial_distances` in YAML config, replacing the hardcoded 0.15m default for Stage 3 initialization.
+
+- [x] **P.10** Save board reference images at pipeline start: Generate and save PNG images of the configured ChArUco board(s) to the output directory before Stage 1, so users can visually verify their config matches the physical board. Saves both extrinsic and intrinsic boards when a separate intrinsic board is configured.
+
+- [ ] **P.11** Add progress feedback to pipeline: Wire up existing `progress_callback` parameters in `calibrate_intrinsics_all()` and `detect_all_frames()`, and set `verbose=1` for Stage 3/4 optimizers. Provides per-camera and per-frame progress during the longest-running pipeline stages.
 
 ---
 
 ## Future: Advanced Optimization
 
 - [ ] **F.1** Ceres Solver integration: Replace scipy `least_squares` with Ceres Solver for Stage 3/4 optimization. Ceres provides automatic differentiation (exact Jacobians), built-in Schur complement solver (marginalizes board poses, reducing effective problem to ~85 camera/interface params regardless of frame count), and robust loss functions. Requires writing a custom `RefractiveCostFunction` implementing the flat-interface projection with Snell's law. Integration via pyceres or pybind11 wrapper, with scipy as fallback for users without C++ dependency.
+
+- [ ] **F.2** Intelligent frame selection: Add a frame selection step before Stage 3 optimization that caps the number of frames at a configurable budget (~50-80) while maximizing camera coverage, pose graph connectivity, and spatial/angular diversity of board poses. Ensures bounded optimization time regardless of input video length.

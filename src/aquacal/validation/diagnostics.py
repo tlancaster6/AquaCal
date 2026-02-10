@@ -336,8 +336,235 @@ def generate_diagnostic_report(
     )
 
 
+def plot_camera_rig(
+    calibration: CalibrationResult,
+    ax: "plt.Axes | None" = None,
+    arrow_length: float = 0.05,
+) -> "plt.Figure":
+    """
+    Plot 3D camera rig with positions, orientations, and water surface.
+
+    Args:
+        calibration: CalibrationResult with camera extrinsics and interface distances
+        ax: Optional existing 3D axes to plot on. If None, creates new figure.
+        arrow_length: Length of optical axis arrows in world units (meters)
+
+    Returns:
+        matplotlib Figure
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # Create figure and axes if not provided
+    if ax is None:
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection="3d")
+    else:
+        fig = ax.get_figure()
+
+    # Collect camera positions and interface z-coordinates
+    camera_positions = []
+    camera_names = []
+    interface_zs = []
+
+    for cam_name, cam_calib in calibration.cameras.items():
+        C = cam_calib.extrinsics.C
+        camera_positions.append(C)
+        camera_names.append(cam_name)
+        # Interface z = camera z + interface_distance (Z-down frame)
+        interface_z = C[2] + cam_calib.interface_distance
+        interface_zs.append(interface_z)
+
+    camera_positions = np.array(camera_positions)
+
+    # Generate colors for cameras
+    colors = plt.cm.tab10(np.linspace(0, 1, len(calibration.cameras)))
+
+    # Plot camera positions
+    ax.scatter(
+        camera_positions[:, 0],
+        camera_positions[:, 1],
+        camera_positions[:, 2],
+        c=colors,
+        s=100,
+        marker="o",
+        label="Cameras",
+    )
+
+    # Plot camera labels and optical axis arrows
+    for i, (cam_name, cam_calib) in enumerate(calibration.cameras.items()):
+        C = cam_calib.extrinsics.C
+        R = cam_calib.extrinsics.R
+
+        # Add label
+        ax.text(C[0], C[1], C[2], f"  {cam_name}", fontsize=9)
+
+        # Optical axis direction: Z-forward in camera frame = third column of R.T
+        # (or equivalently, third row of R)
+        optical_axis = R.T @ np.array([0.0, 0.0, 1.0])
+        arrow_end = C + optical_axis * arrow_length
+
+        # Draw arrow
+        ax.quiver(
+            C[0],
+            C[1],
+            C[2],
+            optical_axis[0] * arrow_length,
+            optical_axis[1] * arrow_length,
+            optical_axis[2] * arrow_length,
+            color=colors[i],
+            arrow_length_ratio=0.3,
+            linewidth=2,
+        )
+
+    # Plot water surface plane
+    mean_interface_z = np.mean(interface_zs)
+
+    # Create grid for plane
+    x_range = camera_positions[:, 0]
+    y_range = camera_positions[:, 1]
+    x_span = x_range.max() - x_range.min()
+    y_span = y_range.max() - y_range.min()
+
+    # Extend plane beyond camera positions
+    margin = max(x_span, y_span) * 0.3 if max(x_span, y_span) > 0 else 0.1
+    x_min, x_max = x_range.min() - margin, x_range.max() + margin
+    y_min, y_max = y_range.min() - margin, y_range.max() + margin
+
+    xx, yy = np.meshgrid(
+        np.linspace(x_min, x_max, 10), np.linspace(y_min, y_max, 10)
+    )
+    zz = np.full_like(xx, mean_interface_z)
+
+    ax.plot_surface(xx, yy, zz, alpha=0.3, color="lightblue", label="Water Surface")
+
+    # Set labels and title
+    ax.set_xlabel("X (m)")
+    ax.set_ylabel("Y (m)")
+    ax.set_zlabel("Z (m, down)")
+    ax.set_title("Camera Rig Layout")
+
+    # Invert Z axis so "up" appears visually upward
+    ax.invert_zaxis()
+
+    # Equal aspect ratio
+    ax.set_box_aspect([1, 1, 1])
+
+    return fig
+
+
+def plot_reprojection_quiver(
+    calibration: CalibrationResult,
+    detections: DetectionResult,
+    reprojection_errors: ReprojectionErrors,
+    camera_name: str,
+    ax: "plt.Axes | None" = None,
+    scale: float = 1.0,
+) -> "plt.Figure":
+    """
+    Plot reprojection error quiver for one camera.
+
+    Args:
+        calibration: CalibrationResult (for image_size)
+        detections: DetectionResult with pixel positions
+        reprojection_errors: Pre-computed errors with residuals array
+        camera_name: Which camera to plot
+        ax: Optional existing axes. If None, creates new figure.
+        scale: Arrow scale factor (1.0 = true pixel scale, >1 exaggerates for visibility)
+
+    Returns:
+        matplotlib Figure
+    """
+    import matplotlib.pyplot as plt
+
+    # Create figure and axes if not provided
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 8))
+    else:
+        fig = ax.get_figure()
+
+    # Get image size
+    if camera_name not in calibration.cameras:
+        raise ValueError(f"Camera '{camera_name}' not in calibration")
+
+    image_size = calibration.cameras[camera_name].intrinsics.image_size
+    width, height = image_size
+
+    # Collect pixel positions and residuals for this camera
+    # Must match iteration order from compute_reprojection_errors()
+    pixel_positions = []
+    residuals_list = []
+
+    residual_idx = 0
+    for frame_idx in sorted(detections.frames.keys()):
+        frame_det = detections.frames[frame_idx]
+        for cam in sorted(frame_det.detections.keys()):
+            detection = frame_det.detections[cam]
+            for i in range(len(detection.corner_ids)):
+                if cam == camera_name:
+                    if residual_idx < len(reprojection_errors.residuals):
+                        px = detection.corners_2d[i]
+                        residual = reprojection_errors.residuals[residual_idx]
+                        pixel_positions.append(px)
+                        residuals_list.append(residual)
+                residual_idx += 1
+
+    if not pixel_positions:
+        # No detections for this camera, create empty plot
+        ax.set_xlim(0, width)
+        ax.set_ylim(height, 0)
+        ax.set_xlabel("u (pixels)")
+        ax.set_ylabel("v (pixels)")
+        ax.set_title(f"{camera_name} — No detections")
+        return fig
+
+    pixel_positions = np.array(pixel_positions)
+    residuals_array = np.array(residuals_list)
+
+    # Compute residual magnitudes for coloring
+    magnitudes = np.sqrt(residuals_array[:, 0] ** 2 + residuals_array[:, 1] ** 2)
+
+    # Plot quiver
+    quiver = ax.quiver(
+        pixel_positions[:, 0],
+        pixel_positions[:, 1],
+        residuals_array[:, 0] * scale,
+        residuals_array[:, 1] * scale,
+        magnitudes,
+        cmap="viridis",
+        scale=1.0,
+        scale_units="xy",
+        angles="xy",
+        width=0.003,
+    )
+
+    # Add colorbar
+    cbar = plt.colorbar(quiver, ax=ax, label="Residual Magnitude (pixels)")
+
+    # Set axes
+    ax.set_xlim(0, width)
+    ax.set_ylim(height, 0)  # Invert Y axis
+    ax.set_xlabel("u (pixels)")
+    ax.set_ylabel("v (pixels)")
+
+    # Compute RMS for this camera
+    rms = calibration.cameras[camera_name].intrinsics.image_size
+    if camera_name in reprojection_errors.per_camera:
+        rms_val = reprojection_errors.per_camera[camera_name]
+        ax.set_title(f"{camera_name} — RMS: {rms_val:.3f} px")
+    else:
+        ax.set_title(f"{camera_name}")
+
+    ax.set_aspect("equal")
+    ax.grid(True, alpha=0.3)
+
+    return fig
+
+
 def save_diagnostic_report(
     report: DiagnosticReport,
+    calibration: CalibrationResult,
+    detections: DetectionResult,
     output_dir: Path,
     save_images: bool = True,
 ) -> dict[str, Path]:
@@ -347,18 +574,24 @@ def save_diagnostic_report(
     Creates:
     - diagnostics.json: Summary statistics and recommendations
     - spatial_error_{cam}.png: Per-camera error heatmaps (if save_images=True)
+    - camera_rig.png: 3D camera rig visualization (if save_images=True)
+    - quiver_{cam}.png: Per-camera reprojection error quiver plots (if save_images=True)
     - depth_errors.csv: Depth-stratified error table
 
     Args:
         report: DiagnosticReport to save
+        calibration: CalibrationResult for camera rig and quiver plots
+        detections: DetectionResult for quiver plots
         output_dir: Directory for output files (created if doesn't exist)
-        save_images: Whether to render and save heatmap images
+        save_images: Whether to render and save images
 
     Returns:
         Dict mapping output type to file path:
         - "json": Path to diagnostics.json
         - "csv": Path to depth_errors.csv
-        - "images": Dict of camera_name -> image path (if save_images=True)
+        - "images": Dict of camera_name -> spatial error image path (if save_images=True)
+        - "rig": Path to camera_rig.png (if save_images=True)
+        - "quiver": Dict of camera_name -> quiver image path (if save_images=True)
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -395,6 +628,7 @@ def save_diagnostic_report(
     if save_images:
         import matplotlib.pyplot as plt
 
+        # Spatial error maps
         result["images"] = {}
         for cam_name, error_map in report.spatial_error_maps.items():
             img_path = output_dir / f"spatial_error_{cam_name}.png"
@@ -410,5 +644,23 @@ def save_diagnostic_report(
             plt.close(fig)
 
             result["images"][cam_name] = img_path
+
+        # Camera rig plot
+        rig_path = output_dir / "camera_rig.png"
+        fig = plot_camera_rig(calibration)
+        fig.savefig(rig_path, dpi=100, bbox_inches="tight")
+        plt.close(fig)
+        result["rig"] = rig_path
+
+        # Reprojection quiver plots
+        result["quiver"] = {}
+        for cam_name in calibration.cameras.keys():
+            quiver_path = output_dir / f"quiver_{cam_name}.png"
+            fig = plot_reprojection_quiver(
+                calibration, detections, report.reprojection, cam_name
+            )
+            fig.savefig(quiver_path, dpi=100, bbox_inches="tight")
+            plt.close(fig)
+            result["quiver"][cam_name] = quiver_path
 
     return result

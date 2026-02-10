@@ -15,6 +15,7 @@ from aquacal.calibration.pipeline import (
     run_calibration_from_config,
     _build_calibration_result,
     _compute_config_hash,
+    _save_board_reference_images,
 )
 from aquacal.config.schema import (
     BoardConfig,
@@ -219,6 +220,7 @@ class TestLoadConfig:
 
         # Check defaults
         assert config.board.dictionary == "DICT_4X4_50"
+        assert config.intrinsic_board is None  # Should default to None
         assert config.n_air == 1.0
         assert config.n_water == 1.333
         assert config.robust_loss == "huber"
@@ -227,6 +229,217 @@ class TestLoadConfig:
         assert config.min_cameras_per_frame == 2
         assert config.holdout_fraction == 0.2
         assert config.save_detailed_residuals is True
+        assert config.initial_interface_distances is None  # Should default to None
+
+    def test_load_config_with_intrinsic_board(self, valid_config_yaml):
+        """Test loading config with separate intrinsic_board section."""
+        # Add intrinsic_board to the config
+        valid_config_yaml["intrinsic_board"] = {
+            "squares_x": 12,
+            "squares_y": 9,
+            "square_size": 0.025,
+            "marker_size": 0.018,
+            "dictionary": "DICT_4X4_100",
+        }
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        # Check extrinsic board (main board)
+        assert config.board.squares_x == 7
+        assert config.board.squares_y == 5
+        assert config.board.square_size == 0.03
+        assert config.board.marker_size == 0.022
+        assert config.board.dictionary == "DICT_4X4_50"
+
+        # Check intrinsic board
+        assert config.intrinsic_board is not None
+        assert config.intrinsic_board.squares_x == 12
+        assert config.intrinsic_board.squares_y == 9
+        assert config.intrinsic_board.square_size == 0.025
+        assert config.intrinsic_board.marker_size == 0.018
+        assert config.intrinsic_board.dictionary == "DICT_4X4_100"
+
+    def test_load_config_without_intrinsic_board(self, valid_config_yaml):
+        """Test that intrinsic_board is None when section is absent."""
+        # Make sure intrinsic_board is not in the config
+        if "intrinsic_board" in valid_config_yaml:
+            del valid_config_yaml["intrinsic_board"]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        # intrinsic_board should be None (backward compatible)
+        assert config.intrinsic_board is None
+
+    def test_load_config_without_initial_distances(self, valid_config_yaml):
+        """Test that initial_interface_distances is None when not provided."""
+        # Ensure initial_distances is not in config
+        if "initial_distances" in valid_config_yaml.get("interface", {}):
+            del valid_config_yaml["interface"]["initial_distances"]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        # initial_interface_distances should be None (backward compatible)
+        assert config.initial_interface_distances is None
+
+    def test_load_config_with_per_camera_initial_distances(self, valid_config_yaml):
+        """Test loading config with per-camera initial_distances."""
+        valid_config_yaml["interface"]["initial_distances"] = {
+            "cam0": 0.25,
+            "cam1": 0.28,
+        }
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.initial_interface_distances is not None
+        assert config.initial_interface_distances == {"cam0": 0.25, "cam1": 0.28}
+
+    def test_load_config_with_scalar_initial_distance(self, valid_config_yaml):
+        """Test loading config with scalar initial_distance (expanded to all cameras)."""
+        valid_config_yaml["interface"]["initial_distances"] = 0.3
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.initial_interface_distances is not None
+        assert config.initial_interface_distances == {"cam0": 0.3, "cam1": 0.3}
+
+    def test_load_config_with_incomplete_initial_distances_dict(self, valid_config_yaml):
+        """Test that incomplete initial_distances dict raises ValueError."""
+        # Only provide distance for cam0, not cam1
+        valid_config_yaml["interface"]["initial_distances"] = {"cam0": 0.25}
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            with pytest.raises(
+                ValueError, match="initial_distances dict must cover all cameras"
+            ):
+                load_config(f.name)
+
+    def test_load_config_with_negative_scalar_initial_distance(self, valid_config_yaml):
+        """Test that negative scalar initial_distance raises ValueError."""
+        valid_config_yaml["interface"]["initial_distances"] = -0.15
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            with pytest.raises(ValueError, match="initial_distances must be positive"):
+                load_config(f.name)
+
+    def test_load_config_with_negative_dict_initial_distance(self, valid_config_yaml):
+        """Test that negative value in initial_distances dict raises ValueError."""
+        valid_config_yaml["interface"]["initial_distances"] = {
+            "cam0": 0.25,
+            "cam1": -0.15,
+        }
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            with pytest.raises(
+                ValueError, match="initial_distances\\['cam1'\\] must be positive"
+            ):
+                load_config(f.name)
+
+    def test_load_config_with_extra_cameras_in_initial_distances(
+        self, valid_config_yaml, capsys
+    ):
+        """Test that extra cameras in initial_distances dict produce a warning."""
+        valid_config_yaml["interface"]["initial_distances"] = {
+            "cam0": 0.25,
+            "cam1": 0.28,
+            "cam2": 0.30,  # Extra camera not in cameras list
+        }
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        # Check warning was printed to stderr
+        captured = capsys.readouterr()
+        assert "cam2" in captured.err
+        assert "not in cameras list" in captured.err
+
+        # Config should still load successfully with all cameras
+        assert config.initial_interface_distances is not None
+        assert "cam0" in config.initial_interface_distances
+        assert "cam1" in config.initial_interface_distances
+        assert "cam2" in config.initial_interface_distances
+
+    def test_load_config_with_invalid_type_initial_distance(self, valid_config_yaml):
+        """Test that invalid type for initial_distances raises ValueError."""
+        valid_config_yaml["interface"]["initial_distances"] = "invalid"
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            with pytest.raises(
+                ValueError, match="initial_distances must be a number or dict"
+            ):
+                load_config(f.name)
+
+    def test_load_config_with_frame_step(self, valid_config_yaml):
+        """Test loading config with frame_step specified."""
+        valid_config_yaml["detection"]["frame_step"] = 5
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.frame_step == 5
+
+    def test_load_config_without_frame_step(self, valid_config_yaml):
+        """Test loading config without frame_step defaults to 1."""
+        # Make sure frame_step is not in the config
+        if "frame_step" in valid_config_yaml.get("detection", {}):
+            del valid_config_yaml["detection"]["frame_step"]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False
+        ) as f:
+            yaml.dump(valid_config_yaml, f)
+            f.flush()
+            config = load_config(f.name)
+
+        assert config.frame_step == 1
 
 
 # --- Test split_detections ---
@@ -353,6 +566,70 @@ class TestBuildCalibrationResult:
 # --- Test _compute_config_hash ---
 
 
+class TestSaveBoardReferenceImages:
+    """Tests for _save_board_reference_images function."""
+
+    def test_save_board_reference_images_with_separate_intrinsic_board(
+        self, sample_board_config
+    ):
+        """Test that both board images are saved when intrinsic board differs."""
+        from aquacal.core.board import BoardGeometry
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+
+            # Create two different board configurations
+            board = BoardGeometry(sample_board_config)
+            intrinsic_board_config = BoardConfig(
+                squares_x=12,
+                squares_y=9,
+                square_size=0.025,
+                marker_size=0.018,
+                dictionary="DICT_4X4_100",
+            )
+            intrinsic_board = BoardGeometry(intrinsic_board_config)
+
+            # Call the function
+            _save_board_reference_images(board, intrinsic_board, output_dir)
+
+            # Verify both images exist
+            extrinsic_path = output_dir / "board_extrinsic.png"
+            intrinsic_path = output_dir / "board_intrinsic.png"
+
+            assert extrinsic_path.exists(), "board_extrinsic.png not saved"
+            assert intrinsic_path.exists(), "board_intrinsic.png not saved"
+
+            # Verify images are not empty
+            assert extrinsic_path.stat().st_size > 0
+            assert intrinsic_path.stat().st_size > 0
+
+    def test_save_board_reference_images_without_separate_intrinsic_board(
+        self, sample_board_config
+    ):
+        """Test that only extrinsic image is saved when intrinsic board is same."""
+        from aquacal.core.board import BoardGeometry
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+
+            # Create a single board used for both intrinsic and extrinsic
+            board = BoardGeometry(sample_board_config)
+            intrinsic_board = board  # Same object
+
+            # Call the function
+            _save_board_reference_images(board, intrinsic_board, output_dir)
+
+            # Verify only extrinsic image exists
+            extrinsic_path = output_dir / "board_extrinsic.png"
+            intrinsic_path = output_dir / "board_intrinsic.png"
+
+            assert extrinsic_path.exists(), "board_extrinsic.png not saved"
+            assert not intrinsic_path.exists(), "board_intrinsic.png should not be saved when boards are identical"
+
+            # Verify extrinsic image is not empty
+            assert extrinsic_path.stat().st_size > 0
+
+
 class TestComputeConfigHash:
     """Tests for _compute_config_hash function."""
 
@@ -396,6 +673,80 @@ class TestComputeConfigHash:
         hash2 = _compute_config_hash(config2)
 
         assert hash1 != hash2
+
+    def test_compute_config_hash_includes_intrinsic_board(self, sample_board_config):
+        """Test that intrinsic_board is included in hash when provided."""
+        intrinsic_board_config = BoardConfig(
+            squares_x=12,
+            squares_y=9,
+            square_size=0.025,
+            marker_size=0.018,
+            dictionary="DICT_4X4_100",
+        )
+
+        config1 = CalibrationConfig(
+            board=sample_board_config,
+            camera_names=["cam0"],
+            intrinsic_video_paths={"cam0": Path("/a")},
+            extrinsic_video_paths={"cam0": Path("/c")},
+            output_dir=Path("/out"),
+            intrinsic_board=None,
+        )
+
+        config2 = CalibrationConfig(
+            board=sample_board_config,
+            camera_names=["cam0"],
+            intrinsic_video_paths={"cam0": Path("/a")},
+            extrinsic_video_paths={"cam0": Path("/c")},
+            output_dir=Path("/out"),
+            intrinsic_board=intrinsic_board_config,
+        )
+
+        hash1 = _compute_config_hash(config1)
+        hash2 = _compute_config_hash(config2)
+
+        # Different intrinsic_board should produce different hash
+        assert hash1 != hash2
+
+    def test_compute_config_hash_includes_initial_interface_distances(
+        self, sample_board_config
+    ):
+        """Test that initial_interface_distances is included in hash when provided."""
+        config1 = CalibrationConfig(
+            board=sample_board_config,
+            camera_names=["cam0", "cam1"],
+            intrinsic_video_paths={"cam0": Path("/a"), "cam1": Path("/b")},
+            extrinsic_video_paths={"cam0": Path("/c"), "cam1": Path("/d")},
+            output_dir=Path("/out"),
+            initial_interface_distances=None,
+        )
+
+        config2 = CalibrationConfig(
+            board=sample_board_config,
+            camera_names=["cam0", "cam1"],
+            intrinsic_video_paths={"cam0": Path("/a"), "cam1": Path("/b")},
+            extrinsic_video_paths={"cam0": Path("/c"), "cam1": Path("/d")},
+            output_dir=Path("/out"),
+            initial_interface_distances={"cam0": 0.25, "cam1": 0.28},
+        )
+
+        config3 = CalibrationConfig(
+            board=sample_board_config,
+            camera_names=["cam0", "cam1"],
+            intrinsic_video_paths={"cam0": Path("/a"), "cam1": Path("/b")},
+            extrinsic_video_paths={"cam0": Path("/c"), "cam1": Path("/d")},
+            output_dir=Path("/out"),
+            initial_interface_distances={"cam0": 0.30, "cam1": 0.28},
+        )
+
+        hash1 = _compute_config_hash(config1)
+        hash2 = _compute_config_hash(config2)
+        hash3 = _compute_config_hash(config3)
+
+        # Different initial_interface_distances should produce different hashes
+        assert hash1 != hash2
+        assert hash2 != hash3
+        assert hash1 != hash3
 
 
 # --- Test run_calibration ---
@@ -588,8 +939,8 @@ class TestRunCalibrationFromConfig:
             # Verify save_diagnostic_report was called
             mock_calibration_stages["save_diag"].assert_called_once()
             call_args = mock_calibration_stages["save_diag"].call_args
-            # Second positional arg is output_dir
-            assert call_args[0][1] == Path(tmpdir)
+            # Fourth positional arg is output_dir (report, calibration, detections, output_dir)
+            assert call_args[0][3] == Path(tmpdir)
             # save_images should be True
             assert call_args[1]["save_images"] is True
 
@@ -625,3 +976,108 @@ class TestRunCalibrationFromConfig:
             assert "[Diagnostics]" in captured.out
             assert "[Save]" in captured.out
             assert "Calibration complete!" in captured.out
+
+    def test_run_calibration_from_config_uses_intrinsic_board(
+        self, mock_calibration_stages, sample_board_config
+    ):
+        """Test that intrinsic_board is passed to calibrate_intrinsics_all when provided."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a different board for intrinsics
+            intrinsic_board_config = BoardConfig(
+                squares_x=12,
+                squares_y=9,
+                square_size=0.025,
+                marker_size=0.018,
+                dictionary="DICT_4X4_100",
+            )
+
+            config = CalibrationConfig(
+                board=sample_board_config,
+                intrinsic_board=intrinsic_board_config,
+                camera_names=["cam0", "cam1"],
+                intrinsic_video_paths={
+                    "cam0": Path("/path/cam0.mp4"),
+                    "cam1": Path("/path/cam1.mp4"),
+                },
+                extrinsic_video_paths={
+                    "cam0": Path("/path/cam0_uw.mp4"),
+                    "cam1": Path("/path/cam1_uw.mp4"),
+                },
+                output_dir=Path(tmpdir),
+            )
+
+            run_calibration_from_config(config)
+
+            # Verify calibrate_intrinsics_all was called with intrinsic board
+            mock_calibration_stages["intrinsics"].assert_called_once()
+            call_args = mock_calibration_stages["intrinsics"].call_args
+
+            # Check that the board parameter has the intrinsic board config
+            board_arg = call_args[1]["board"]
+            assert board_arg.config.squares_x == 12
+            assert board_arg.config.squares_y == 9
+            assert board_arg.config.square_size == 0.025
+            assert board_arg.config.marker_size == 0.018
+
+    def test_run_calibration_from_config_falls_back_to_extrinsic_board(
+        self, mock_calibration_stages, sample_board_config
+    ):
+        """Test that extrinsic board is used for intrinsics when intrinsic_board is None."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CalibrationConfig(
+                board=sample_board_config,
+                intrinsic_board=None,  # No separate intrinsic board
+                camera_names=["cam0", "cam1"],
+                intrinsic_video_paths={
+                    "cam0": Path("/path/cam0.mp4"),
+                    "cam1": Path("/path/cam1.mp4"),
+                },
+                extrinsic_video_paths={
+                    "cam0": Path("/path/cam0_uw.mp4"),
+                    "cam1": Path("/path/cam1_uw.mp4"),
+                },
+                output_dir=Path(tmpdir),
+            )
+
+            run_calibration_from_config(config)
+
+            # Verify calibrate_intrinsics_all was called with extrinsic board
+            mock_calibration_stages["intrinsics"].assert_called_once()
+            call_args = mock_calibration_stages["intrinsics"].call_args
+
+            # Check that the board parameter has the extrinsic board config
+            board_arg = call_args[1]["board"]
+            assert board_arg.config.squares_x == 7
+            assert board_arg.config.squares_y == 5
+            assert board_arg.config.square_size == 0.03
+            assert board_arg.config.marker_size == 0.022
+
+    def test_run_calibration_from_config_passes_initial_interface_distances(
+        self, mock_calibration_stages, sample_board_config
+    ):
+        """Test that initial_interface_distances is passed to optimize_interface."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            initial_distances = {"cam0": 0.25, "cam1": 0.28}
+            config = CalibrationConfig(
+                board=sample_board_config,
+                camera_names=["cam0", "cam1"],
+                intrinsic_video_paths={
+                    "cam0": Path("/path/cam0.mp4"),
+                    "cam1": Path("/path/cam1.mp4"),
+                },
+                extrinsic_video_paths={
+                    "cam0": Path("/path/cam0_uw.mp4"),
+                    "cam1": Path("/path/cam1_uw.mp4"),
+                },
+                output_dir=Path(tmpdir),
+                initial_interface_distances=initial_distances,
+            )
+
+            run_calibration_from_config(config)
+
+            # Verify optimize_interface was called with initial_interface_distances
+            mock_calibration_stages["optimize"].assert_called_once()
+            call_args = mock_calibration_stages["optimize"].call_args
+
+            # Check that initial_interface_distances was passed
+            assert call_args[1]["initial_interface_distances"] == initial_distances

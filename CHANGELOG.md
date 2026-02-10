@@ -8,6 +8,128 @@ Format: Agents append entries at the top (below this header) with the date, file
 
 <!-- Agents: add new entries below this line, above previous entries -->
 
+## 2026-02-10
+### [src/aquacal/calibration/pipeline.py]
+- Added `import time` for elapsed time tracking
+- Stage 1: Pass progress callback to `calibrate_intrinsics_all()` to print per-camera calibration progress
+- Extrinsic Detection: Pass progress callback to `detect_all_frames()` with local `_detection_progress()` function that prints at ~10% intervals
+- Stage 3: Wrap `optimize_interface()` call with timing using `time.perf_counter()`, display elapsed time in final RMS output
+- Stage 4: Wrap `joint_refinement()` call with timing using `time.perf_counter()`, display elapsed time in final RMS output
+- All 39 existing pipeline unit tests pass without modification
+
+## 2026-02-10
+### [src/aquacal/calibration/pipeline.py]
+- Added `_save_board_reference_images()` function to generate and save ChArUco board reference images
+- Images saved as `board_extrinsic.png` (always) and optionally `board_intrinsic.png` (when separate intrinsic board configured)
+- Function called during pipeline startup before Stage 1 begins
+- Added `import cv2` for board image generation
+
+### [tests/unit/test_pipeline.py]
+- Added `TestSaveBoardReferenceImages` class with 2 tests
+- Test: board images saved when separate intrinsic board configured
+- Test: only extrinsic image saved when intrinsic board identical to extrinsic board
+- All 39 pipeline tests pass
+
+## 2026-02-10
+### [src/aquacal/config/schema.py]
+- Added `frame_step: int = 1` field to `CalibrationConfig` to control frame sampling during detection and intrinsic calibration
+- Updated docstring to document the new parameter
+
+### [src/aquacal/calibration/pipeline.py]
+- Updated `load_config()` to parse `detection.frame_step` from YAML (defaults to 1 for backward compatibility)
+- Updated `run_calibration_from_config()` to pass `frame_step` to `calibrate_intrinsics_all()`
+- Updated `run_calibration_from_config()` to pass `frame_step` to `detect_all_frames()`
+
+### [tests/unit/test_pipeline.py]
+- Added `test_load_config_with_frame_step`: Verifies frame_step is parsed correctly when specified
+- Added `test_load_config_without_frame_step`: Verifies frame_step defaults to 1 when not provided
+- All 37 pipeline tests pass
+
+## 2026-02-10
+### [src/aquacal/config/schema.py]
+- Added `initial_interface_distances: dict[str, float] | None` field to `CalibrationConfig` for user-specified approximate camera-to-water-surface distances
+
+### [src/aquacal/calibration/pipeline.py]
+- Updated `load_config()` to parse `interface.initial_distances` from YAML (supports dict or scalar formats)
+- Scalar values are automatically expanded to all cameras
+- Added validation: dict must cover all cameras, all values must be positive
+- Updated `run_calibration_from_config()` to pass `initial_interface_distances` to `optimize_interface()`
+- Updated `_compute_config_hash()` to include `initial_interface_distances` in hash for reproducibility tracking
+
+### [tests/unit/test_pipeline.py]
+- Added 8 new tests for `initial_interface_distances` config parsing and validation
+- Added 1 test to verify `initial_interface_distances` is passed to `optimize_interface()`
+- Added 1 test to verify config hash includes `initial_interface_distances`
+- All 36 pipeline tests pass
+
+## 2026-02-10
+### [src/aquacal/validation/diagnostics.py]
+- Added `plot_camera_rig()`: 3D visualization of camera rig with positions, optical axis arrows, labels, and water surface plane
+- Added `plot_reprojection_quiver()`: per-camera quiver plots showing reprojection error direction and magnitude at each detected corner
+- Updated `save_diagnostic_report()` to accept `calibration` and `detections` parameters and generate camera_rig.png and quiver_{camera}.png files when save_images=True
+- Return dict now includes "rig" (Path) and "quiver" (dict of camera_name -> Path) keys
+
+### [src/aquacal/calibration/pipeline.py]
+- Updated save_diagnostic_report() call to pass temp_result (calibration) and val_detections (detections) arguments
+
+### [tests/unit/test_diagnostics.py]
+- Added TestPlotCameraRig class with 3 tests verifying single/multiple camera plots and custom arrow length
+- Added TestPlotReprojectionQuiver class with 4 tests verifying basic quiver plots, error handling, and scale parameter
+- Added TestSaveDiagnosticReportWithNewPlots class with 3 tests verifying new plot file generation
+- Updated existing TestSaveDiagnosticReport tests to use new save_diagnostic_report() signature
+- All 25 diagnostics tests pass
+
+### [tests/unit/test_pipeline.py]
+- Updated test_run_calibration_from_config_saves_diagnostics to check correct argument position for output_dir (now arg 3 instead of arg 1)
+- All 25 pipeline tests pass
+
+## 2026-02-10
+### [src/aquacal/cli.py]
+- Added `aquacal init` subcommand to auto-generate config YAML from video directories
+- Scans intrinsic and extrinsic video directories for `.mp4`, `.avi`, `.mov`, `.mkv` files (case-insensitive)
+- Extracts camera names via configurable regex pattern (default `(.+)` matches full filename stem)
+- Validates camera name overlap between directories (error if empty, warning if partial)
+- Generates config with all CalibrationConfig fields, placeholder board values, absolute video paths
+- Command-line interface: `--intrinsic-dir`, `--extrinsic-dir`, `--output` (default: `config.yaml`), `--pattern` (default: `(.+)`)
+- Error handling: missing directories, output file exists, invalid regex (not exactly 1 capture group), no videos found
+
+### [src/aquacal/config/example_config.yaml]
+- Added commented-out `intrinsic_board` section between `board:` and `cameras:` with usage note
+- Updated camera list comment from "up to 14 supported" to "Camera names are flexible — use any string that matches your video filenames"
+
+### [tests/unit/test_cli.py]
+- Added TestCmdInit class with 11 tests covering all `aquacal init` functionality
+- Tests verify: basic generation, custom regex patterns, video extension filtering, camera mismatch warnings, empty intersection errors, output file exists errors, missing directory errors, invalid regex errors, no videos found errors, generated config structure and defaults
+- All 17 tests pass (7 existing + 10 new)
+
+## 2026-02-10
+### [README.md]
+- Wrote comprehensive user-facing documentation with 7 main sections: project summary, installation, quick start, CLI reference, configuration file reference, pipeline overview, and output description
+- Documented all CLI commands and flags: `aquacal calibrate` with -v/--verbose, -o/--output-dir, --dry-run options
+- Provided complete annotated YAML configuration example showing all fields from CalibrationConfig with correct defaults (board, intrinsic_board, cameras, paths, interface, optimization, detection, validation)
+- Included minimal quick start example for new users to run calibration end-to-end
+- Linked to docs/COORDINATES.md for coordinate frame conventions rather than duplicating
+
+## 2026-02-10
+### [src/aquacal/config/schema.py]
+- Added optional `intrinsic_board: BoardConfig | None = None` field to `CalibrationConfig` dataclass
+- Allows separate ChArUco board specification for in-air intrinsic calibration vs underwater extrinsic calibration
+- Field placed after required fields, defaults to None for backward compatibility
+
+### [src/aquacal/calibration/pipeline.py]
+- Updated `load_config()`: parses optional `intrinsic_board:` section from YAML config files
+- Updated `run_calibration_from_config()`: creates separate `BoardGeometry` for intrinsics when `intrinsic_board` provided, falls back to extrinsic board when None
+- Stage 1 (intrinsic calibration) uses intrinsic board; Stages 2-4 continue using extrinsic board
+- Updated `_compute_config_hash()`: includes intrinsic_board parameters in hash when provided for reproducibility tracking
+
+### [tests/unit/test_pipeline.py]
+- Added `test_load_config_with_intrinsic_board`: verifies parsing of separate intrinsic board section from YAML
+- Added `test_load_config_without_intrinsic_board`: verifies backward compatibility (intrinsic_board=None when section absent)
+- Added `test_run_calibration_from_config_uses_intrinsic_board`: verifies intrinsic board passed to Stage 1 when provided
+- Added `test_run_calibration_from_config_falls_back_to_extrinsic_board`: verifies extrinsic board used when intrinsic_board=None
+- Added `test_compute_config_hash_includes_intrinsic_board`: verifies different intrinsic boards produce different hashes
+- All 25 tests pass
+
 ## 2026-02-04
 ### [src/aquacal/calibration/_optim_common.py] (new file)
 - Extracted shared optimization utilities from interface_estimation.py and refinement.py

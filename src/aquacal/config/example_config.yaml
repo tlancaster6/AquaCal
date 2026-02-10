@@ -8,12 +8,21 @@ board:
   marker_size: 0.022     # ArUco marker size in meters (22mm)
   dictionary: "DICT_4X4_50"  # ArUco dictionary name
 
+# Optional: use a different board for in-air intrinsic calibration
+# If omitted, the board above is used for both intrinsic and extrinsic steps
+# intrinsic_board:
+#   squares_x: 12
+#   squares_y: 9
+#   square_size: 0.025
+#   marker_size: 0.018
+#   dictionary: "DICT_4X4_100"
+
 cameras:
   - cam0    # Reference camera (will be at world origin)
   - cam1
   - cam2
   - cam3
-  # Add more cameras as needed (up to 14 supported)
+  # Camera names are flexible — use any string that matches your video filenames
 
 paths:
   intrinsic_videos:
@@ -32,6 +41,14 @@ interface:
   n_air: 1.0             # Refractive index of air
   n_water: 1.333         # Refractive index of water (fresh water at 20C)
   normal_fixed: true     # If false, estimate interface tilt
+
+  # Optional: approximate camera-to-water-surface distances (meters)
+  # Improves Stage 3 initialization. Doesn't need to be exact (within 2-3x is fine)
+  # initial_distances:
+  #   cam0: 0.20
+  #   cam1: 0.20
+  #   cam2: 0.20
+  #   cam3: 0.20
 
 optimization:
   robust_loss: "huber"   # Options: "huber", "soft_l1", "linear"
