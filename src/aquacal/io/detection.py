@@ -143,9 +143,11 @@ def detect_all_frames(
                 # Detect corners
                 detection = detect_charuco(image, board, cam_matrix, dist_coeffs)
 
-                # Filter by min_corners
+                # Filter by min_corners and collinearity
                 if detection is not None and detection.num_corners >= min_corners:
-                    frame_detections[cam_name] = detection
+                    obj_pts = board.get_corner_array(detection.corner_ids)
+                    if np.linalg.matrix_rank(obj_pts[:, :2] - obj_pts[0, :2]) >= 2:
+                        frame_detections[cam_name] = detection
 
             # Only store frame if at least one camera detected the board
             if frame_detections:

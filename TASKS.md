@@ -80,7 +80,7 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.10** Save board reference images at pipeline start: Generate and save PNG images of the configured ChArUco board(s) to the output directory before Stage 1, so users can visually verify their config matches the physical board. Saves both extrinsic and intrinsic boards when a separate intrinsic board is configured.
 
-- [ ] **P.11** Add progress feedback to pipeline: Wire up existing `progress_callback` parameters in `calibrate_intrinsics_all()` and `detect_all_frames()`, and set `verbose=1` for Stage 3/4 optimizers. Provides per-camera and per-frame progress during the longest-running pipeline stages.
+- [x] **P.11** Add progress feedback to pipeline: Wire up existing `progress_callback` parameters in `calibrate_intrinsics_all()` and `detect_all_frames()`, and set `verbose=1` for Stage 3/4 optimizers. Provides per-camera and per-frame progress during the longest-running pipeline stages.
 
 ---
 

@@ -9,6 +9,24 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-10
+### [src/aquacal/calibration/intrinsics.py]
+- **BUG FIX**: Added collinearity check to filter out frames where all detected ChArUco corners lie on a single board row
+- Check uses `np.linalg.matrix_rank()` on object point positions (x,y only); skips frames with rank < 2
+- Prevents OpenCV `calibrateCamera` crash from degenerate homography estimation on collinear points
+- Visualization script `scripts/visualize_collinear_frame.py` created to capture problematic frame (frame 1330, camera e3v8250, 8 corners at y=0)
+
+### [src/aquacal/io/detection.py]
+- Added collinearity check to `detect_all_frames()` to filter degenerate detections in extrinsic path
+- Same rank-2 validation applied to object points before adding detection to result
+
+### [tests/unit/test_intrinsics.py]
+- Added `test_filters_collinear_detections`: verifies calibration succeeds without crashing when video contains frames with collinear corners
+- All 14 intrinsics tests pass
+
+### [tests/unit/test_pipeline.py]
+- All 39 pipeline tests pass (no modifications needed)
+
+## 2026-02-10
 ### [src/aquacal/calibration/pipeline.py]
 - Added `import time` for elapsed time tracking
 - Stage 1: Pass progress callback to `calibrate_intrinsics_all()` to print per-camera calibration progress

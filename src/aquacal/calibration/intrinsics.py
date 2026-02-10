@@ -70,6 +70,11 @@ def calibrate_intrinsics_single(
             if detection is None or detection.num_corners < min_corners:
                 continue
 
+            # Skip collinear detections (degenerate for homography estimation)
+            obj_pts = board.get_corner_array(detection.corner_ids)
+            if np.linalg.matrix_rank(obj_pts[:, :2] - obj_pts[0, :2]) < 2:
+                continue
+
             all_detections.append((detection.corner_ids, detection.corners_2d))
 
     if not all_detections:
