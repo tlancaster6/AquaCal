@@ -24,6 +24,7 @@ from aquacal.validation.reconstruction import (
     triangulate_charuco_corners,
     compute_3d_distance_errors,
     compute_board_planarity_error,
+    get_adjacent_corner_pairs,
     DistanceErrors,
 )
 
@@ -186,6 +187,31 @@ def create_synthetic_detections(
 # --- Test Cases ---
 
 
+def test_get_adjacent_corner_pairs(board_geometry):
+    """Test that get_adjacent_corner_pairs returns correct pairs."""
+    # Board is 5x4 squares, so (5-1)x(4-1) = 4x3 = 12 corners
+    # Horizontal pairs: (cols-1) * rows = 3 * 3 = 9
+    # Vertical pairs: cols * (rows-1) = 4 * 2 = 8
+    # Total: 17 pairs
+    pairs = get_adjacent_corner_pairs(board_geometry)
+
+    assert len(pairs) == 17
+
+    # Check that all pairs are adjacent (differ by 1 horizontally or cols vertically)
+    cols = board_geometry.config.squares_x - 1  # 4
+    for id1, id2 in pairs:
+        assert id1 < id2  # Lower ID first
+        diff = id2 - id1
+        # Either horizontal neighbor (diff=1) or vertical neighbor (diff=cols=4)
+        assert diff == 1 or diff == cols
+
+    # Check specific pairs exist (spot check)
+    assert (0, 1) in pairs  # Horizontal pair in first row
+    assert (0, 4) in pairs  # Vertical pair in first column
+    assert (8, 9) in pairs  # Horizontal pair in third row
+    assert (7, 11) in pairs  # Vertical pair in fourth column
+
+
 def test_triangulate_charuco_corners_basic(
     board_config, board_geometry, interface_params, camera_intrinsics
 ):
@@ -327,7 +353,7 @@ def test_compute_3d_distance_errors_perfect(
         board=board_config,
     )
 
-    # Create perfect detections
+    # Create perfect detections (corners 0,1,2,3 are in first row, so 3 adjacent pairs)
     corner_ids = [0, 1, 2, 3]
     corner_positions_3d = {}
     for cid in corner_ids:
@@ -344,7 +370,12 @@ def test_compute_3d_distance_errors_perfect(
     # Should have low error (< 0.1mm)
     assert errors.mean < 0.0001, f"Mean error {errors.mean*1000:.3f}mm > 0.1mm"
     assert errors.max_error < 0.001, f"Max error {errors.max_error*1000:.3f}mm > 1mm"
-    assert errors.num_comparisons > 0
+    assert errors.num_comparisons == 3  # Adjacent pairs: (0,1), (1,2), (2,3)
+    assert errors.num_frames == 1
+    # Check new fields
+    assert abs(errors.signed_mean) < 0.0001  # Should be near zero for perfect data
+    assert errors.rmse < 0.0001
+    assert errors.percent_error < 0.01  # Less than 0.01%
 
 
 def test_compute_3d_distance_errors_with_noise(
@@ -394,8 +425,12 @@ def test_compute_3d_distance_errors_with_noise(
 
     # With noise, error should be non-zero but reasonable
     assert errors.mean > 0.0
-    assert errors.mean < 0.015  # Less than 1.5 cm (reasonable for 1px noise at this distance)
-    assert errors.num_comparisons > 0
+    assert errors.mean < 0.020  # Less than 2 cm (reasonable for 1px noise at this distance)
+    assert errors.num_comparisons == 3  # Adjacent pairs: (0,1), (1,2), (2,3)
+    assert errors.num_frames == 1
+    # Check new fields exist and are reasonable
+    assert errors.rmse > 0.0
+    assert errors.percent_error > 0.0
 
 
 def test_compute_3d_distance_errors_multiple_frames(
@@ -423,7 +458,7 @@ def test_compute_3d_distance_errors_multiple_frames(
         board=board_config,
     )
 
-    # Create detections for multiple frames
+    # Create detections for multiple frames (corners 0,1,2 give 2 adjacent pairs)
     corner_ids = [0, 1, 2]
     all_frames = {}
 
@@ -447,9 +482,55 @@ def test_compute_3d_distance_errors_multiple_frames(
     errors = compute_3d_distance_errors(calibration, detections, board_geometry)
 
     # Should have comparisons from all frames
-    # 3 corners = 3 pairs per frame, 3 frames = 9 pairs
-    assert errors.num_comparisons == 9
+    # 3 corners = 2 adjacent pairs per frame (0-1, 1-2), 3 frames = 6 pairs
+    assert errors.num_comparisons == 6
+    assert errors.num_frames == 3
     assert errors.mean < 0.001
+
+
+def test_compute_3d_distance_errors_signed_error(
+    board_config, board_geometry, interface_params, camera_intrinsics
+):
+    """Test that signed error is positive when distances are overestimated."""
+    cam1 = create_camera_calibration(
+        "cam1",
+        camera_intrinsics,
+        R=np.eye(3),
+        t=np.array([0.0, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+    cam2 = create_camera_calibration(
+        "cam2",
+        camera_intrinsics,
+        R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
+        t=np.array([0.2, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+
+    calibration = create_calibration_result(
+        cameras={"cam1": cam1, "cam2": cam2},
+        interface=interface_params,
+        board=board_config,
+    )
+
+    # Create detections with artificially scaled-up distances (1% larger)
+    corner_ids = [0, 1, 2, 3]
+    corner_positions_3d = {}
+    for cid in corner_ids:
+        board_pos = board_geometry.corner_positions[cid]
+        # Scale up by 1% to simulate overestimation
+        corner_positions_3d[cid] = (board_pos * 1.01) + np.array([0.0, 0.0, 0.6])
+
+    detections = create_synthetic_detections(
+        calibration, board_geometry, corner_ids, corner_positions_3d, frame_idx=0
+    )
+
+    errors = compute_3d_distance_errors(calibration, detections, board_geometry)
+
+    # With 1% scale, distances should be ~1% larger
+    assert errors.signed_mean > 0, "Signed mean should be positive for overestimated distances"
+    expected_signed_error = 0.01 * board_config.square_size  # ~0.4mm
+    assert abs(errors.signed_mean - expected_signed_error) < 0.0002  # Within 0.2mm
 
 
 def test_compute_3d_distance_errors_empty(
@@ -477,7 +558,11 @@ def test_compute_3d_distance_errors_empty(
     assert np.isnan(errors.mean)
     assert np.isnan(errors.std)
     assert np.isnan(errors.max_error)
+    assert np.isnan(errors.signed_mean)
+    assert np.isnan(errors.rmse)
+    assert np.isnan(errors.percent_error)
     assert errors.num_comparisons == 0
+    assert errors.num_frames == 0
 
 
 def test_compute_3d_distance_errors_include_per_pair(
@@ -520,11 +605,13 @@ def test_compute_3d_distance_errors_include_per_pair(
     )
 
     assert errors.per_corner_pair is not None
-    # 3 corners = 3 pairs: (0,1), (0,2), (1,2)
-    assert len(errors.per_corner_pair) == 3
+    # 3 corners in first row = 2 adjacent pairs: (0,1), (1,2)
+    assert len(errors.per_corner_pair) == 2
     assert (0, 1) in errors.per_corner_pair
-    assert (0, 2) in errors.per_corner_pair
     assert (1, 2) in errors.per_corner_pair
+    # Values should be signed errors (near zero for perfect data)
+    for pair, signed_error in errors.per_corner_pair.items():
+        assert abs(signed_error) < 0.001, f"Pair {pair} error too large"
 
 
 def test_compute_board_planarity_error_coplanar():

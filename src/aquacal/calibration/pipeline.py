@@ -396,21 +396,26 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 — registers '3d' projection
+        from aquacal.validation.diagnostics import plot_camera_rig
 
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection="3d")
+        # Build temporary CalibrationResult for plotting
+        temp_cameras = {}
         for cam_name, ext in extrinsics.items():
-            C = ext.C
-            ax.scatter(C[0], C[1], C[2], s=50)
-            ax.text(C[0], C[1], C[2], f"  {cam_name}", fontsize=7)
-        ax.set_xlabel("X (m)")
-        ax.set_ylabel("Y (m)")
-        ax.set_zlabel("Z (m)")
-        ax.set_title("Stage 2: Initial Camera Positions (pre-optimization)")
+            temp_cameras[cam_name] = CameraCalibration(
+                intrinsics=intrinsics[cam_name],
+                extrinsics=ext,
+                interface_distance=config.initial_interface_distances.get(cam_name, 0.15),
+            )
+        temp_result = CalibrationResult(cameras=temp_cameras, board_poses={})
+
+        fig = plot_camera_rig(
+            temp_result,
+            title="Stage 2: Initial Camera Positions (pre-optimization)",
+        )
         fig.savefig(
             str(config.output_dir / "camera_rig_initial.png"),
-            dpi=150, bbox_inches="tight",
+            dpi=150,
+            bbox_inches="tight",
         )
         plt.close(fig)
         print(f"  Saved camera_rig_initial.png")
@@ -578,9 +583,19 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         temp_result, val_detections, board
     )
     if np.isnan(reconstruction_errors.mean):
-        print("  WARNING: 3D reconstruction mean error: N/A (no valid comparisons)")
+        print("  WARNING: 3D reconstruction: N/A (no valid comparisons)")
     else:
-        print(f"  3D reconstruction mean error: {reconstruction_errors.mean*1000:.2f} mm")
+        print(
+            f"  3D distance error: MAE {reconstruction_errors.mean*1000:.2f} mm, "
+            f"RMSE {reconstruction_errors.rmse*1000:.2f} mm "
+            f"({reconstruction_errors.percent_error:.1f}% of square size)"
+        )
+        if abs(reconstruction_errors.signed_mean) > 0.0005:  # > 0.5mm bias
+            sign = "+" if reconstruction_errors.signed_mean > 0 else ""
+            bias_type = "overestimate" if reconstruction_errors.signed_mean > 0 else "underestimate"
+            print(
+                f"  Scale bias: {sign}{reconstruction_errors.signed_mean*1000:.2f} mm ({bias_type})"
+            )
 
     # --- Generate Diagnostics ---
     print("\n[Diagnostics] Generating report...")
@@ -651,8 +666,9 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         print("  3D error: N/A")
     else:
         print(
-            f"  3D error: {reconstruction_errors.mean*1000:.2f} "
-            f"± {reconstruction_errors.std*1000:.2f} mm"
+            f"  3D error: MAE {reconstruction_errors.mean*1000:.2f} mm, "
+            f"RMSE {reconstruction_errors.rmse*1000:.2f} mm "
+            f"({reconstruction_errors.percent_error:.1f}%)"
         )
     print("=" * 60)
 

@@ -296,6 +296,21 @@ def generate_recommendations(
                 f"3D reconstruction error ({reconstruction.mean*1000:.2f} mm) is elevated"
             )
 
+        # Scale bias detection
+        if abs(reconstruction.signed_mean) > 0.001:
+            bias_mm = reconstruction.signed_mean * 1000
+            sign = "+" if bias_mm > 0 else ""
+            if bias_mm > 0:
+                recs.append(
+                    f"Systematic scale bias detected ({sign}{bias_mm:.1f} mm) — "
+                    f"distances overestimated (check n_water or interface distance)"
+                )
+            else:
+                recs.append(
+                    f"Systematic scale bias detected ({sign}{bias_mm:.1f} mm) — "
+                    f"distances underestimated"
+                )
+
     # Depth trend
     if len(depth_errors) >= 2:
         errors = depth_errors["mean_error"].dropna()
@@ -390,6 +405,10 @@ def generate_diagnostic_report(
         "reconstruction_std": reconstruction_errors.std,
         "reconstruction_max": reconstruction_errors.max_error,
         "reconstruction_num_comparisons": float(reconstruction_errors.num_comparisons),
+        "reconstruction_signed_mean": reconstruction_errors.signed_mean,
+        "reconstruction_rmse": reconstruction_errors.rmse,
+        "reconstruction_percent_error": reconstruction_errors.percent_error,
+        "reconstruction_num_frames": float(reconstruction_errors.num_frames),
         "water_surface_z_mean": water_surface["mean"],
         "water_surface_z_std": water_surface["std"],
         "water_surface_z_spread": water_surface["spread"],
@@ -407,29 +426,22 @@ def generate_diagnostic_report(
 
 def plot_camera_rig(
     calibration: CalibrationResult,
-    ax: "plt.Axes | None" = None,
     arrow_length: float = 0.05,
+    title: str = "Camera Rig Layout",
 ) -> "plt.Figure":
     """
-    Plot 3D camera rig with positions, orientations, and water surface.
+    Plot 3D camera rig with positions, orientations, and water surface in three viewing angles.
 
     Args:
         calibration: CalibrationResult with camera extrinsics and interface distances
-        ax: Optional existing 3D axes to plot on. If None, creates new figure.
         arrow_length: Length of optical axis arrows in world units (meters)
+        title: Overall figure title
 
     Returns:
-        matplotlib Figure
+        matplotlib Figure with three subplots (perspective, top-down, side view)
     """
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
-
-    # Create figure and axes if not provided
-    if ax is None:
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection="3d")
-    else:
-        fig = ax.get_figure()
 
     # Collect camera positions and interface z-coordinates
     camera_positions = []
@@ -449,75 +461,98 @@ def plot_camera_rig(
     # Generate colors for cameras
     colors = plt.cm.tab10(np.linspace(0, 1, len(calibration.cameras)))
 
-    # Plot camera positions
-    ax.scatter(
-        camera_positions[:, 0],
-        camera_positions[:, 1],
-        camera_positions[:, 2],
-        c=colors,
-        s=100,
-        marker="o",
-        label="Cameras",
-    )
-
-    # Plot camera labels and optical axis arrows
-    for i, (cam_name, cam_calib) in enumerate(calibration.cameras.items()):
-        C = cam_calib.extrinsics.C
-        R = cam_calib.extrinsics.R
-
-        # Add label
-        ax.text(C[0], C[1], C[2], f"  {cam_name}", fontsize=9)
-
-        # Optical axis direction: Z-forward in camera frame = third column of R.T
-        # (or equivalently, third row of R)
-        optical_axis = R.T @ np.array([0.0, 0.0, 1.0])
-        arrow_end = C + optical_axis * arrow_length
-
-        # Draw arrow
-        ax.quiver(
-            C[0],
-            C[1],
-            C[2],
-            optical_axis[0] * arrow_length,
-            optical_axis[1] * arrow_length,
-            optical_axis[2] * arrow_length,
-            color=colors[i],
-            arrow_length_ratio=0.3,
-            linewidth=2,
+    # Helper function to plot on a single axes
+    def plot_on_axes(ax: "plt.Axes") -> None:
+        """Plot camera rig on given 3D axes."""
+        # Plot camera positions
+        ax.scatter(
+            camera_positions[:, 0],
+            camera_positions[:, 1],
+            camera_positions[:, 2],
+            c=colors,
+            s=100,
+            marker="o",
+            label="Cameras",
         )
 
-    # Plot water surface plane
-    mean_interface_z = np.mean(interface_zs)
+        # Plot camera labels and optical axis arrows
+        for i, (cam_name, cam_calib) in enumerate(calibration.cameras.items()):
+            C = cam_calib.extrinsics.C
+            R = cam_calib.extrinsics.R
 
-    # Create grid for plane
-    x_range = camera_positions[:, 0]
-    y_range = camera_positions[:, 1]
-    x_span = x_range.max() - x_range.min()
-    y_span = y_range.max() - y_range.min()
+            # Add label
+            ax.text(C[0], C[1], C[2], f"  {cam_name}", fontsize=9)
 
-    # Extend plane beyond camera positions
-    margin = max(x_span, y_span) * 0.3 if max(x_span, y_span) > 0 else 0.1
-    x_min, x_max = x_range.min() - margin, x_range.max() + margin
-    y_min, y_max = y_range.min() - margin, y_range.max() + margin
+            # Optical axis direction: Z-forward in camera frame = third column of R.T
+            # (or equivalently, third row of R)
+            optical_axis = R.T @ np.array([0.0, 0.0, 1.0])
 
-    xx, yy = np.meshgrid(
-        np.linspace(x_min, x_max, 10), np.linspace(y_min, y_max, 10)
-    )
-    zz = np.full_like(xx, mean_interface_z)
+            # Draw arrow
+            ax.quiver(
+                C[0],
+                C[1],
+                C[2],
+                optical_axis[0] * arrow_length,
+                optical_axis[1] * arrow_length,
+                optical_axis[2] * arrow_length,
+                color=colors[i],
+                arrow_length_ratio=0.3,
+                linewidth=2,
+            )
 
-    ax.plot_surface(xx, yy, zz, alpha=0.3, color="lightblue", label="Water Surface")
+        # Plot water surface plane
+        mean_interface_z = np.mean(interface_zs)
 
-    # Set labels and title
-    ax.set_xlabel("X (m)")
-    ax.set_ylabel("Y (m)")
-    ax.set_zlabel("Z (m, down)")
-    ax.set_title("Camera Rig Layout")
+        # Create grid for plane
+        x_range = camera_positions[:, 0]
+        y_range = camera_positions[:, 1]
+        x_span = x_range.max() - x_range.min()
+        y_span = y_range.max() - y_range.min()
 
-    # Invert Z axis so "up" appears visually upward
-    ax.invert_zaxis()
+        # Extend plane beyond camera positions
+        margin = max(x_span, y_span) * 0.3 if max(x_span, y_span) > 0 else 0.1
+        x_min, x_max = x_range.min() - margin, x_range.max() + margin
+        y_min, y_max = y_range.min() - margin, y_range.max() + margin
 
-    # Equal aspect ratio
-    ax.set_box_aspect([1, 1, 1])
+        xx, yy = np.meshgrid(
+            np.linspace(x_min, x_max, 10), np.linspace(y_min, y_max, 10)
+        )
+        zz = np.full_like(xx, mean_interface_z)
+
+        ax.plot_surface(xx, yy, zz, alpha=0.3, color="lightblue", label="Water Surface")
+
+        # Set labels
+        ax.set_xlabel("X (m)")
+        ax.set_ylabel("Y (m)")
+        ax.set_zlabel("Z (m, down)")
+
+        # Invert Z axis so "up" appears visually upward
+        ax.invert_zaxis()
+
+        # Equal aspect ratio
+        ax.set_box_aspect([1, 1, 1])
+
+    # Create 1x3 figure with three 3D subplots
+    fig = plt.figure(figsize=(20, 7))
+    axes = [fig.add_subplot(1, 3, i + 1, projection="3d") for i in range(3)]
+
+    # Plot on each axes
+    for ax in axes:
+        plot_on_axes(ax)
+
+    # Set viewing angles for each panel
+    axes[0].view_init(elev=30, azim=-60)
+    axes[0].set_title("Perspective")
+
+    axes[1].view_init(elev=90, azim=-90)
+    axes[1].set_title("Top-Down (XY)")
+
+    axes[2].view_init(elev=0, azim=0)
+    axes[2].set_title("Side (XZ)")
+
+    # Set overall figure title
+    fig.suptitle(title, fontsize=16)
+    fig.tight_layout()
 
     return fig
 
@@ -686,6 +721,10 @@ def save_diagnostic_report(
             "std": report.reconstruction.std,
             "max_error": report.reconstruction.max_error,
             "num_comparisons": report.reconstruction.num_comparisons,
+            "signed_mean": report.reconstruction.signed_mean,
+            "rmse": report.reconstruction.rmse,
+            "percent_error": report.reconstruction.percent_error,
+            "num_frames": report.reconstruction.num_frames,
         },
         "water_surface": {
             "mean": water_surface["mean"],

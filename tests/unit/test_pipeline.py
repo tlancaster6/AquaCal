@@ -911,6 +911,10 @@ class TestRunCalibrationFromConfig:
             mock_3d_result = MagicMock()
             mock_3d_result.mean = 0.001
             mock_3d_result.std = 0.0005
+            mock_3d_result.signed_mean = 0.0002
+            mock_3d_result.rmse = 0.0011
+            mock_3d_result.percent_error = 2.5
+            mock_3d_result.num_frames = 8
             mock_3d.return_value = mock_3d_result
 
             # Mock diagnostic report

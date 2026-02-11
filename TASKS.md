@@ -94,7 +94,13 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [ ] **P.17** Wire up `normal_fixed` config and add normal optimization: `interface_normal_fixed` is parsed from YAML and stored in config but never passed to the optimizers — the normal is always hardcoded to `[0, 0, -1]`. Add `refractive_project_general()` (Newton-Raphson for arbitrary normals), add 2 tilt-angle parameters to the Stage 3/4 optimization vector when `normal_fixed: false`, and wire through pipeline. Needed when camera rig is tilted relative to water surface.
 
-- [ ] **P.18** Water surface Z consistency diagnostic: After Stage 3, compute `water_z = camera_z + interface_distance` per camera and report the spread. Tests the physical constraint that the water surface is a single plane. Add to pipeline printout and `diagnostics.json`.
+- [x] **P.18** Water surface Z consistency diagnostic: After Stage 3, compute `water_z = camera_z + interface_distance` per camera and report the spread. Tests the physical constraint that the water surface is a single plane. Add to pipeline printout and `diagnostics.json`.
+
+- [ ] **P.19** Fix low quality extrinsic initialization. Optimization is compensating, but the initial guess is bad despite P.15
+
+- [x] **P.20** Improve 3D distance validation metric: Change `compute_3d_distance_errors()` from all N-choose-2 corner pairs to adjacent-only (single known ground truth = `square_size`). Add signed error (bias detection), RMSE, and percent error. Update pipeline printout and diagnostics recommendations.
+
+- [x] **P.21** Three-panel camera rig visualization: Refactor `plot_camera_rig()` to produce a 1×3 figure with perspective, top-down, and side-on views. Replace inline scatter plot in pipeline.py with a call to the shared function.
 
 ---
 

@@ -4,6 +4,8 @@ import json
 import tempfile
 from pathlib import Path
 
+import matplotlib
+matplotlib.use('Agg')  # Set non-interactive backend for testing
 import numpy as np
 import pandas as pd
 import pytest
@@ -29,6 +31,7 @@ from aquacal.validation.diagnostics import (
     DiagnosticReport,
     compute_spatial_error_map,
     compute_depth_stratified_errors,
+    compute_water_surface_consistency,
     generate_recommendations,
     generate_diagnostic_report,
     save_diagnostic_report,
@@ -608,9 +611,9 @@ class TestPlotCameraRig:
         fig = plot_camera_rig(calibration_result)
 
         assert fig is not None
-        # Check that figure has 3D axes
-        assert len(fig.axes) == 1
-        assert fig.axes[0].name == "3d"
+        # Check that figure has 3 3D axes (three-panel view)
+        assert len(fig.axes) == 3
+        assert all(ax.name == "3d" for ax in fig.axes)
 
     def test_multiple_cameras(self, board_config):
         """Test that plot_camera_rig works with multiple cameras."""
@@ -656,8 +659,9 @@ class TestPlotCameraRig:
         fig = plot_camera_rig(calibration)
 
         assert fig is not None
-        assert len(fig.axes) == 1
-        assert fig.axes[0].name == "3d"
+        # Check that figure has 3 3D axes (three-panel view)
+        assert len(fig.axes) == 3
+        assert all(ax.name == "3d" for ax in fig.axes)
 
     def test_custom_arrow_length(self, calibration_result):
         """Test that arrow_length parameter is accepted."""
@@ -926,3 +930,188 @@ class TestSaveDiagnosticReportWithNewPlots:
                 cam_name = f"cam{i}"
                 assert cam_name in result["quiver"]
                 assert result["quiver"][cam_name].exists()
+
+
+class TestComputeWaterSurfaceConsistency:
+    """Tests for compute_water_surface_consistency()."""
+
+    def test_coplanar_cameras(self, board_config):
+        """Test cameras at same Z with same interface distance -> spread ≈ 0."""
+        # Create 3 cameras all at Z=0 with interface_distance=0.5
+        cameras = {}
+        for i in range(3):
+            K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            R = np.eye(3)
+            t = np.array([i * 0.1, 0.0, 0.0])  # Different X positions, same Z=0
+            extrinsics = CameraExtrinsics(R=R, t=t)
+            cameras[f"cam{i}"] = CameraCalibration(
+                name=f"cam{i}",
+                intrinsics=intrinsics,
+                extrinsics=extrinsics,
+                interface_distance=0.5,  # Same interface distance
+            )
+
+        interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
+        diagnostics = DiagnosticsData(
+            reprojection_error_rms=0.5,
+            reprojection_error_per_camera={f"cam{i}": 0.5 for i in range(3)},
+            validation_3d_error_mean=0.001,
+            validation_3d_error_std=0.0005,
+        )
+        metadata = CalibrationMetadata(
+            calibration_date="2026-01-01",
+            software_version="0.1.0",
+            config_hash="abc123",
+            num_frames_used=10,
+            num_frames_holdout=2,
+        )
+        calibration = CalibrationResult(
+            cameras=cameras,
+            interface=interface,
+            board=board_config,
+            diagnostics=diagnostics,
+            metadata=metadata,
+        )
+
+        result = compute_water_surface_consistency(calibration)
+
+        # All cameras at Z=0 with d=0.5 -> water_z = 0.5 for all
+        assert np.isclose(result["mean"], 0.5)
+        assert np.isclose(result["std"], 0.0)
+        assert np.isclose(result["spread"], 0.0)
+        assert len(result["per_camera"]) == 3
+        for cam_name, water_z in result["per_camera"].items():
+            assert np.isclose(water_z, 0.5)
+
+    def test_different_heights_compensated(self, board_config):
+        """Test cameras at different Z but interface distances compensate -> spread ≈ 0."""
+        # Create 3 cameras at different heights but interface distances adjusted
+        cameras = {}
+        for i in range(3):
+            K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            R = np.eye(3)
+            # Camera center C = -R^T @ t. With R=I, C = -t
+            # Set C_z to 0.1 * i, so t_z = -0.1 * i
+            cam_c_z = 0.1 * i  # cam0 at Z=0, cam1 at Z=0.1, cam2 at Z=0.2
+            t = np.array([i * 0.1, 0.0, -cam_c_z])  # Note: t_z = -C_z
+            extrinsics = CameraExtrinsics(R=R, t=t)
+            # Adjust interface distance so water_z = C_z + d = 0.5 for all
+            interface_distance = 0.5 - cam_c_z  # d = 0.5, 0.4, 0.3
+            cameras[f"cam{i}"] = CameraCalibration(
+                name=f"cam{i}",
+                intrinsics=intrinsics,
+                extrinsics=extrinsics,
+                interface_distance=interface_distance,
+            )
+
+        interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
+        diagnostics = DiagnosticsData(
+            reprojection_error_rms=0.5,
+            reprojection_error_per_camera={f"cam{i}": 0.5 for i in range(3)},
+            validation_3d_error_mean=0.001,
+            validation_3d_error_std=0.0005,
+        )
+        metadata = CalibrationMetadata(
+            calibration_date="2026-01-01",
+            software_version="0.1.0",
+            config_hash="abc123",
+            num_frames_used=10,
+            num_frames_holdout=2,
+        )
+        calibration = CalibrationResult(
+            cameras=cameras,
+            interface=interface,
+            board=board_config,
+            diagnostics=diagnostics,
+            metadata=metadata,
+        )
+
+        result = compute_water_surface_consistency(calibration)
+
+        # All cameras should agree on water_z = 0.5
+        assert np.isclose(result["mean"], 0.5, atol=1e-10)
+        assert np.isclose(result["std"], 0.0, atol=1e-10)
+        assert np.isclose(result["spread"], 0.0, atol=1e-10)
+        assert len(result["per_camera"]) == 3
+
+    def test_outlier_camera(self, board_config):
+        """Test one camera with wrong interface distance -> large spread, outlier detected."""
+        # Create 5 cameras: 4 agree, 1 is a clear outlier
+        cameras = {}
+        expected_water_zs = {}
+        for i in range(5):
+            K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            R = np.eye(3)
+            t = np.array([i * 0.1, 0.0, 0.0])  # All at C_z=0 (since R=I, t_z=0 -> C_z=0)
+            extrinsics = CameraExtrinsics(R=R, t=t)
+            # cam0-3: d=0.5, cam4: d=1.1 (outlier - 600mm off)
+            interface_distance = 1.1 if i == 4 else 0.5
+            cameras[f"cam{i}"] = CameraCalibration(
+                name=f"cam{i}",
+                intrinsics=intrinsics,
+                extrinsics=extrinsics,
+                interface_distance=interface_distance,
+            )
+            expected_water_zs[f"cam{i}"] = 0.0 + interface_distance
+
+        interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
+        diagnostics = DiagnosticsData(
+            reprojection_error_rms=0.5,
+            reprojection_error_per_camera={f"cam{i}": 0.5 for i in range(5)},
+            validation_3d_error_mean=0.001,
+            validation_3d_error_std=0.0005,
+        )
+        metadata = CalibrationMetadata(
+            calibration_date="2026-01-01",
+            software_version="0.1.0",
+            config_hash="abc123",
+            num_frames_used=10,
+            num_frames_holdout=2,
+        )
+        calibration = CalibrationResult(
+            cameras=cameras,
+            interface=interface,
+            board=board_config,
+            diagnostics=diagnostics,
+            metadata=metadata,
+        )
+
+        result = compute_water_surface_consistency(calibration)
+
+        # Mean should be around (0.5*4 + 1.1) / 5 = 0.62
+        assert np.isclose(result["mean"], (0.5 * 4 + 1.1) / 5.0)
+        # Spread should be 1.1 - 0.5 = 0.6
+        assert np.isclose(result["spread"], 0.6)
+        # Std should be non-zero
+        assert result["std"] > 0
+
+        # Test recommendations detect outlier
+        reproj = ReprojectionErrors(
+            rms=0.5,
+            per_camera={f"cam{i}": 0.5 for i in range(5)},
+            per_frame={0: 0.5},
+            residuals=np.zeros((10, 2)),
+            num_observations=10,
+        )
+        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
+        depth_errors = pd.DataFrame(
+            {
+                "depth_min": [0.5],
+                "depth_max": [1.0],
+                "mean_error": [0.5],
+                "std_error": [0.1],
+                "num_observations": [10],
+            }
+        )
+
+        recs = generate_recommendations(reproj, recon, depth_errors, result)
+
+        # Should mention large spread (600mm)
+        assert any("large" in r.lower() and "600" in r for r in recs)
+
+        # Verify that cam4 is far from the mean
+        mean_z = result["mean"]
+        assert abs(expected_water_zs["cam4"] - mean_z) > 0.4  # 400mm difference

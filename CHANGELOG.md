@@ -8,6 +8,79 @@ Format: Agents append entries at the top (below this header) with the date, file
 
 <!-- Agents: add new entries below this line, above previous entries -->
 
+## 2026-02-11
+### [src/aquacal/validation/diagnostics.py]
+- Modified `plot_camera_rig()` to produce three-panel figure (perspective, top-down, side view)
+- Removed `ax` parameter; function now creates 1×3 subplot layout internally
+- Added `title` parameter for customizable figure title
+- Each panel shows cameras, optical axes, labels, and water surface with different viewing angles
+
+### [src/aquacal/calibration/pipeline.py]
+- Replaced inline scatter plot with call to `plot_camera_rig()` for initial rig visualization
+- Now displays water surface plane in initial rig plot using temporary CalibrationResult
+
+### [tests/unit/test_diagnostics.py]
+- Added matplotlib 'Agg' backend configuration for non-interactive testing
+- Updated test assertions to expect 3 axes instead of 1 (three-panel layout)
+
+## 2026-02-11
+### [src/aquacal/validation/reconstruction.py]
+- Added `get_adjacent_corner_pairs()` to compute horizontally/vertically adjacent corner pairs on board
+- Modified `compute_3d_distance_errors()` to use adjacent-only pairs instead of all N-choose-2 pairs
+- Updated `DistanceErrors` dataclass with new fields: `signed_mean`, `rmse`, `percent_error`, `num_frames`
+- Signed error convention: positive = overestimate, negative = underestimate
+
+### [src/aquacal/calibration/pipeline.py]
+- Updated validation printout to show MAE, RMSE, percent error, and scale bias detection (>0.5mm)
+- Updated final summary to show MAE, RMSE, and percent error instead of just mean ± std
+
+### [src/aquacal/validation/diagnostics.py]
+- Added scale bias detection in `generate_recommendations()` - flags systematic bias > 1mm
+- Updated `save_diagnostic_report()` to include new reconstruction fields in JSON output
+- Updated summary statistics to include signed_mean, rmse, percent_error, and num_frames
+
+### [tests/unit/test_reconstruction.py]
+- Added `test_get_adjacent_corner_pairs()` to verify correct pair generation
+- Added `test_compute_3d_distance_errors_signed_error()` to verify signed error convention
+- Updated all existing tests to expect adjacent-only pairs and verify new fields
+
+### [tests/unit/test_pipeline.py]
+- Updated mock for `compute_3d_distance_errors` to include new fields (signed_mean, rmse, percent_error, num_frames)
+
+## 2026-02-11
+### [src/aquacal/calibration/pipeline.py]
+- Added water surface Z consistency diagnostic printout after Stage 3 and Stage 4
+- Reports per-camera water_z = camera_z + interface_distance, plus mean/std/spread summary
+
+### [src/aquacal/validation/diagnostics.py]
+- Added `compute_water_surface_consistency()` function to compute water surface Z statistics across cameras
+- Integrated water surface consistency into `generate_diagnostic_report()` - adds stats to summary dict
+- Updated `generate_recommendations()` to analyze water surface spread and flag outlier cameras (>2σ from mean)
+- Updated `save_diagnostic_report()` to include water_surface section in diagnostics.json
+
+### [tests/unit/test_diagnostics.py]
+- Added `TestComputeWaterSurfaceConsistency` test class with 3 tests: coplanar cameras, different heights compensated, and outlier detection
+
+## 2026-02-10
+### [src/aquacal/config/schema.py]
+- Added `rational_model_cameras: list[str]` field to `CalibrationConfig` for per-camera 8-coefficient rational distortion model
+
+### [src/aquacal/calibration/intrinsics.py]
+- Added `rational_model: bool` parameter to `calibrate_intrinsics_single()` — passes `cv2.CALIB_RATIONAL_MODEL` flag
+- Added `rational_model_cameras: list[str]` parameter to `calibrate_intrinsics_all()` — selects model per camera
+
+### [src/aquacal/calibration/pipeline.py]
+- Parse `rational_model_cameras` from YAML config, pass through to Stage 1
+- Print per-camera intrinsic RMS after Stage 1 calibration
+- Fixed crash in `_estimate_validation_poses()`: return penalty `(100.0, 100.0)` for failed projections instead of skipping (was causing "array changed size between calls")
+- Added pre-optimization camera rig plot (`camera_rig_initial.png`) between Stage 2 and Stage 3
+
+### [src/aquacal/config/example_config.yaml]
+- Added commented-out `rational_model_cameras` section
+
+### [src/aquacal/cli.py]
+- Added `rational_model_cameras` to generated config template in `_generate_config_yaml()`
+
 ## 2026-02-10 (Task P.15)
 ### [src/aquacal/calibration/extrinsics.py]
 - Added `refractive_solve_pnp()`: refractive-corrected PnP using identity-camera trick and LM refinement

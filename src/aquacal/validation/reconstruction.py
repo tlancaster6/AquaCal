@@ -16,6 +16,34 @@ from aquacal.core.board import BoardGeometry
 from aquacal.triangulation.triangulate import triangulate_point
 
 
+def get_adjacent_corner_pairs(board: BoardGeometry) -> list[tuple[int, int]]:
+    """
+    Get pairs of adjacent corners on the board (separated by one square_size).
+
+    Adjacent means horizontally or vertically neighboring on the checker grid
+    (not diagonal). Each pair appears once with lower ID first.
+
+    Args:
+        board: Board geometry
+
+    Returns:
+        List of (corner_id_1, corner_id_2) tuples
+    """
+    cols = board.config.squares_x - 1
+    rows = board.config.squares_y - 1
+    pairs = []
+    for corner_id in range(cols * rows):
+        col = corner_id % cols
+        row = corner_id // cols
+        # Right neighbor
+        if col + 1 < cols:
+            pairs.append((corner_id, corner_id + 1))
+        # Down neighbor
+        if row + 1 < rows:
+            pairs.append((corner_id, corner_id + cols))
+    return pairs
+
+
 @dataclass
 class DistanceErrors:
     """Container for 3D distance error statistics.
@@ -25,7 +53,11 @@ class DistanceErrors:
         std: Standard deviation of distance errors in meters
         max_error: Maximum distance error observed in meters
         num_comparisons: Total number of corner pairs compared
-        per_corner_pair: Optional dict mapping (id1, id2) to error in meters
+        per_corner_pair: Optional dict mapping (id1, id2) to signed error in meters
+        signed_mean: Mean signed error in meters (+ = overestimate, - = underestimate)
+        rmse: Root mean squared error in meters
+        percent_error: (MAE / ground_truth_distance) * 100
+        num_frames: Number of frames with valid measurements
     """
 
     mean: float
@@ -33,6 +65,10 @@ class DistanceErrors:
     max_error: float
     num_comparisons: int
     per_corner_pair: dict[tuple[int, int], float] | None = None
+    signed_mean: float = 0.0
+    rmse: float = 0.0
+    percent_error: float = 0.0
+    num_frames: int = 0
 
 
 def triangulate_charuco_corners(
@@ -91,7 +127,7 @@ def compute_3d_distance_errors(
     Compute 3D distance errors by comparing triangulated corner distances to known geometry.
 
     For each frame, triangulates corners visible in 2+ cameras, then compares
-    pairwise distances to expected distances from board geometry. Aggregates
+    distances between adjacent corners to the expected square_size. Aggregates
     statistics across all frames.
 
     Args:
@@ -104,12 +140,18 @@ def compute_3d_distance_errors(
         DistanceErrors with aggregated statistics across all frames.
 
     Notes:
+        - Only compares adjacent corners (horizontally or vertically neighboring)
         - Only compares corners that were both successfully triangulated
-        - Expected distance computed from board.corner_positions
+        - Expected distance is always board.config.square_size for adjacent pairs
         - Returns DistanceErrors with mean=0, std=0, num_comparisons=0 if no valid pairs
     """
-    all_errors = []
+    # Precompute adjacent pairs
+    adjacent_pairs = get_adjacent_corner_pairs(board)
+    ground_truth_distance = board.config.square_size
+
+    all_signed_errors = []
     per_pair = {} if include_per_pair else None
+    num_frames_with_measurements = 0
 
     for frame_idx in detections.frames:
         corners_3d = triangulate_charuco_corners(calibration, detections, frame_idx)
@@ -117,29 +159,30 @@ def compute_3d_distance_errors(
         if len(corners_3d) < 2:
             continue
 
-        corner_ids = sorted(corners_3d.keys())
+        frame_had_measurements = False
 
-        # Compare all pairs of triangulated corners
-        for i, id1 in enumerate(corner_ids):
-            for id2 in corner_ids[i + 1 :]:
+        # Compare adjacent pairs only
+        for id1, id2 in adjacent_pairs:
+            if id1 in corners_3d and id2 in corners_3d:
                 # Triangulated distance
                 actual_dist = np.linalg.norm(corners_3d[id1] - corners_3d[id2])
 
-                # Expected distance from board geometry
-                pos1 = board.corner_positions[id1]
-                pos2 = board.corner_positions[id2]
-                expected_dist = np.linalg.norm(pos1 - pos2)
-
-                error = abs(actual_dist - expected_dist)
-                all_errors.append(error)
+                # Signed error: positive if overestimate, negative if underestimate
+                signed_error = actual_dist - ground_truth_distance
+                all_signed_errors.append(signed_error)
+                frame_had_measurements = True
 
                 if per_pair is not None:
-                    pair_key = (min(id1, id2), max(id1, id2))
-                    # Keep worst error for each pair across frames
-                    if pair_key not in per_pair or error > per_pair[pair_key]:
-                        per_pair[pair_key] = error
+                    pair_key = (id1, id2)  # Already in order from get_adjacent_corner_pairs
+                    # Keep worst absolute error for each pair across frames
+                    abs_error = abs(signed_error)
+                    if pair_key not in per_pair or abs_error > abs(per_pair[pair_key]):
+                        per_pair[pair_key] = signed_error
 
-    if not all_errors:
+        if frame_had_measurements:
+            num_frames_with_measurements += 1
+
+    if not all_signed_errors:
         warnings.warn("No valid 3D distance comparisons — returning NaN")
         return DistanceErrors(
             mean=float("nan"),
@@ -147,15 +190,25 @@ def compute_3d_distance_errors(
             max_error=float("nan"),
             num_comparisons=0,
             per_corner_pair=per_pair,
+            signed_mean=float("nan"),
+            rmse=float("nan"),
+            percent_error=float("nan"),
+            num_frames=0,
         )
 
-    errors_arr = np.array(all_errors)
+    signed_arr = np.array(all_signed_errors)
+    abs_arr = np.abs(signed_arr)
+
     return DistanceErrors(
-        mean=float(np.mean(errors_arr)),
-        std=float(np.std(errors_arr)),
-        max_error=float(np.max(errors_arr)),
-        num_comparisons=len(all_errors),
+        mean=float(np.mean(abs_arr)),
+        std=float(np.std(abs_arr)),
+        max_error=float(np.max(abs_arr)),
+        num_comparisons=len(all_signed_errors),
         per_corner_pair=per_pair,
+        signed_mean=float(np.mean(signed_arr)),
+        rmse=float(np.sqrt(np.mean(signed_arr**2))),
+        percent_error=float(np.mean(abs_arr) / ground_truth_distance * 100),
+        num_frames=num_frames_with_measurements,
     )
 
 
