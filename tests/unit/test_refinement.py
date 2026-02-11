@@ -7,18 +7,17 @@ from aquacal.config.schema import (
     BoardConfig,
     CameraIntrinsics,
     CameraExtrinsics,
-    Detection,
-    FrameDetections,
-    DetectionResult,
     BoardPose,
+    DetectionResult,
     ConvergenceError,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.core.camera import Camera
-from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project
 from aquacal.calibration.refinement import joint_refinement
 from aquacal.calibration._optim_common import pack_params, unpack_params
+
+import sys
+sys.path.insert(0, ".")
+from tests.synthetic.ground_truth import generate_synthetic_detections
 
 
 @pytest.fixture
@@ -97,65 +96,6 @@ def synthetic_board_poses() -> list[BoardPose]:
             )
         )
     return poses
-
-
-def generate_synthetic_detections(
-    intrinsics: dict[str, CameraIntrinsics],
-    extrinsics: dict[str, CameraExtrinsics],
-    interface_distances: dict[str, float],
-    board: BoardGeometry,
-    board_poses: list[BoardPose],
-    noise_std: float = 0.0,
-) -> DetectionResult:
-    """Generate synthetic detections using refractive_project."""
-    interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
-    frames = {}
-
-    for bp in board_poses:
-        corners_3d = board.transform_corners(bp.rvec, bp.tvec)
-        detections_dict = {}
-
-        for cam_name in intrinsics:
-            camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
-            interface = Interface(
-                normal=interface_normal,
-                base_height=0.0,
-                camera_offsets={cam_name: interface_distances[cam_name]},
-            )
-
-            corner_ids = []
-            corners_2d = []
-
-            for corner_id in range(board.num_corners):
-                point_3d = corners_3d[corner_id]
-                projected = refractive_project(camera, interface, point_3d)
-
-                if projected is not None:
-                    w, h = intrinsics[cam_name].image_size
-                    if 0 <= projected[0] < w and 0 <= projected[1] < h:
-                        corner_ids.append(corner_id)
-                        px = projected.copy()
-                        if noise_std > 0:
-                            px += np.random.normal(0, noise_std, 2)
-                        corners_2d.append(px)
-
-            if len(corner_ids) >= 4:
-                detections_dict[cam_name] = Detection(
-                    corner_ids=np.array(corner_ids, dtype=np.int32),
-                    corners_2d=np.array(corners_2d, dtype=np.float64),
-                )
-
-        if detections_dict:
-            frames[bp.frame_idx] = FrameDetections(
-                frame_idx=bp.frame_idx,
-                detections=detections_dict,
-            )
-
-    return DetectionResult(
-        frames=frames,
-        camera_names=list(intrinsics.keys()),
-        total_frames=len(board_poses),
-    )
 
 
 @pytest.fixture
@@ -345,6 +285,7 @@ class TestJointRefinement:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         ext_opt, dist_opt, poses_opt, intr_opt, rms = joint_refinement(
@@ -424,6 +365,7 @@ class TestJointRefinement:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         ext_opt, _, _, _, _ = joint_refinement(
@@ -473,6 +415,7 @@ class TestJointRefinement:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         _, dist_opt, _, _, _ = joint_refinement(
@@ -503,6 +446,7 @@ class TestJointRefinement:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         _, _, _, intr_opt, _ = joint_refinement(
@@ -544,6 +488,7 @@ class TestJointRefinement:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         _, _, _, intr_opt, _ = joint_refinement(
@@ -577,6 +522,7 @@ class TestJointRefinement:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         _, _, poses_opt, _, _ = joint_refinement(

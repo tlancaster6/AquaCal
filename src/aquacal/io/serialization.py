@@ -70,12 +70,15 @@ def _deserialize_camera_extrinsics(data: dict[str, Any]) -> CameraExtrinsics:
 
 def _serialize_camera_calibration(cam: CameraCalibration) -> dict[str, Any]:
     """Serialize CameraCalibration to dict."""
-    return {
+    result = {
         "name": cam.name,
         "intrinsics": _serialize_camera_intrinsics(cam.intrinsics),
         "extrinsics": _serialize_camera_extrinsics(cam.extrinsics),
         "interface_distance": cam.interface_distance,
     }
+    if cam.is_auxiliary:
+        result["is_auxiliary"] = True
+    return result
 
 
 def _deserialize_camera_calibration(data: dict[str, Any]) -> CameraCalibration:
@@ -85,6 +88,7 @@ def _deserialize_camera_calibration(data: dict[str, Any]) -> CameraCalibration:
         intrinsics=_deserialize_camera_intrinsics(data["intrinsics"]),
         extrinsics=_deserialize_camera_extrinsics(data["extrinsics"]),
         interface_distance=data["interface_distance"],
+        is_auxiliary=data.get("is_auxiliary", False),
     )
 
 

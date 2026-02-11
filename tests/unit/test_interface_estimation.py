@@ -7,17 +7,12 @@ from aquacal.config.schema import (
     BoardConfig,
     CameraIntrinsics,
     CameraExtrinsics,
-    Detection,
-    FrameDetections,
-    DetectionResult,
     BoardPose,
+    DetectionResult,
     InsufficientDataError,
     ConvergenceError,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.core.camera import Camera
-from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project
 from aquacal.calibration.interface_estimation import (
     optimize_interface,
     _compute_initial_board_poses,
@@ -27,6 +22,10 @@ from aquacal.calibration._optim_common import (
     unpack_params,
     build_jacobian_sparsity,
 )
+
+import sys
+sys.path.insert(0, ".")
+from tests.synthetic.ground_truth import generate_synthetic_detections
 
 
 @pytest.fixture
@@ -87,71 +86,6 @@ def ground_truth_distances() -> dict[str, float]:
     return {"cam0": 0.15, "cam1": 0.16, "cam2": 0.14}
 
 
-def generate_synthetic_detections(
-    intrinsics: dict[str, CameraIntrinsics],
-    extrinsics: dict[str, CameraExtrinsics],
-    interface_distances: dict[str, float],
-    board: BoardGeometry,
-    board_poses: list[BoardPose],
-    noise_std: float = 0.0,
-) -> DetectionResult:
-    """
-    Generate synthetic detections using refractive_project.
-
-    Creates detections by projecting board corners through the refractive
-    interface for each camera and frame.
-    """
-    interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
-    frames = {}
-
-    for bp in board_poses:
-        corners_3d = board.transform_corners(bp.rvec, bp.tvec)
-        detections_dict = {}
-
-        for cam_name in intrinsics:
-            camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
-            interface = Interface(
-                normal=interface_normal,
-                base_height=0.0,
-                camera_offsets={cam_name: interface_distances[cam_name]},
-            )
-
-            corner_ids = []
-            corners_2d = []
-
-            for corner_id in range(board.num_corners):
-                point_3d = corners_3d[corner_id]
-                projected = refractive_project(camera, interface, point_3d)
-
-                if projected is not None:
-                    # Check if within image bounds
-                    w, h = intrinsics[cam_name].image_size
-                    if 0 <= projected[0] < w and 0 <= projected[1] < h:
-                        corner_ids.append(corner_id)
-                        px = projected.copy()
-                        if noise_std > 0:
-                            px += np.random.normal(0, noise_std, 2)
-                        corners_2d.append(px)
-
-            if len(corner_ids) >= 4:
-                detections_dict[cam_name] = Detection(
-                    corner_ids=np.array(corner_ids, dtype=np.int32),
-                    corners_2d=np.array(corners_2d, dtype=np.float64),
-                )
-
-        if detections_dict:
-            frames[bp.frame_idx] = FrameDetections(
-                frame_idx=bp.frame_idx,
-                detections=detections_dict,
-            )
-
-    return DetectionResult(
-        frames=frames,
-        camera_names=list(intrinsics.keys()),
-        total_frames=len(board_poses),
-    )
-
-
 @pytest.fixture
 def synthetic_board_poses(board) -> list[BoardPose]:
     """Board poses for 3 frames at varying positions underwater.
@@ -191,6 +125,7 @@ class TestComputeInitialBoardPoses:
             board,
             synthetic_board_poses,
             noise_std=0.0,
+            min_corners=4,
         )
 
         poses = _compute_initial_board_poses(
@@ -220,6 +155,7 @@ class TestComputeInitialBoardPoses:
             board,
             synthetic_board_poses,
             noise_std=0.0,
+            min_corners=4,
         )
 
         # Request very high min_corners to filter everything
@@ -358,6 +294,7 @@ class TestOptimizeInterface:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         # Perturb initial extrinsics slightly
@@ -454,6 +391,7 @@ class TestOptimizeInterface:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         _, dist_opt, _, _ = optimize_interface(
@@ -485,6 +423,7 @@ class TestOptimizeInterface:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         # Don't provide initial_interface_distances
@@ -518,6 +457,7 @@ class TestOptimizeInterface:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         ext_opt, dist_opt, poses_opt, rms = optimize_interface(
@@ -579,6 +519,7 @@ class TestOptimizeInterface:
             board,
             poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         ext_opt, dist_opt, poses_opt, rms = optimize_interface(
@@ -612,6 +553,7 @@ class TestOptimizeInterface:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         # Robust loss functions should achieve low RMS
@@ -657,6 +599,7 @@ class TestOptimizeInterface:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         # Same normal, but as explicit array
@@ -693,6 +636,7 @@ class TestBuildJacobianSparsity:
             board,
             synthetic_board_poses,
             noise_std=0.0,
+            min_corners=4,
         )
 
         camera_order = sorted(intrinsics.keys())
@@ -739,6 +683,7 @@ class TestBuildJacobianSparsity:
             board,
             synthetic_board_poses,
             noise_std=0.0,
+            min_corners=4,
         )
 
         camera_order = sorted(intrinsics.keys())  # ["cam0", "cam1", "cam2"]
@@ -823,6 +768,7 @@ class TestBuildJacobianSparsity:
             board,
             synthetic_board_poses,
             noise_std=0.0,
+            min_corners=4,
         )
 
         camera_order = sorted(intrinsics.keys())
@@ -863,6 +809,7 @@ class TestOptimizeInterfaceWithFastProjection:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         # Run with fast projection (sparse jacobian disabled - has issues)
@@ -917,6 +864,7 @@ class TestOptimizeInterfaceWithFastProjection:
             board,
             synthetic_board_poses,
             noise_std=0.5,
+            min_corners=4,
         )
 
         # Run with sparse Jacobian

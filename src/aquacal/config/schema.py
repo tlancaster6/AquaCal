@@ -90,11 +90,14 @@ class CameraCalibration:
         intrinsics: Intrinsic camera parameters
         extrinsics: Extrinsic camera parameters (pose in world frame)
         interface_distance: Distance in meters from camera center to water surface
+        is_auxiliary: If True, this camera was registered post-hoc against
+            fixed board poses (excluded from joint Stage 3/4 optimization).
     """
     name: str
     intrinsics: CameraIntrinsics
     extrinsics: CameraExtrinsics
     interface_distance: float  # meters from camera center to water surface
+    is_auxiliary: bool = False
 
 
 @dataclass
@@ -201,6 +204,14 @@ class CalibrationConfig:
         rational_model_cameras: List of camera names that should use the 8-coefficient
             rational distortion model instead of the standard 5-coefficient model.
             Use for wide-angle lenses where 5 coefficients are insufficient.
+        auxiliary_cameras: List of auxiliary camera names registered post-hoc against
+            fixed board poses. These cameras are calibrated for intrinsics and
+            detected, but excluded from joint Stage 3/4 optimization. Must not
+            overlap with camera_names.
+        auxiliary_water_z_weight: Water-Z regularization weight for auxiliary cameras.
+            Higher than water_z_weight because auxiliary registration has only 1
+            regularization residual vs thousands of reprojection residuals.
+            0.0 disables (default). Recommended value ~100.
     """
     board: BoardConfig
     camera_names: list[str]
@@ -221,7 +232,9 @@ class CalibrationConfig:
     save_detailed_residuals: bool = True
     initial_interface_distances: dict[str, float] | None = None
     rational_model_cameras: list[str] = field(default_factory=list)
+    auxiliary_cameras: list[str] = field(default_factory=list)
     water_z_weight: float = 0.0  # 0.0 = disabled
+    auxiliary_water_z_weight: float = 0.0  # water-Z regularization for auxiliary cameras (0 = disabled)
 
 
 @dataclass

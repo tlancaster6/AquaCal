@@ -27,6 +27,10 @@ from aquacal.validation.reprojection import (
     ReprojectionErrors,
 )
 
+import sys
+sys.path.insert(0, ".")
+from tests.synthetic.ground_truth import generate_synthetic_detections
+
 
 @pytest.fixture
 def board_config() -> BoardConfig:
@@ -143,65 +147,6 @@ def calibration_result(
     )
 
 
-def generate_synthetic_detections(
-    intrinsics: dict[str, CameraIntrinsics],
-    extrinsics: dict[str, CameraExtrinsics],
-    interface_distances: dict[str, float],
-    board: BoardGeometry,
-    board_poses: dict[int, BoardPose],
-    noise_std: float = 0.0,
-) -> DetectionResult:
-    """Generate synthetic detections using refractive_project."""
-    interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
-    frames = {}
-
-    for frame_idx, bp in board_poses.items():
-        corners_3d = board.transform_corners(bp.rvec, bp.tvec)
-        detections_dict = {}
-
-        for cam_name in intrinsics:
-            camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
-            interface = Interface(
-                normal=interface_normal,
-                base_height=0.0,
-                camera_offsets={cam_name: interface_distances[cam_name]},
-            )
-
-            corner_ids = []
-            corners_2d = []
-
-            for corner_id in range(board.num_corners):
-                point_3d = corners_3d[corner_id]
-                projected = refractive_project(camera, interface, point_3d)
-
-                if projected is not None:
-                    w, h = intrinsics[cam_name].image_size
-                    if 0 <= projected[0] < w and 0 <= projected[1] < h:
-                        corner_ids.append(corner_id)
-                        px = projected.copy()
-                        if noise_std > 0:
-                            px += np.random.normal(0, noise_std, 2)
-                        corners_2d.append(px)
-
-            if len(corner_ids) >= 4:
-                detections_dict[cam_name] = Detection(
-                    corner_ids=np.array(corner_ids, dtype=np.int32),
-                    corners_2d=np.array(corners_2d, dtype=np.float64),
-                )
-
-        if detections_dict:
-            frames[frame_idx] = FrameDetections(
-                frame_idx=frame_idx,
-                detections=detections_dict,
-            )
-
-    return DetectionResult(
-        frames=frames,
-        camera_names=list(intrinsics.keys()),
-        total_frames=len(board_poses),
-    )
-
-
 class TestReprojectionErrors:
     """Tests for reprojection error computation."""
 
@@ -217,7 +162,13 @@ class TestReprojectionErrors:
         """Test that perfect synthetic data gives near-zero reprojection error."""
         # Generate synthetic detections with no noise
         detections = generate_synthetic_detections(
-            intrinsics, extrinsics, interface_distances, board, board_poses, noise_std=0.0
+            intrinsics,
+            extrinsics,
+            interface_distances,
+            board,
+            list(board_poses.values()),
+            noise_std=0.0,
+            min_corners=4,
         )
 
         # Compute reprojection errors
@@ -247,8 +198,9 @@ class TestReprojectionErrors:
             extrinsics,
             interface_distances,
             board,
-            board_poses,
+            list(board_poses.values()),
             noise_std=noise_std,
+            min_corners=4,
         )
 
         # Compute reprojection errors
@@ -270,7 +222,13 @@ class TestReprojectionErrors:
     ):
         """Test that per-camera errors are computed correctly."""
         detections = generate_synthetic_detections(
-            intrinsics, extrinsics, interface_distances, board, board_poses, noise_std=0.0
+            intrinsics,
+            extrinsics,
+            interface_distances,
+            board,
+            list(board_poses.values()),
+            noise_std=0.0,
+            min_corners=4,
         )
 
         errors = compute_reprojection_errors(calibration_result, detections, board_poses)
@@ -296,7 +254,13 @@ class TestReprojectionErrors:
     ):
         """Test that per-frame errors are computed correctly."""
         detections = generate_synthetic_detections(
-            intrinsics, extrinsics, interface_distances, board, board_poses, noise_std=0.0
+            intrinsics,
+            extrinsics,
+            interface_distances,
+            board,
+            list(board_poses.values()),
+            noise_std=0.0,
+            min_corners=4,
         )
 
         errors = compute_reprojection_errors(calibration_result, detections, board_poses)
@@ -321,7 +285,13 @@ class TestReprojectionErrors:
     ):
         """Test that residuals array has correct shape."""
         detections = generate_synthetic_detections(
-            intrinsics, extrinsics, interface_distances, board, board_poses, noise_std=0.0
+            intrinsics,
+            extrinsics,
+            interface_distances,
+            board,
+            list(board_poses.values()),
+            noise_std=0.0,
+            min_corners=4,
         )
 
         errors = compute_reprojection_errors(calibration_result, detections, board_poses)
@@ -400,8 +370,9 @@ class TestReprojectionErrors:
             extrinsics,
             interface_distances,
             board,
-            {0: board_pose},
+            [board_pose],
             noise_std=0.0,
+            min_corners=4,
         )
 
         # Should not crash even if some projections fail

@@ -31,6 +31,7 @@ from aquacal.calibration.intrinsics import calibrate_intrinsics_all
 from aquacal.calibration.extrinsics import build_pose_graph, estimate_extrinsics
 from aquacal.calibration.interface_estimation import (
     optimize_interface,
+    register_auxiliary_camera,
     _compute_initial_board_poses,
 )
 from aquacal.calibration.refinement import joint_refinement
@@ -101,6 +102,27 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     extrinsic_paths = {k: Path(v) for k, v in paths["extrinsic_videos"].items()}
     output_dir = Path(paths["output_dir"])
 
+    # Auxiliary cameras (parsed early since initial_distances references it)
+    auxiliary_cameras = data.get("auxiliary_cameras", [])
+    if auxiliary_cameras:
+        overlap = set(data["cameras"]) & set(auxiliary_cameras)
+        if overlap:
+            raise ValueError(
+                f"auxiliary_cameras must not overlap with cameras. "
+                f"Overlap: {sorted(overlap)}"
+            )
+        for aux_cam in auxiliary_cameras:
+            if aux_cam not in intrinsic_paths:
+                raise ValueError(
+                    f"Auxiliary camera '{aux_cam}' missing from "
+                    f"paths.intrinsic_videos"
+                )
+            if aux_cam not in extrinsic_paths:
+                raise ValueError(
+                    f"Auxiliary camera '{aux_cam}' missing from "
+                    f"paths.extrinsic_videos"
+                )
+
     # Interface settings
     interface = data.get("interface", {})
     n_air = interface.get("n_air", 1.0)
@@ -112,14 +134,15 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     if "initial_distances" in interface:
         raw_distances = interface["initial_distances"]
 
-        # Handle scalar format (apply to all cameras)
+        # Handle scalar format (apply to all cameras including auxiliary)
         if isinstance(raw_distances, (int, float)):
             if raw_distances <= 0:
                 raise ValueError(
                     f"initial_distances must be positive, got {raw_distances}"
                 )
             initial_interface_distances = {
-                cam: float(raw_distances) for cam in data["cameras"]
+                cam: float(raw_distances)
+                for cam in data["cameras"] + auxiliary_cameras
             }
         # Handle dict format (per-camera)
         elif isinstance(raw_distances, dict):
@@ -138,8 +161,12 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
                         f"initial_distances['{cam}'] must be positive, got {dist}"
                     )
 
-            # Warn about extra cameras (not in cameras list)
-            extra_cameras = set(raw_distances.keys()) - set(data["cameras"])
+            # Warn about extra cameras (not in cameras or auxiliary list)
+            extra_cameras = (
+                set(raw_distances.keys())
+                - set(data["cameras"])
+                - set(auxiliary_cameras)
+            )
             if extra_cameras:
                 import sys
                 print(
@@ -161,6 +188,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     max_cal_frames_raw = opt.get("max_calibration_frames", None)
     max_cal_frames = int(max_cal_frames_raw) if max_cal_frames_raw is not None else None
     water_z_weight = opt.get("water_z_weight", 0.0)
+    auxiliary_water_z_weight = opt.get("auxiliary_water_z_weight", 0.0)
 
     # Detection settings
     det = data.get("detection", {})
@@ -196,7 +224,9 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         save_detailed_residuals=save_detailed,
         initial_interface_distances=initial_interface_distances,
         rational_model_cameras=rational_model_cameras,
+        auxiliary_cameras=auxiliary_cameras,
         water_z_weight=water_z_weight,
+        auxiliary_water_z_weight=auxiliary_water_z_weight,
     )
 
 
@@ -415,13 +445,36 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
     print(f"  Calibration frames: {len(cal_detections.frames)}")
     print(f"  Validation frames: {len(val_detections.frames)}")
 
+    # --- Filter to primary cameras for Stages 2-3 ---
+    primary_camera_set = set(config.camera_names)
+    primary_intrinsics = {
+        k: v for k, v in intrinsics.items() if k in primary_camera_set
+    }
+
+    # Filter detection frames to primary cameras only
+    primary_cal_frames = {}
+    for frame_idx, frame_det in cal_detections.frames.items():
+        primary_dets = {
+            k: v for k, v in frame_det.detections.items()
+            if k in primary_camera_set
+        }
+        if primary_dets:
+            primary_cal_frames[frame_idx] = FrameDetections(
+                frame_idx=frame_idx, detections=primary_dets
+            )
+    primary_cal_detections = DetectionResult(
+        frames=primary_cal_frames,
+        camera_names=config.camera_names,
+        total_frames=cal_detections.total_frames,
+    )
+
     # --- Stage 2: Extrinsic Initialization ---
     print("\n[Stage 2] Extrinsic initialization...")
-    pose_graph = build_pose_graph(cal_detections, config.min_cameras_per_frame)
+    pose_graph = build_pose_graph(primary_cal_detections, config.min_cameras_per_frame)
     reference_camera = config.camera_names[0]
     interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
     extrinsics = estimate_extrinsics(
-        pose_graph, intrinsics, board, reference_camera,
+        pose_graph, primary_intrinsics, board, reference_camera,
         interface_distances=config.initial_interface_distances,
         interface_normal=interface_normal,
         n_air=config.n_air,
@@ -466,10 +519,10 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         print(f"  Warning: Could not save camera_rig_initial.png: {e}")
 
     # --- Subsample for optimization if configured ---
-    optim_detections = cal_detections
-    if config.max_calibration_frames is not None and len(cal_detections.frames) > config.max_calibration_frames:
-        optim_detections = _subsample_detections(cal_detections, config.max_calibration_frames)
-        print(f"\n[Frame Selection] Subsampled {len(cal_detections.frames)} → {len(optim_detections.frames)} frames for optimization")
+    optim_detections = primary_cal_detections
+    if config.max_calibration_frames is not None and len(primary_cal_detections.frames) > config.max_calibration_frames:
+        optim_detections = _subsample_detections(primary_cal_detections, config.max_calibration_frames)
+        print(f"\n[Frame Selection] Subsampled {len(primary_cal_detections.frames)} → {len(optim_detections.frames)} frames for optimization")
 
     # --- Stage 3: Interface Optimization ---
     print("\n[Stage 3] Interface and pose optimization...")
@@ -477,7 +530,7 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
     t0 = time.perf_counter()
     stage3_extrinsics, stage3_distances, stage3_poses, stage3_rms = optimize_interface(
         detections=optim_detections,
-        intrinsics=intrinsics,
+        intrinsics=primary_intrinsics,
         initial_extrinsics=extrinsics,
         board=board,
         reference_camera=reference_camera,
@@ -525,7 +578,7 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         ) = joint_refinement(
             stage3_result=stage3_result,
             detections=optim_detections,
-            intrinsics=intrinsics,
+            intrinsics=primary_intrinsics,
             board=board,
             reference_camera=reference_camera,
             refine_intrinsics=True,
@@ -558,11 +611,60 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         final_extrinsics = stage3_extrinsics
         final_distances = stage3_distances
         final_poses = stage3_poses
-        final_intrinsics = intrinsics
+        final_intrinsics = primary_intrinsics
         final_rms = stage3_rms
 
     # Convert poses list to dict
     board_poses_dict = {bp.frame_idx: bp for bp in final_poses}
+
+    # --- Stage 3b: Register Auxiliary Cameras ---
+    aux_extrinsics = {}
+    aux_distances = {}
+    if config.auxiliary_cameras:
+        print(f"\n[Stage 3b] Registering {len(config.auxiliary_cameras)} auxiliary camera(s)...")
+
+        # Compute target water_z from primary cameras
+        primary_water_zs = [
+            final_extrinsics[cam].C[2] + final_distances[cam]
+            for cam in config.camera_names
+        ]
+        target_water_z = float(np.mean(primary_water_zs))
+
+        for aux_cam in config.auxiliary_cameras:
+            # Count observations
+            n_frames = 0
+            n_corners = 0
+            for frame_idx, frame_det in all_detections.frames.items():
+                if aux_cam in frame_det.detections and frame_idx in board_poses_dict:
+                    n_frames += 1
+                    n_corners += frame_det.detections[aux_cam].num_corners
+
+            print(f"  {aux_cam}: {n_frames} frames, {n_corners} corners")
+
+            try:
+                aux_ext, aux_dist, aux_rms = register_auxiliary_camera(
+                    camera_name=aux_cam,
+                    intrinsics=intrinsics[aux_cam],
+                    detections=all_detections,
+                    board_poses=board_poses_dict,
+                    board=board,
+                    initial_interface_distance=(
+                        config.initial_interface_distances.get(aux_cam, 0.15)
+                        if config.initial_interface_distances
+                        else 0.15
+                    ),
+                    interface_normal=interface_normal,
+                    n_air=config.n_air,
+                    n_water=config.n_water,
+                    target_water_z=target_water_z,
+                    water_z_weight=config.auxiliary_water_z_weight,
+                    verbose=2 if verbose else 0,
+                )
+                aux_extrinsics[aux_cam] = aux_ext
+                aux_distances[aux_cam] = aux_dist
+                print(f"  {aux_cam}: RMS {aux_rms:.2f} px, interface_d={aux_dist:.4f}m")
+            except Exception as e:
+                print(f"  {aux_cam}: FAILED — {e}")
 
     # Estimate board poses for validation frames
     print("\n[Validation] Estimating board poses for held-out frames...")
@@ -700,6 +802,16 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         diagnostics=diagnostics,
         metadata=metadata,
     )
+
+    # Add auxiliary cameras to result
+    for aux_cam in aux_extrinsics:
+        result.cameras[aux_cam] = CameraCalibration(
+            name=aux_cam,
+            intrinsics=intrinsics[aux_cam],
+            extrinsics=aux_extrinsics[aux_cam],
+            interface_distance=aux_distances[aux_cam],
+            is_auxiliary=True,
+        )
 
     # --- Save Calibration ---
     print("\n[Save] Saving calibration result...")

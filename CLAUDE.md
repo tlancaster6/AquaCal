@@ -19,7 +19,7 @@ Refractive multi-camera calibration library for an array of cameras in air viewi
 
 Before ending your session:
 
-1. Run the tests specified in Acceptance Criteria
+1. Run the tests specified in Acceptance Criteria. If a test fails, make your fix then re-run that test specifically and confirm it passes before re-running the whole suite
 2. Append an entry to `CHANGELOG.md`:
    ```
    ## YYYY-MM-DD

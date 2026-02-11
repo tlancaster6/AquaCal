@@ -327,6 +327,16 @@ def _generate_config_yaml(
 
     lines.extend([
         "",
+        "# Optional: auxiliary cameras (registered post-hoc, excluded from joint optimization)",
+        "# Move camera names from 'cameras' to here if they should not participate in Stage 3",
+        "# auxiliary_cameras:",
+    ])
+
+    for cam in camera_names:
+        lines.append(f"  # - {cam}")
+
+    lines.extend([
+        "",
         "paths:",
         "  intrinsic_videos:",
     ])
@@ -366,6 +376,7 @@ def _generate_config_yaml(
         "  loss_scale: 1.0        # Residual scale for robust loss (pixels)",
         "  # max_calibration_frames: 150  # Max frames for Stage 3/4 (null = no limit)",
         "  # water_z_weight: 10.0  # Regularization for water surface consistency (0 = disabled)",
+        "  # auxiliary_water_z_weight: 100.0  # Water-Z regularization for auxiliary cameras",
         "",
         "detection:",
         "  min_corners: 8         # Minimum corners per frame to use detection",

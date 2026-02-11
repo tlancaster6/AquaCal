@@ -31,6 +31,12 @@ cameras:
 # rational_model_cameras:
 #   - cam2
 
+# Optional: auxiliary cameras registered post-hoc against the primary calibration
+# These cameras go through intrinsic calibration and detection, but are excluded
+# from joint optimization (Stages 2-3). Useful for wide-angle overview cameras.
+# auxiliary_cameras:
+#   - center_cam
+
 paths:
   intrinsic_videos:
     cam0: "/path/to/intrinsic/cam0.mp4"
@@ -64,7 +70,11 @@ optimization:
                                   # Stages 1-2 still use all frames. Reduces memory and runtime.
   # water_z_weight: 10.0  # Regularization for water surface consistency (0 = disabled)
                            # Penalizes disagreement in inferred water surface Z across cameras.
-                           # Breaks the camera-height / interface-distance degeneracy.
+                           # Breaks the camera-height / interface-distance degeneracy. Increase for
+                           # stronger regularization
+  # auxiliary_water_z_weight: 100.0  # Water-Z regularization for auxiliary cameras (0 = disabled)
+                                      # Higher than water_z_weight because auxiliary registration has
+                                      # far fewer regularization residuals vs reprojection residuals
 
 detection:
   min_corners: 8         # Minimum corners per frame to use detection

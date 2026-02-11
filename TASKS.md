@@ -68,7 +68,7 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.4** Expose `frame_step` in config and pipeline: Add `frame_step` to `CalibrationConfig`, parse from `detection.frame_step` in YAML, and pass through to `detect_all_frames()` and `calibrate_intrinsics_all()`. The parameter already exists in those functions but is never wired up from the pipeline. Essential for real-world videos (5 min × 30 FPS = 9,000 frames).
 
-- [ ] **P.5** Standardize synthetic pipeline tests: Make test structure consistent across all scenarios in `test_full_pipeline.py`. Each scenario (ideal, realistic, minimal) should test calibration accuracy (rotation, translation, interface distance errors) and RMS reprojection error with scenario-appropriate thresholds. Remove misplaced ground-truth fixture tests (camera count, geometry checks) from calibration test classes — these already exist in `TestGenerateRealRigArray`.
+- [ ] **P.5** Standardize synthetic pipeline tests: Make test structure consistent across all scenarios in `test_full_pipeline.py`. Each scenario (ideal, realistic, minimal) should test calibration accuracy (rotation, translation, interface distance errors) and RMS reprojection error with scenario-appropriate thresholds. Remove misplaced ground-truth fixture tests (camera count, geometry checks) from calibration test classes — these already exist in `TestGenerateRealRigArray`. Mark particularly the realistic rig tests with @pytest.mark.slow.
 
 - [x] **P.6** Support separate intrinsic board configuration: Allow users to specify a different ChArUco board for intrinsic (in-air) calibration vs extrinsic (underwater) calibration. Add optional `intrinsic_board` field to `CalibrationConfig`, parse it in `load_config()`, and pass it to Stage 1. Falls back to `board` when not set.
 
@@ -96,7 +96,7 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.18** Water surface Z consistency diagnostic: After Stage 3, compute `water_z = camera_z + interface_distance` per camera and report the spread. Tests the physical constraint that the water surface is a single plane. Add to pipeline printout and `diagnostics.json`.
 
-- [ ] **P.19** Fix low quality extrinsic initialization. Optimization is compensating, but the initial guess could be better
+- [ ] **P.19** Improve extrinsic initialization. Optimization is compensating, but the initial guess could be better
 
 - [x] **P.20** Improve 3D distance validation metric: Change `compute_3d_distance_errors()` from all N-choose-2 corner pairs to adjacent-only (single known ground truth = `square_size`). Add signed error (bias detection), RMSE, and percent error. Update pipeline printout and diagnostics recommendations.
 
@@ -104,14 +104,18 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.22** Test and document sparse Jacobian OOM fix: Add unit tests for `dense_threshold` behavior in `make_sparse_jacobian_func()` and update changelog. The function was modified to return sparse matrices for large problems to avoid OOM, but was not tested or documented.
 
+- [x] **P.23** water surface consistency soft regularization to break degeneracy between camera-z and interface distance while still allowing for slight camera height variations
+
+- [x] **P.24** Add option to set some cameras as auxillary cameras. These cameras will be excluded from the stage 3 and 4 optimization, and then added in after-the-fact without modifying the non-auxillary camera parameters. Useful when you don't want a particular camera "poisoning" the optimization -- for example, a wide-angle overview that has significantly higher distortion and associated RMS errors. 
+
 ---
 
-## Future: Advanced Optimization and Downstrea Features
+## Future: Advanced Optimization and Downstream Features
 
 - [ ] **F.1** Ceres Solver integration: Replace scipy `least_squares` with Ceres Solver for Stage 3/4 optimization. Ceres provides automatic differentiation (exact Jacobians), built-in Schur complement solver (marginalizes board poses, reducing effective problem to ~85 camera/interface params regardless of frame count), and robust loss functions. Requires writing a custom `RefractiveCostFunction` implementing the flat-interface projection with Snell's law. Integration via pyceres or pybind11 wrapper, with scipy as fallback for users without C++ dependency.
 
 - [ ] **F.2** Intelligent frame selection: Add a frame selection step before Stage 3 optimization that caps the number of frames at a configurable budget (~50-80) while maximizing camera coverage, pose graph connectivity, and spatial/angular diversity of board poses. Ensures bounded optimization time regardless of input video length.
 
-- [ ] **F.3** 3D sand surface reconstruction using refraction-aware triangulation
+- [ ] **F.3** 3D sand surface reconstruction using refraction-aware triangulation (possibly separate library importing from aquacal)
 
-- [ ] **F.4** 3D pose estimation and tracking of individual animals
+- [ ] **F.4** 3D pose estimation and tracking of individual animals (possibly separate library importing from aquacal)

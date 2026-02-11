@@ -295,3 +295,186 @@ def optimize_interface(
     board_poses_list = [opt_board_poses[frame_idx] for frame_idx in frame_order]
 
     return opt_extrinsics, opt_distances, board_poses_list, rms_error
+
+
+def register_auxiliary_camera(
+    camera_name: str,
+    intrinsics: CameraIntrinsics,
+    detections: DetectionResult,
+    board_poses: dict[int, BoardPose],
+    board: BoardGeometry,
+    initial_interface_distance: float = 0.15,
+    interface_normal: Vec3 | None = None,
+    n_air: float = 1.0,
+    n_water: float = 1.333,
+    min_corners: int = 4,
+    target_water_z: float | None = None,
+    water_z_weight: float = 10.0,
+    verbose: int = 0,
+) -> tuple[CameraExtrinsics, float, float]:
+    """Register a single auxiliary camera against fixed board poses.
+
+    Estimates the camera's extrinsics and interface distance by minimizing
+    refractive reprojection error against known board poses from Stage 3.
+    The board poses are treated as fixed ground truth.
+
+    Args:
+        camera_name: Name of the auxiliary camera
+        intrinsics: Camera intrinsic parameters
+        detections: Full detection results (must contain this camera's detections)
+        board_poses: Fixed board poses from Stage 3 (frame_idx -> BoardPose)
+        board: Board geometry
+        initial_interface_distance: Starting interface distance estimate
+        interface_normal: Interface normal (default [0, 0, -1])
+        n_air: Refractive index of air
+        n_water: Refractive index of water
+        min_corners: Minimum corners per detection
+        target_water_z: Target water surface Z from primary calibration.
+            When provided, adds a soft regularization residual anchoring
+            this camera's water_z to the primary cameras' mean.
+        water_z_weight: Weight for the water_z regularization residual.
+            Only used when target_water_z is not None.
+        verbose: Verbosity level
+
+    Returns:
+        Tuple of (extrinsics, interface_distance, rms_error)
+
+    Raises:
+        InsufficientDataError: If no usable frames found
+    """
+    from aquacal.core.camera import Camera
+    from aquacal.core.interface_model import Interface
+    from aquacal.core.refractive_geometry import refractive_project_fast
+
+    if interface_normal is None:
+        interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
+    else:
+        interface_normal = np.asarray(interface_normal, dtype=np.float64)
+
+    # --- Step 1: Collect observations ---
+    # Find frames where this camera has detections AND a board pose exists
+    obs_frames = []  # list of (frame_idx, corner_ids, corners_2d)
+    total_corners = 0
+
+    for frame_idx, frame_det in detections.frames.items():
+        if camera_name not in frame_det.detections:
+            continue
+        if frame_idx not in board_poses:
+            continue
+        det = frame_det.detections[camera_name]
+        if det.num_corners < min_corners:
+            continue
+        obs_frames.append((frame_idx, det.corner_ids, det.corners_2d))
+        total_corners += det.num_corners
+
+    if len(obs_frames) == 0:
+        raise InsufficientDataError(
+            f"No usable frames for auxiliary camera '{camera_name}'. "
+            f"Need frames with both detections (>={min_corners} corners) "
+            f"and existing board poses."
+        )
+
+    # --- Step 2: Initial guess via refractive PnP ---
+    # Use the frame with the most corners
+    best_frame = max(obs_frames, key=lambda x: len(x[1]))
+    best_frame_idx, best_ids, best_corners = best_frame
+
+    pnp_result = refractive_solve_pnp(
+        intrinsics, best_corners, best_ids, board,
+        initial_interface_distance, interface_normal, n_air, n_water,
+    )
+
+    if pnp_result is None:
+        raise InsufficientDataError(
+            f"Refractive PnP failed for auxiliary camera '{camera_name}' "
+            f"on frame {best_frame_idx} ({len(best_ids)} corners)."
+        )
+
+    rvec_bc, tvec_bc = pnp_result  # board-in-camera pose
+
+    # Transform to world frame: camera extrinsics from board pose
+    bp = board_poses[best_frame_idx]
+    R_bw = rvec_to_matrix(bp.rvec)
+    R_bc = rvec_to_matrix(rvec_bc)
+    # world_to_cam = board_to_cam @ world_to_board
+    R_wb, t_wb = invert_pose(R_bw, bp.tvec)
+    R_wc, t_wc = compose_poses(R_bc, tvec_bc, R_wb, t_wb)
+
+    initial_rvec = matrix_to_rvec(R_wc)
+    initial_tvec = t_wc
+
+    # --- Step 3: Build parameter vector ---
+    # [rvec(3), tvec(3), interface_distance(1)] = 7 params
+    x0 = np.concatenate([initial_rvec, initial_tvec, [initial_interface_distance]])
+
+    # --- Step 4: Residual function ---
+    def residuals(x):
+        rvec = x[:3]
+        tvec = x[3:6]
+        iface_dist = x[6]
+
+        R = rvec_to_matrix(rvec)
+        ext = CameraExtrinsics(R=R, t=tvec)
+        camera = Camera(camera_name, intrinsics, ext)
+        interface = Interface(
+            normal=interface_normal,
+            base_height=0.0,
+            camera_offsets={camera_name: iface_dist},
+            n_air=n_air,
+            n_water=n_water,
+        )
+
+        resid = []
+        for frame_idx, corner_ids, corners_2d in obs_frames:
+            bp = board_poses[frame_idx]
+            corners_3d = board.transform_corners(bp.rvec, bp.tvec)
+
+            for i, cid in enumerate(corner_ids):
+                pt_3d = corners_3d[int(cid)]
+                projected = refractive_project_fast(camera, interface, pt_3d)
+                if projected is not None:
+                    resid.append(projected[0] - corners_2d[i, 0])
+                    resid.append(projected[1] - corners_2d[i, 1])
+                else:
+                    resid.append(100.0)
+                    resid.append(100.0)
+
+        # Water surface Z regularization
+        if target_water_z is not None and water_z_weight > 0:
+            cam_center = -R.T @ tvec
+            water_z = cam_center[2] + iface_dist
+            resid.append(water_z_weight * (water_z - target_water_z))
+
+        return np.array(resid, dtype=np.float64)
+
+    # --- Step 5: Bounds ---
+    lower = np.full(7, -np.inf)
+    upper = np.full(7, np.inf)
+    lower[6] = 0.01  # interface_distance lower bound
+    upper[6] = 2.0   # interface_distance upper bound
+
+    # --- Step 6: Optimize ---
+    result = least_squares(
+        residuals,
+        x0=x0,
+        method="trf",
+        loss="huber",
+        f_scale=1.0,
+        bounds=(lower, upper),
+        verbose=verbose,
+    )
+
+    # --- Step 7: Extract results ---
+    opt_rvec = result.x[:3]
+    opt_tvec = result.x[3:6]
+    opt_iface_dist = float(result.x[6])
+
+    opt_R = rvec_to_matrix(opt_rvec)
+    opt_extrinsics = CameraExtrinsics(R=opt_R, t=opt_tvec)
+
+    # RMS over reprojection residuals only (exclude regularization term)
+    n_reproj = total_corners * 2
+    reproj_residuals = result.fun[:n_reproj]
+    rms_error = float(np.sqrt(np.mean(reproj_residuals**2)))
+
+    return opt_extrinsics, opt_iface_dist, rms_error

@@ -9,6 +9,22 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-11
+### [P.2] Consolidate Synthetic Data Generation
+- Removed duplicate `generate_synthetic_detections()` from `tests/unit/test_interface_estimation.py`, `tests/unit/test_refinement.py`, and `tests/unit/test_reprojection.py`
+- All three test files now import from centralized `tests/synthetic/ground_truth.py`
+- Updated 27 call sites to add `min_corners=4` parameter for unit test scenarios
+- Updated `test_reprojection.py` to convert `dict[int, BoardPose]` to `list[BoardPose]` at call sites
+- Removed unused imports (Camera, Interface, refractive_project, Detection, FrameDetections) where no longer needed
+
+## 2026-02-11
+### [P.24] Auxiliary Camera Registration
+- Added `auxiliary_cameras` config field and `is_auxiliary` flag on `CameraCalibration`
+- New `register_auxiliary_camera()` in `interface_estimation.py`: 7-param optimization (6 DOF extrinsics + 1 interface distance) against fixed Stage 3 board poses, with optional water-Z regularization
+- Separate `auxiliary_water_z_weight` config option (default 0, recommended ~100) since auxiliary cameras need a higher weight due to single-residual vs thousands of reprojection residuals
+- Pipeline filters Stages 2-3 to primary cameras only; Stage 3b registers auxiliary cameras post-hoc
+- Updated `load_config()` with validation, `serialization.py` for is_auxiliary, `example_config.yaml` and `aquacal init` CLI
+
+## 2026-02-11
 ### [src/aquacal/calibration/_optim_common.py]
 - Added `water_z_weight` parameter to `compute_residuals()` and `build_jacobian_sparsity()`
 - When weight > 0, appends N_cameras soft regularization residuals penalizing water surface Z inconsistency across cameras, breaking the depth-interface distance degeneracy
