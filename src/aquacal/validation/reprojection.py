@@ -84,8 +84,7 @@ def compute_reprojection_errors(
             camera = Camera(cam_name, cam_calib.intrinsics, cam_calib.extrinsics)
             interface = Interface(
                 normal=calibration.interface.normal,
-                base_height=0.0,
-                camera_offsets={cam_name: cam_calib.interface_distance},
+                camera_distances={cam_name: cam_calib.interface_distance},
                 n_air=calibration.interface.n_air,
                 n_water=calibration.interface.n_water,
             )

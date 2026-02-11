@@ -9,6 +9,25 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-11
+### [tests/synthetic/test_full_pipeline.py, tests/synthetic/conftest.py]
+- Standardized calibration scenario test structure: all three classes (TestIdealScenario, TestRealisticScenario, TestMinimalScenario) now have 4 tests each (rotation, translation, interface distance, RMS) with scenario-appropriate thresholds
+- Added class-scoped result fixtures (ideal_result, realistic_result, minimal_result) to run calibration once per scenario class, avoiding redundant optimization runs
+- Removed misplaced ground-truth fixture tests (test_has_13_cameras, test_geometry) from TestRealisticScenario - these duplicated TestGenerateRealRigArray tests
+- Changed conftest.py scenario fixture scopes from function to class for compatibility with class-scoped result fixtures
+- Marked all three calibration scenario test classes with @pytest.mark.slow for selective test execution
+- All 33 tests pass; `pytest -m "not slow"` correctly skips 12 calibration tests and runs 21 fast tests
+
+## 2026-02-11
+### [P.1] Simplify Interface Class
+- Removed redundant `base_height` parameter from `Interface` class in `src/aquacal/core/interface_model.py`
+- Replaced `base_height` + `camera_offsets` with single `camera_distances` parameter
+- Updated all Interface() constructor calls across 7 source files and 7 test files (23 call sites total)
+- Updated docstrings in `interface_model.py` and `refractive_geometry.py`
+- Renamed local variable in `triangulate.py` from `camera_offsets` to `camera_distances` for clarity
+- Cleaned up `test_interface_model.py`: consolidated redundant tests, clarified docstrings to reflect simplified model
+- All tests pass; purely mechanical refactor with no behavior changes
+
+## 2026-02-11
 ### [P.2] Consolidate Synthetic Data Generation
 - Removed duplicate `generate_synthetic_detections()` from `tests/unit/test_interface_estimation.py`, `tests/unit/test_refinement.py`, and `tests/unit/test_reprojection.py`
 - All three test files now import from centralized `tests/synthetic/ground_truth.py`

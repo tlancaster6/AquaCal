@@ -33,8 +33,7 @@ def simple_interface():
     """Horizontal interface at Z=0.15."""
     return Interface(
         normal=np.array([0, 0, -1]),
-        base_height=0.15,
-        camera_offsets={'cam0': 0.0},
+        camera_distances={'cam0': 0.15},
         n_air=1.0,
         n_water=1.333
     )
@@ -420,8 +419,7 @@ class TestOffsetCameraRoundTrip:
         camera = Camera("cam_offset", intrinsics, extrinsics)
         interface = Interface(
             normal=np.array([0, 0, -1]),
-            base_height=0.0,
-            camera_offsets={'cam_offset': 0.15},
+            camera_distances={'cam_offset': 0.15},
             n_air=1.0,
             n_water=1.333
         )
@@ -454,8 +452,7 @@ class TestOffsetCameraRoundTrip:
         camera = Camera("cam_xy", intrinsics, extrinsics)
         interface = Interface(
             normal=np.array([0, 0, -1]),
-            base_height=0.0,
-            camera_offsets={'cam_xy': 0.15},
+            camera_distances={'cam_xy': 0.15},
             n_air=1.0,
             n_water=1.333
         )
@@ -505,8 +502,7 @@ class TestOffsetCameraRoundTrip:
             )
             interface = Interface(
                 normal=np.array([0, 0, -1]),
-                base_height=0.0,
-                camera_offsets={f'cam{i}': 0.15},
+                camera_distances={f'cam{i}': 0.15},
                 n_air=1.0,
                 n_water=1.333
             )
@@ -577,8 +573,7 @@ class TestRefractiveProjectFast:
             )
             interface = Interface(
                 normal=np.array([0, 0, -1]),
-                base_height=0.0,
-                camera_offsets={"cam_test": 0.15},
+                camera_distances={"cam_test": 0.15},
             )
 
             test_points = [
@@ -619,8 +614,7 @@ class TestRefractiveProjectFast:
         """Raises ValueError for tilted interface."""
         tilted = Interface(
             normal=np.array([0.1, 0, -0.995]),
-            base_height=0.15,
-            camera_offsets={"cam0": 0.0},
+            camera_distances={"cam0": 0.15},
         )
         with pytest.raises(ValueError, match="horizontal"):
             refractive_project_fast(simple_camera, tilted, np.array([0, 0, 0.5]))
@@ -712,8 +706,7 @@ class TestRefractiveProjectFastBatch:
         """Raises ValueError for tilted interface in batch."""
         tilted = Interface(
             normal=np.array([0.1, 0, -0.995]),
-            base_height=0.15,
-            camera_offsets={"cam0": 0.0},
+            camera_distances={"cam0": 0.15},
         )
         points = np.array([[0, 0, 0.5], [0.1, 0.1, 0.4]])
         with pytest.raises(ValueError, match="horizontal"):

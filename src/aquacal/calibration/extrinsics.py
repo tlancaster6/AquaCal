@@ -155,8 +155,7 @@ def refractive_solve_pnp(
     camera = Camera("_pnp", intrinsics, identity_ext)
     interface = Interface(
         normal=interface_normal,
-        base_height=0.0,
-        camera_offsets={"_pnp": interface_distance},
+        camera_distances={"_pnp": interface_distance},
         n_air=n_air,
         n_water=n_water,
     )

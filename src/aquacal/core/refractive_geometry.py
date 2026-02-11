@@ -78,7 +78,7 @@ def trace_ray_air_to_water(
     Trace ray from camera through air-water interface.
 
     Args:
-        camera: Camera object (camera.name must be in interface.camera_offsets)
+        camera: Camera object (camera.name must be in interface.camera_distances)
         interface: Interface object
         pixel: 2D pixel coordinates
 

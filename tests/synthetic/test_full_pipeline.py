@@ -122,6 +122,30 @@ def _run_calibration_stages(
     )
 
 
+@pytest.fixture(scope="class")
+def ideal_result(scenario_ideal):
+    """Run calibration once for all ideal scenario tests."""
+    result = _run_calibration_stages(scenario_ideal, noise_std=0.0)
+    errors = compute_calibration_errors(result, scenario_ideal)
+    return result, errors
+
+
+@pytest.fixture(scope="class")
+def realistic_result(scenario_realistic):
+    """Run calibration once for all realistic scenario tests."""
+    result = _run_calibration_stages(scenario_realistic)
+    errors = compute_calibration_errors(result, scenario_realistic)
+    return result, errors
+
+
+@pytest.fixture(scope="class")
+def minimal_result(scenario_minimal):
+    """Run calibration once for all minimal scenario tests."""
+    result = _run_calibration_stages(scenario_minimal)
+    errors = compute_calibration_errors(result, scenario_minimal)
+    return result, errors
+
+
 class TestGenerateCameraIntrinsics:
     """Tests for generate_camera_intrinsics function."""
 
@@ -370,77 +394,67 @@ class TestGenerateSyntheticDetections:
             assert frame_idx in pose_indices
 
 
+@pytest.mark.slow
 class TestIdealScenario:
     """Test with zero noise - should recover ground truth exactly."""
 
-    def test_recovers_extrinsics_with_low_error(self, scenario_ideal):
-        """With no noise, extrinsics should match ground truth closely."""
-        result = _run_calibration_stages(scenario_ideal, noise_std=0.0)
-        errors = compute_calibration_errors(result, scenario_ideal)
-
-        # With no noise, should get very accurate results
-        # Note: There's inherent error from initialization and optimization
+    def test_rotation_accuracy(self, ideal_result):
+        result, errors = ideal_result
         assert errors["rotation_error_deg"] < 0.5
+
+    def test_translation_accuracy(self, ideal_result):
+        result, errors = ideal_result
         assert errors["translation_error_mm"] < 5.0
+
+    def test_interface_distance_accuracy(self, ideal_result):
+        result, errors = ideal_result
         assert errors["interface_distance_error_mm"] < 10.0
 
-    def test_rms_error_near_zero(self, scenario_ideal):
-        """RMS reprojection error should be near zero with no noise."""
-        result = _run_calibration_stages(scenario_ideal, noise_std=0.0)
-
-        # RMS error should be very small
+    def test_rms_reprojection_error(self, ideal_result):
+        result, errors = ideal_result
         assert result.diagnostics.reprojection_error_rms < 1.0
 
 
+@pytest.mark.slow
 class TestRealisticScenario:
     """Test with 13-camera rig matching actual hardware."""
 
-    def test_accuracy_within_tolerance(self, scenario_realistic):
-        """Calibration should achieve reasonable accuracy."""
-        result = _run_calibration_stages(scenario_realistic)
-        errors = compute_calibration_errors(result, scenario_realistic)
-
-        # With 0.5px noise on 13 cameras, should get good results
+    def test_rotation_accuracy(self, realistic_result):
+        result, errors = realistic_result
         assert errors["rotation_error_deg"] < 1.5
+
+    def test_translation_accuracy(self, realistic_result):
+        result, errors = realistic_result
         assert errors["translation_error_mm"] < 15.0
+
+    def test_interface_distance_accuracy(self, realistic_result):
+        result, errors = realistic_result
         assert errors["interface_distance_error_mm"] < 20.0
 
-    def test_has_13_cameras(self, scenario_realistic):
-        """Verify scenario has correct number of cameras."""
-        assert len(scenario_realistic.intrinsics) == 13
-        assert len(scenario_realistic.extrinsics) == 13
-        assert len(scenario_realistic.interface_distances) == 13
-
-    def test_geometry(self, scenario_realistic):
-        """Verify camera positions match expected geometry."""
-        ext = scenario_realistic.extrinsics
-
-        # cam0 at origin
-        np.testing.assert_allclose(ext["cam0"].C, [0, 0, 0], atol=1e-10)
-
-        # Inner ring cameras at 300mm radius
-        for i in range(1, 7):
-            C = ext[f"cam{i}"].C
-            radius = np.sqrt(C[0] ** 2 + C[1] ** 2)
-            np.testing.assert_allclose(radius, 0.300, atol=1e-6)
-
-        # Outer ring cameras at 600mm radius
-        for i in range(7, 13):
-            C = ext[f"cam{i}"].C
-            radius = np.sqrt(C[0] ** 2 + C[1] ** 2)
-            np.testing.assert_allclose(radius, 0.600, atol=1e-6)
+    def test_rms_reprojection_error(self, realistic_result):
+        result, errors = realistic_result
+        assert result.diagnostics.reprojection_error_rms < 2.0
 
 
+@pytest.mark.slow
 class TestMinimalScenario:
-    """Test edge case: minimum viable configuration."""
+    """Test edge case: minimum viable configuration (2 cameras)."""
 
-    def test_two_camera_calibration(self, scenario_minimal):
-        """Should work with just 2 cameras."""
-        result = _run_calibration_stages(scenario_minimal)
+    def test_rotation_accuracy(self, minimal_result):
+        result, errors = minimal_result
+        assert errors["rotation_error_deg"] < 3.0
 
-        assert len(result.cameras) == 2
-        assert "cam0" in result.cameras
-        assert "cam1" in result.cameras
+    def test_translation_accuracy(self, minimal_result):
+        result, errors = minimal_result
+        assert errors["translation_error_mm"] < 30.0
+
+    def test_interface_distance_accuracy(self, minimal_result):
+        result, errors = minimal_result
+        assert errors["interface_distance_error_mm"] < 30.0
+
+    def test_rms_reprojection_error(self, minimal_result):
+        result, errors = minimal_result
+        assert result.diagnostics.reprojection_error_rms < 3.0
 
 
 class TestComputeCalibrationErrors:

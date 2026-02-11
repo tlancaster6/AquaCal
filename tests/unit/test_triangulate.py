@@ -243,8 +243,7 @@ class TestTriangulatePoint:
         interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
         interface = Interface(
             normal=interface_normal,
-            base_height=0.0,
-            camera_offsets=interface_distances,  # All cameras
+            camera_distances=interface_distances,  # All cameras
             n_air=1.0,
             n_water=1.333,
         )
@@ -310,8 +309,7 @@ class TestTriangulatePoint:
         # Create shared interface with all cameras
         interface = Interface(
             normal=interface_normal,
-            base_height=0.0,
-            camera_offsets=interface_distances,  # All cameras
+            camera_distances=interface_distances,  # All cameras
             n_air=1.0,
             n_water=1.333,
         )
@@ -360,8 +358,7 @@ class TestTriangulatePoint:
         # Create shared interface with all cameras
         interface = Interface(
             normal=interface_normal,
-            base_height=0.0,
-            camera_offsets=interface_distances,  # All cameras
+            camera_distances=interface_distances,  # All cameras
             n_air=1.0,
             n_water=1.333,
         )

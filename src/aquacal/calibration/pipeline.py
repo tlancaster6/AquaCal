@@ -892,8 +892,7 @@ def _estimate_validation_poses(
 
         interface = Interface(
             normal=interface_normal,
-            base_height=0.0,
-            camera_offsets=interface_distances,
+            camera_distances=interface_distances,
             n_air=n_air,
             n_water=n_water,
         )

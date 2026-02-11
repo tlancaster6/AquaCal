@@ -1,303 +1,203 @@
-# Task: P.24 Auxiliary Camera Registration
+# Task: P.5 Standardize Synthetic Pipeline Tests
 
 ## Objective
 
-Add support for auxiliary cameras (e.g., wide-angle overview camera) that are calibrated for intrinsics and registered to the rig coordinate system, but excluded from the joint Stage 3/4 optimization. This prevents poorly-modeled cameras from degrading the primary calibration while still placing them in the same world frame for downstream use (e.g., tracking association).
+Make the test structure consistent across all calibration scenarios in `test_full_pipeline.py`. Each scenario should test the same metrics with scenario-appropriate thresholds. Remove misplaced ground-truth fixture tests from calibration test classes.
 
 ## Background
 
-A central wide-angle camera sees the entire underwater volume (the union of all narrow cameras' FOVs) and is valuable for object tracking continuity. However, including it in Stage 3 joint optimization degrades the primary calibration — its ~4px intrinsic RMS (vs <1px for narrow cameras) introduces large residuals that bias other cameras' parameters. The solution: calibrate it separately against the fixed board poses from Stage 3, solving only its 7 free parameters (6 DOF extrinsics + 1 interface distance).
+The three calibration scenario test classes (`TestIdealScenario`, `TestRealisticScenario`, `TestMinimalScenario`) currently have inconsistent structure:
+
+- **`TestIdealScenario`** (good): Tests rotation, translation, interface distance errors AND RMS reprojection error.
+- **`TestRealisticScenario`** (mixed): Tests rotation, translation, interface distance errors but NOT RMS error. Also contains `test_has_13_cameras` and `test_geometry` which test the ground-truth fixture properties, not calibration accuracy. These are duplicates of tests already in `TestGenerateRealRigArray`.
+- **`TestMinimalScenario`** (weak): Only tests that 2 cameras exist in the result — no accuracy checks at all.
 
 ## Context Files
 
 Read these files before starting (in order):
 
-1. `src/aquacal/config/schema.py` (lines 173-219) — `CalibrationConfig` dataclass. Add `auxiliary_cameras` field.
-2. `src/aquacal/config/schema.py` (lines 84-98) — `CameraCalibration` dataclass. May need an `is_auxiliary: bool` flag.
-3. `src/aquacal/calibration/pipeline.py` (lines 47-200) — `load_config()`. Parse auxiliary cameras from YAML.
-4. `src/aquacal/calibration/pipeline.py` (lines 330-720) — `run_calibration_from_config()`. Full pipeline flow. Stage 1 processes all cameras. Stages 2-3 use only `config.camera_names`. New Stage 3b goes after Stage 3 (or Stage 4), before validation.
-5. `src/aquacal/calibration/interface_estimation.py` (lines 117-285) — `optimize_interface()` for reference on how the residual function works. Stage 3b is a simplified version.
-6. `src/aquacal/calibration/extrinsics.py` (lines 106-192) — `refractive_solve_pnp()` for reference on single-camera refractive pose estimation. Stage 3b initial guess can come from this.
-7. `src/aquacal/core/refractive_geometry.py` — `refractive_project_fast()` used in residual computation.
-8. `src/aquacal/config/example_config.yaml` — Example config file. Add commented-out `auxiliary_cameras` section.
-9. `src/aquacal/cli.py` (lines 274-381) — `_generate_config_yaml()`. The `aquacal init` command generates config YAML from scanned video directories. Must include `auxiliary_cameras` in generated output.
+1. `tests/synthetic/test_full_pipeline.py` — The file to modify. Read the full file.
+2. `tests/synthetic/ground_truth.py` (lines 605-686) — `compute_calibration_errors()` returns: `rotation_error_deg`, `translation_error_mm`, `interface_distance_error_mm`, `focal_length_error_percent`, `principal_point_error_px`.
 
 ## Modify
 
-- `src/aquacal/config/schema.py`
-- `src/aquacal/calibration/pipeline.py`
-- `src/aquacal/calibration/interface_estimation.py` (new function)
-- `src/aquacal/config/example_config.yaml`
-- `src/aquacal/cli.py`
+- `tests/synthetic/test_full_pipeline.py`
+- `tests/synthetic/conftest.py` — change scenario fixture scopes from function to class
 
 ## Do Not Modify
 
 Everything not listed above. In particular:
-- `src/aquacal/calibration/_optim_common.py` — shared optimization code stays as-is
-- `src/aquacal/calibration/refinement.py` — Stage 4 unchanged
-- `src/aquacal/calibration/intrinsics.py` — already handles rational model via `rational_model_cameras` parameter
+- `tests/synthetic/ground_truth.py` — test infrastructure stays as-is
 - `TASKS.md` — orchestrator maintains this
 
 ## Design
 
-### Part 1: Config Schema
+### Part 1: Remove Misplaced Tests from `TestRealisticScenario`
 
-Add to `CalibrationConfig`:
-```python
-auxiliary_cameras: list[str] = field(default_factory=list)
-```
+Delete these two tests from `TestRealisticScenario`:
 
-Auxiliary camera names must NOT appear in `camera_names` (the primary list). They must have entries in both `intrinsic_video_paths` and `extrinsic_video_paths`.
+- `test_has_13_cameras` (lines 408-412): Duplicates `TestGenerateRealRigArray.test_creates_13_cameras`
+- `test_geometry` (lines 414-431): Duplicates `TestGenerateRealRigArray.test_inner_ring_radius` and `test_outer_ring_radius`
 
-Add to `CameraCalibration`:
-```python
-is_auxiliary: bool = False
-```
+These test the ground-truth fixture, not calibration accuracy. They already exist in `TestGenerateRealRigArray` (lines 226-298).
 
-This flag is informational — downstream code can use it to exclude auxiliary cameras from triangulation/reconstruction.
+### Part 2: Add Class-Scoped Result Fixtures
 
-### Part 2: YAML Config Format
-
-```yaml
-cameras: [cam0, cam1, ..., cam11]       # primary cameras (joint optimization)
-auxiliary_cameras: [center_cam]          # registered post-hoc (optional)
-
-paths:
-  intrinsic_videos:
-    cam0: path/to/cam0_inair.mp4
-    # ... all primary cameras ...
-    center_cam: path/to/center_inair.mp4    # auxiliary too
-  extrinsic_videos:
-    cam0: path/to/cam0_underwater.mp4
-    # ... all primary cameras ...
-    center_cam: path/to/center_underwater.mp4  # auxiliary too
-```
-
-### Part 3: YAML Parsing in `load_config()`
+Add three class-scoped fixtures that run the calibration once per scenario class, avoiding redundant optimization runs (especially important for the 13-camera realistic scenario):
 
 ```python
-auxiliary_cameras = data.get("auxiliary_cameras", [])
+@pytest.fixture(scope="class")
+def ideal_result(scenario_ideal):
+    """Run calibration once for all ideal scenario tests."""
+    result = _run_calibration_stages(scenario_ideal, noise_std=0.0)
+    errors = compute_calibration_errors(result, scenario_ideal)
+    return result, errors
+
+
+@pytest.fixture(scope="class")
+def realistic_result(scenario_realistic):
+    """Run calibration once for all realistic scenario tests."""
+    result = _run_calibration_stages(scenario_realistic)
+    errors = compute_calibration_errors(result, scenario_realistic)
+    return result, errors
+
+
+@pytest.fixture(scope="class")
+def minimal_result(scenario_minimal):
+    """Run calibration once for all minimal scenario tests."""
+    result = _run_calibration_stages(scenario_minimal)
+    errors = compute_calibration_errors(result, scenario_minimal)
+    return result, errors
 ```
 
-Validate:
-- No overlap between `cameras` and `auxiliary_cameras`
-- Each auxiliary camera has entries in both `intrinsic_video_paths` and `extrinsic_video_paths`
-- If auxiliary cameras are specified, `rational_model_cameras` may include them
+Place these after `_run_calibration_stages()` and before the test classes.
 
-Pass to `CalibrationConfig` constructor.
-
-### Part 4: Pipeline Changes
-
-The pipeline needs these modifications to `run_calibration_from_config()`:
-
-**Stage 1 — include auxiliary cameras**: `calibrate_intrinsics_all()` already operates on whatever paths are provided. Just ensure `config.intrinsic_video_paths` includes auxiliary cameras (it will, since they're in the `paths` section).
-
-However, there's a subtlety: currently `intrinsic_video_paths` is built from `paths.intrinsic_videos` which may include auxiliary cameras. But only `config.camera_names` cameras are used in Stages 2-3. We need to make sure the intrinsics dict includes auxiliary cameras after Stage 1.
-
-**Detection — include auxiliary cameras**: `detect_all_frames()` also operates on whatever paths are provided. The `extrinsic_video_paths` includes auxiliary cameras, so they'll be detected automatically. But the detection result will include the auxiliary cameras mixed in with primary cameras.
-
-**Stages 2-3 — exclude auxiliary cameras**: Build a filtered `DetectionResult` that only includes primary cameras for Stage 2/3. Or more simply: `build_pose_graph()`, `estimate_extrinsics()`, and `optimize_interface()` only process cameras they find in their inputs. Since we only pass primary camera intrinsics/extrinsics to these functions, auxiliary cameras are automatically excluded.
-
-The cleanest approach: after detection, split the detection data:
-```python
-# Filter detections to primary cameras only for Stages 2-3
-primary_camera_set = set(config.camera_names)
-# The detection result includes all cameras; Stage 2-3 functions
-# only process cameras in the intrinsics/extrinsics dicts they receive,
-# so auxiliary cameras are naturally excluded. But the frame filtering
-# (min_cameras_per_frame) should only count primary cameras.
-```
-
-Actually, the simplest approach: run detection separately for primary and auxiliary cameras, OR run detection on all cameras together but pass only primary-camera intrinsics/extrinsics to Stages 2-3.
-
-**Recommended approach**: Run detection on ALL cameras (primary + auxiliary). The existing pipeline functions only process cameras that exist in the `intrinsics` and `initial_extrinsics` dicts they receive, so auxiliary cameras in the detection results are silently ignored by Stages 2-3. For Stage 3b, we just need the auxiliary camera's detections from the same `DetectionResult`.
-
-The key change: only pass primary camera intrinsics to `estimate_extrinsics()` and `optimize_interface()`. Currently the pipeline uses `intrinsics` (all cameras) — it needs to be filtered to primary-only for Stages 2-3.
-
-**Stage 3b — register auxiliary cameras**: After Stage 3 (or Stage 4 if enabled), for each auxiliary camera:
+**Important**: For class-scoped fixtures to work with session/module-scoped scenario fixtures, the `conftest.py` scenario fixtures need to be at least class scope too. Currently they are function-scoped (the default). Update `tests/synthetic/conftest.py` to use `scope="class"`:
 
 ```python
-.# Compute mean water_z from primary cameras for regularization
-primary_water_zs = [
-    final_extrinsics[cam].C[2] + final_distances[cam]
-    for cam in config.camera_names
-]
-target_water_z = float(np.mean(primary_water_zs))
-
-for aux_cam in config.auxiliary_cameras:
-    aux_ext, aux_dist, aux_rms = register_auxiliary_camera(
-        camera_name=aux_cam,
-        intrinsics=intrinsics[aux_cam],
-        detections=all_detections,  # full detection set, not subsampled
-        board_poses=board_poses_dict,  # fixed from Stage 3
-        board=board,
-        initial_interface_distance=config.initial_interface_distances.get(aux_cam, 0.15),
-        interface_normal=interface_normal,
-        n_air=config.n_air,
-        n_water=config.n_water,
-        target_water_z=target_water_z,
-        water_z_weight=config.water_z_weight,
-    )
+@pytest.fixture(scope="class")
+def scenario_ideal() -> SyntheticScenario:
+    ...
 ```
 
-**Output — merge into CalibrationResult**: Auxiliary cameras are added to `result.cameras` with `is_auxiliary=True`. They appear in `calibration.json` alongside primary cameras.
+Do the same for `scenario_minimal` and `scenario_realistic`.
 
-### Part 5: `register_auxiliary_camera()` Function
+### Part 3: Standardize Test Structure
 
-Add to `interface_estimation.py`:
+Each scenario class should have exactly 4 tests with scenario-appropriate thresholds. Tests use the class-scoped result fixtures to avoid redundant optimization runs:
 
 ```python
-def register_auxiliary_camera(
-    camera_name: str,
-    intrinsics: CameraIntrinsics,
-    detections: DetectionResult,
-    board_poses: dict[int, BoardPose],
-    board: BoardGeometry,
-    initial_interface_distance: float = 0.15,
-    interface_normal: Vec3 | None = None,
-    n_air: float = 1.0,
-    n_water: float = 1.333,
-    min_corners: int = 4,
-    target_water_z: float | None = None,
-    water_z_weight: float = 10.0,
-    verbose: int = 0,
-) -> tuple[CameraExtrinsics, float, float]:
-    """
-    Register a single auxiliary camera against fixed board poses.
+@pytest.mark.slow
+class TestIdealScenario:
+    """Test with zero noise - should recover ground truth exactly."""
 
-    Estimates the camera's extrinsics and interface distance by minimizing
-    refractive reprojection error against known board poses from Stage 3.
-    The board poses are treated as fixed ground truth.
+    def test_rotation_accuracy(self, ideal_result):
+        result, errors = ideal_result
+        assert errors["rotation_error_deg"] < 0.5
 
-    Args:
-        camera_name: Name of the auxiliary camera
-        intrinsics: Camera intrinsic parameters
-        detections: Full detection results (must contain this camera's detections)
-        board_poses: Fixed board poses from Stage 3 (frame_idx -> BoardPose)
-        board: Board geometry
-        initial_interface_distance: Starting interface distance estimate
-        interface_normal: Interface normal (default [0, 0, -1])
-        n_air: Refractive index of air
-        n_water: Refractive index of water
-        min_corners: Minimum corners per detection
-        target_water_z: Target water surface Z from primary calibration.
-            When provided, adds a soft regularization residual anchoring
-            this camera's water_z to the primary cameras' mean.
-        water_z_weight: Weight for the water_z regularization residual.
-            Only used when target_water_z is not None.
-        verbose: Verbosity level
+    def test_translation_accuracy(self, ideal_result):
+        result, errors = ideal_result
+        assert errors["translation_error_mm"] < 5.0
 
-    Returns:
-        Tuple of (extrinsics, interface_distance, rms_error)
-    """
+    def test_interface_distance_accuracy(self, ideal_result):
+        result, errors = ideal_result
+        assert errors["interface_distance_error_mm"] < 10.0
+
+    def test_rms_reprojection_error(self, ideal_result):
+        result, errors = ideal_result
+        assert result.diagnostics.reprojection_error_rms < 1.0
+
+
+@pytest.mark.slow
+class TestRealisticScenario:
+    """Test with 13-camera rig matching actual hardware."""
+
+    def test_rotation_accuracy(self, realistic_result):
+        result, errors = realistic_result
+        assert errors["rotation_error_deg"] < 1.5
+
+    def test_translation_accuracy(self, realistic_result):
+        result, errors = realistic_result
+        assert errors["translation_error_mm"] < 15.0
+
+    def test_interface_distance_accuracy(self, realistic_result):
+        result, errors = realistic_result
+        assert errors["interface_distance_error_mm"] < 20.0
+
+    def test_rms_reprojection_error(self, realistic_result):
+        result, errors = realistic_result
+        assert result.diagnostics.reprojection_error_rms < 2.0
+
+
+@pytest.mark.slow
+class TestMinimalScenario:
+    """Test edge case: minimum viable configuration (2 cameras)."""
+
+    def test_rotation_accuracy(self, minimal_result):
+        result, errors = minimal_result
+        assert errors["rotation_error_deg"] < 3.0
+
+    def test_translation_accuracy(self, minimal_result):
+        result, errors = minimal_result
+        assert errors["translation_error_mm"] < 30.0
+
+    def test_interface_distance_accuracy(self, minimal_result):
+        result, errors = minimal_result
+        assert errors["interface_distance_error_mm"] < 30.0
+
+    def test_rms_reprojection_error(self, minimal_result):
+        result, errors = minimal_result
+        assert result.diagnostics.reprojection_error_rms < 3.0
 ```
 
-**Implementation**:
+### Threshold Rationale
 
-1. **Collect observations**: Find all frames where this camera detected the board AND a board pose exists from Stage 3.
+| Metric | Ideal (0px noise) | Realistic (0.5px noise, 13 cams) | Minimal (0.5px noise, 2 cams) |
+|---|---|---|---|
+| Rotation (deg) | < 0.5 | < 1.5 | < 3.0 |
+| Translation (mm) | < 5.0 | < 15.0 | < 30.0 |
+| Interface dist (mm) | < 10.0 | < 20.0 | < 30.0 |
+| RMS (px) | < 1.0 | < 2.0 | < 3.0 |
 
-2. **Initial guess**: Use `refractive_solve_pnp()` on the frame with the most corners to get an initial extrinsics estimate. Initial interface distance from config.
+Ideal thresholds are kept from the existing tests. Realistic thresholds are kept from the existing tests. Minimal thresholds are looser — 2 cameras provide much less geometric constraint.
 
-3. **Parameter vector**: 7 parameters — `[rvec(3), tvec(3), interface_distance(1)]`
+### Part 4: `@pytest.mark.slow` Markers
 
-4. **Residual function**: For each frame, for each detected corner:
-   - Look up the 3D board point from the fixed board pose
-   - Project through the refractive model using the candidate camera extrinsics and interface distance
-   - Residual = projected pixel - detected pixel
+All three calibration scenario test classes must be marked `@pytest.mark.slow`. This lets developers skip the optimization-heavy tests during quick iteration:
 
-5. **Water surface regularization**: When `target_water_z` is provided, append one extra residual:
-   ```
-   r_reg = water_z_weight * (cam_z + interface_distance - target_water_z)
-   ```
-   This softly constrains the auxiliary camera to be consistent with the primary cameras' water surface. The pipeline passes in the mean water_z from Stage 3 as the target. Since there's only 1 camera and 7 params, this is just one extra residual — no sparsity concerns.
-
-6. **Optimization**: `scipy.optimize.least_squares` with method="trf", bounds on interface distance [0.01, 2.0], Huber loss.
-
-7. **Return**: Optimized extrinsics, interface distance, and RMS reprojection error.
-
-### Part 6: Pipeline Printout
-
-```
-[Stage 3b] Registering auxiliary cameras...
-  center_cam: 527 frames, 25529 corners
-  center_cam: RMS 4.21 px, interface_d=0.892m
+```bash
+pytest tests/synthetic/ -m "not slow" -v   # fast fixture/utility tests only
+pytest tests/synthetic/ -v                  # everything including slow calibration tests
 ```
 
-### Part 7: Serialization
-
-The `is_auxiliary` flag needs to be saved/loaded in `calibration.json`. Check `serialization.py` to see if `CameraCalibration` fields are serialized dynamically or explicitly. If explicitly, add `is_auxiliary` to the serialization.
-
-### Part 8: Example Config
-
-Update `src/aquacal/config/example_config.yaml` to include a commented-out `auxiliary_cameras` section after `rational_model_cameras`:
-
-```yaml
-# Optional: auxiliary cameras registered post-hoc against the primary calibration
-# These cameras go through intrinsic calibration and detection, but are excluded
-# from joint optimization (Stages 2-3). Useful for wide-angle overview cameras.
-# auxiliary_cameras:
-#   - center_cam
-```
-
-### Part 9: CLI Init Command
-
-Update `_generate_config_yaml()` in `cli.py` to include a commented-out `auxiliary_cameras` section in generated configs. Place it after the `rational_model_cameras` block:
-
-```python
-lines.extend([
-    "",
-    "# Optional: auxiliary cameras (registered post-hoc, excluded from joint optimization)",
-    "# Move camera names from 'cameras' to here if they should not participate in Stage 3",
-    "# auxiliary_cameras:",
-])
-
-for cam in camera_names:
-    lines.append(f"  # - {cam}")
-```
-
-This lets users easily move a camera from `cameras` to `auxiliary_cameras` by commenting/uncommenting lines.
-
-### Part 10: Rational Distortion Model Support
-
-Auxiliary cameras must be supported by `rational_model_cameras`. This already works if:
-- The auxiliary camera name appears in `rational_model_cameras` in the YAML
-- `rational_model_cameras` is passed to `calibrate_intrinsics_all()` (it already is)
-- `register_auxiliary_camera()` uses the intrinsics returned by Stage 1, which will already have 8 distortion coefficients if the rational model was used
-
-No code changes needed for this — just ensure the `load_config()` validation doesn't reject rational model cameras that are auxiliary (it shouldn't, since `rational_model_cameras` is parsed independently from `cameras`). Verify this is the case.
+The `slow` marker is already registered in `pyproject.toml`. Do NOT mark the non-calibration test classes (`TestGenerateCameraIntrinsics`, `TestGenerateCameraArray`, `TestGenerateRealRigArray`, `TestCreateScenario`, `TestGenerateSyntheticDetections`, `TestComputeCalibrationErrors`) — those are fast.
 
 ## Acceptance Criteria
 
-- [ ] `CalibrationConfig` has `auxiliary_cameras: list[str]` field (default empty)
-- [ ] `CameraCalibration` has `is_auxiliary: bool = False` field
-- [ ] `load_config()` parses `auxiliary_cameras` from YAML and validates no overlap with primary cameras
-- [ ] Stage 1 calibrates intrinsics for both primary and auxiliary cameras
-- [ ] Auxiliary cameras in `rational_model_cameras` use the 8-coefficient distortion model (verify no validation blocks this)
-- [ ] Detection runs on all cameras (primary + auxiliary)
-- [ ] Stages 2-3 operate on primary cameras only (auxiliary excluded)
-- [ ] `register_auxiliary_camera()` optimizes 7 params (6 DOF extrinsics + 1 interface distance) against fixed board poses
-- [ ] Auxiliary cameras appear in final `CalibrationResult` with `is_auxiliary=True`
-- [ ] `is_auxiliary` flag is saved/loaded in `calibration.json`
-- [ ] Pipeline prints auxiliary camera registration results
-- [ ] `example_config.yaml` includes commented-out `auxiliary_cameras` section
-- [ ] `aquacal init` generates config with commented-out `auxiliary_cameras` section
-- [ ] No test failures: `pytest tests/unit/ -v`
+- [ ] `TestIdealScenario` has 4 tests: rotation, translation, interface distance, RMS
+- [ ] `TestRealisticScenario` has 4 tests: rotation, translation, interface distance, RMS
+- [ ] `TestMinimalScenario` has 4 tests: rotation, translation, interface distance, RMS
+- [ ] All three calibration scenario classes marked `@pytest.mark.slow`
+- [ ] Class-scoped result fixtures (`ideal_result`, `realistic_result`, `minimal_result`) run optimization once per class
+- [ ] `conftest.py` scenario fixtures use `scope="class"`
+- [ ] No ground-truth fixture tests in calibration scenario classes (no camera count checks, no geometry checks)
+- [ ] `TestGenerateRealRigArray` unchanged (still has fixture geometry tests)
+- [ ] `TestGenerateSyntheticDetections` unchanged
+- [ ] `TestCreateScenario` unchanged
+- [ ] `TestComputeCalibrationErrors` unchanged
+- [ ] `_run_calibration_stages()` helper unchanged
+- [ ] All tests pass: `pytest tests/synthetic/test_full_pipeline.py -v`
+- [ ] Slow marker works: `pytest tests/synthetic/ -m "not slow" -v` runs only fast tests
 - [ ] No modifications to files outside "Modify" list
 
 ## Notes
 
-1. **Why not just use refractive_solve_pnp per-frame and average**: PnP estimates a camera-to-board transform per frame. Since the camera is fixed, we'd need to transform each estimate to world frame and average. This loses information — joint optimization over all frames simultaneously is more accurate and naturally handles outlier frames via robust loss.
+1. **Minimal scenario thresholds are guesses**: The minimal scenario (2 cameras, 0.5px noise) has never been tested for accuracy before — only that it runs. The thresholds above (3 deg, 30mm, 30mm, 3px) are generous starting points. If tests fail, loosen them — the important thing is that *some* accuracy check exists, not that it's tight.
 
-2. **Detection filtering for auxiliary cameras**: The `min_cameras_per_frame` filter counts how many cameras see the board. When run on all cameras, an auxiliary camera's detections inflate this count. This is fine — it's conservative (keeps more frames). But the Stage 2 pose graph only uses primary cameras, so connectivity is unaffected.
+2. **`compute_calibration_errors` uses ground-truth intrinsics**: Since `_run_calibration_stages()` passes ground-truth intrinsics to the result (line 90), `focal_length_error_percent` and `principal_point_error_px` will always be 0. No need to test these — they're trivially zero. Only test the 3 estimated quantities: rotation, translation, interface distance.
 
-3. **Validation**: Auxiliary cameras should probably be excluded from the validation metrics (reprojection RMS, 3D reconstruction) since their accuracy is expected to be lower. But their own reprojection RMS should be reported separately as a sanity check.
-
-4. **Initial extrinsics for auxiliary camera**: The initial guess matters. `refractive_solve_pnp` on a single frame gives a rough pose. A better approach might be to run PnP on multiple frames and take the median translation. But for a 7-param optimization with hundreds of frames, convergence from a rough initial guess should be fine.
-
-5. **Using all detections, not subsampled**: Stage 3b uses all frames (not the `max_calibration_frames`-subsampled set) since it's only 7 parameters — no memory/runtime concern. More data = better registration.
-
-6. **Serialization of `is_auxiliary`**: Check whether `save_calibration()` in `serialization.py` uses `dataclasses.asdict()` or manual field listing. If manual, `is_auxiliary` needs to be added explicitly.
+3. **Existing `TestComputeCalibrationErrors.test_perfect_match_gives_zero_errors`** already tests all 5 error metrics with a perfect-match result. That test stays as-is.
 
 ## Model Recommendation
 
-**Opus** — This task involves pipeline architecture changes (filtering cameras across stages), a new optimization function, config/serialization updates, and careful reasoning about which data flows where. The `register_auxiliary_camera()` function needs to correctly assemble residuals from fixed board poses, which requires understanding the coordinate conventions.
+**Sonnet** — Straightforward restructuring. Delete 2 tests, add missing tests with specified thresholds, refactor existing tests into consistent 4-test pattern. No logic changes.

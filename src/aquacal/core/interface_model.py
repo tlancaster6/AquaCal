@@ -11,12 +11,11 @@ class Interface:
     Planar refractive interface (air-water boundary).
 
     The interface is a horizontal plane at a specific Z-coordinate in the world frame.
-    Per-camera offsets allow for cameras at slightly different heights.
+    Each camera has an associated interface distance (distance from camera to water surface).
 
     Attributes:
         normal: Unit normal vector pointing from water toward air [0, 0, -1]
-        base_height: Z-coordinate of interface plane for reference camera
-        camera_offsets: Per-camera adjustments to base_height
+        camera_distances: Per-camera interface distances (distance from camera to water surface)
         n_air: Refractive index of air (default 1.0)
         n_water: Refractive index of water (default 1.333)
     """
@@ -24,8 +23,7 @@ class Interface:
     def __init__(
         self,
         normal: Vec3,
-        base_height: float,
-        camera_offsets: dict[str, float],
+        camera_distances: dict[str, float],
         n_air: float = 1.0,
         n_water: float = 1.333
     ):
@@ -34,23 +32,19 @@ class Interface:
 
         Args:
             normal: Unit normal vector pointing from water to air (typically [0,0,-1])
-            base_height: Z-coordinate of interface plane in world frame (e.g., 0.15 means
-                        interface is at Z=0.15m, which is 0.15m below a camera at Z=0)
-            camera_offsets: Per-camera offset from base_height. Reference camera should
-                           have offset=0. Positive offset means interface is further from
-                           that camera.
+            camera_distances: Per-camera interface distance (distance from camera to water surface).
+                            For a camera at world Z=0, this is the Z-coordinate of the water surface.
             n_air: Refractive index of air
             n_water: Refractive index of water
         """
         self.normal = normal / np.linalg.norm(normal)  # Ensure unit vector
-        self.base_height = base_height
-        self.camera_offsets = camera_offsets
+        self.camera_distances = camera_distances
         self.n_air = n_air
         self.n_water = n_water
 
     def get_interface_distance(self, camera_name: str) -> float:
         """
-        Get the effective interface Z-coordinate for a specific camera.
+        Get the interface distance for a specific camera.
 
         This equals the distance from camera to interface IF the camera is at Z=0.
 
@@ -58,12 +52,12 @@ class Interface:
             camera_name: Name of camera
 
         Returns:
-            base_height + camera_offsets[camera_name]
+            Interface distance for the specified camera
 
         Raises:
-            KeyError: If camera_name not in camera_offsets
+            KeyError: If camera_name not in camera_distances
         """
-        return self.base_height + self.camera_offsets[camera_name]
+        return self.camera_distances[camera_name]
 
     def get_interface_point(self, camera_center: Vec3, camera_name: str) -> Vec3:
         """
@@ -73,18 +67,18 @@ class Interface:
 
         Args:
             camera_center: Camera center in world coordinates [x, y, z]
-            camera_name: Name of camera (for offset lookup)
+            camera_name: Name of camera (for distance lookup)
 
         Returns:
             3D point on interface plane [x, y, z_interface]
 
         Note:
             Only uses camera_center[0] and camera_center[1] (XY position).
-            The Z-coordinate is determined by base_height + offset, not by
-            camera_center[2]. This is intentional — the interface is at a
+            The Z-coordinate is determined by the camera's interface distance,
+            not by camera_center[2]. This is intentional — the interface is at a
             fixed world Z position.
         """
-        z_interface = self.base_height + self.camera_offsets[camera_name]
+        z_interface = self.camera_distances[camera_name]
         return np.array([camera_center[0], camera_center[1], z_interface], dtype=np.float64)
 
     @property

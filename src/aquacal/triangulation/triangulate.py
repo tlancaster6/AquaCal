@@ -33,8 +33,8 @@ def triangulate_point(
     if len(observations) < 2:
         return None
 
-    # Build camera_offsets dict with ALL cameras
-    camera_offsets = {
+    # Build camera_distances dict with ALL cameras
+    camera_distances = {
         cam_name: calibration.cameras[cam_name].interface_distance
         for cam_name in calibration.cameras
     }
@@ -42,8 +42,7 @@ def triangulate_point(
     # Create single shared interface with all cameras
     interface = Interface(
         normal=calibration.interface.normal,
-        base_height=0.0,
-        camera_offsets=camera_offsets,
+        camera_distances=camera_distances,
         n_air=calibration.interface.n_air,
         n_water=calibration.interface.n_water,
     )

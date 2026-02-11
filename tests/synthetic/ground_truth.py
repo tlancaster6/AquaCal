@@ -448,8 +448,7 @@ def generate_synthetic_detections(
             camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
             interface = Interface(
                 normal=interface_normal,
-                base_height=0.0,
-                camera_offsets={cam_name: interface_distances[cam_name]},
+                camera_distances={cam_name: interface_distances[cam_name]},
             )
 
             corner_ids: list[int] = []

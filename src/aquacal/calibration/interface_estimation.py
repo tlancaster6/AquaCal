@@ -418,8 +418,7 @@ def register_auxiliary_camera(
         camera = Camera(camera_name, intrinsics, ext)
         interface = Interface(
             normal=interface_normal,
-            base_height=0.0,
-            camera_offsets={camera_name: iface_dist},
+            camera_distances={camera_name: iface_dist},
             n_air=n_air,
             n_water=n_water,
         )

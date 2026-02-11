@@ -435,8 +435,7 @@ def compute_residuals(
 
             interface = Interface(
                 normal=interface_normal,
-                base_height=0.0,
-                camera_offsets={cam_name: interface_distances[cam_name]},
+                camera_distances={cam_name: interface_distances[cam_name]},
                 n_air=n_air,
                 n_water=n_water,
             )

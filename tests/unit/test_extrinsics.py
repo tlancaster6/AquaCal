@@ -404,8 +404,7 @@ def _generate_refractive_detections(
     camera = Camera(cam_name, intrinsics_single, camera_ext)
     interface = Interface(
         normal=np.array([0.0, 0.0, -1.0]),
-        base_height=0.0,
-        camera_offsets={cam_name: interface_distance},
+        camera_distances={cam_name: interface_distance},
         n_air=n_air,
         n_water=n_water,
     )

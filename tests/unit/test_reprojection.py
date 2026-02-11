@@ -312,8 +312,7 @@ class TestReprojectionErrors:
         camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
         interface = Interface(
             normal=np.array([0.0, 0.0, -1.0], dtype=np.float64),
-            base_height=0.0,
-            camera_offsets={cam_name: interface_distances[cam_name]},
+            camera_distances={cam_name: interface_distances[cam_name]},
         )
 
         # Generate synthetic detection for this camera/frame
@@ -421,8 +420,7 @@ class TestReprojectionErrors:
         camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
         interface = Interface(
             normal=np.array([0.0, 0.0, -1.0], dtype=np.float64),
-            base_height=0.0,
-            camera_offsets={cam_name: interface_distances[cam_name]},
+            camera_distances={cam_name: interface_distances[cam_name]},
         )
 
         # Create a detection with some corners
