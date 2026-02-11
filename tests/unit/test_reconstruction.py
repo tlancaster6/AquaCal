@@ -455,7 +455,7 @@ def test_compute_3d_distance_errors_multiple_frames(
 def test_compute_3d_distance_errors_empty(
     board_config, board_geometry, interface_params, camera_intrinsics
 ):
-    """Test that empty detections return zero-valued DistanceErrors."""
+    """Test that empty detections return NaN-valued DistanceErrors."""
     cam1 = create_camera_calibration(
         "cam1",
         camera_intrinsics,
@@ -474,9 +474,9 @@ def test_compute_3d_distance_errors_empty(
 
     errors = compute_3d_distance_errors(calibration, detections, board_geometry)
 
-    assert errors.mean == 0.0
-    assert errors.std == 0.0
-    assert errors.max_error == 0.0
+    assert np.isnan(errors.mean)
+    assert np.isnan(errors.std)
+    assert np.isnan(errors.max_error)
     assert errors.num_comparisons == 0
 
 

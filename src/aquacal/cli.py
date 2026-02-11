@@ -140,7 +140,7 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
 
     # Run calibration
     try:
-        result = run_calibration(config_path)
+        result = run_calibration(config_path, verbose=args.verbose)
         return 0
     except CalibrationError as e:
         print(f"Calibration failed: {e}", file=sys.stderr)

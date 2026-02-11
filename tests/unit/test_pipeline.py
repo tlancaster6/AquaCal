@@ -1160,3 +1160,32 @@ class TestRunCalibrationFromConfig:
 
             # Check that initial_interface_distances was passed
             assert call_args[1]["initial_interface_distances"] == initial_distances
+
+    def test_run_calibration_from_config_estimates_validation_poses(
+        self, mock_calibration_stages, sample_board_config, capsys
+    ):
+        """Test that validation frame board poses are estimated and reported."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = CalibrationConfig(
+                board=sample_board_config,
+                camera_names=["cam0", "cam1"],
+                intrinsic_video_paths={
+                    "cam0": Path("/path/cam0.mp4"),
+                    "cam1": Path("/path/cam1.mp4"),
+                },
+                extrinsic_video_paths={
+                    "cam0": Path("/path/cam0_uw.mp4"),
+                    "cam1": Path("/path/cam1_uw.mp4"),
+                },
+                output_dir=Path(tmpdir),
+                holdout_fraction=0.2,
+            )
+
+            run_calibration_from_config(config)
+
+            captured = capsys.readouterr()
+
+            # Check that validation pose estimation message is printed
+            assert "[Validation] Estimating board poses for held-out frames" in captured.out
+            assert "Estimated" in captured.out
+            assert "validation frame poses" in captured.out

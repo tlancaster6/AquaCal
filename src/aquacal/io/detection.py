@@ -125,9 +125,12 @@ def detect_all_frames(
     try:
         camera_names = video_set.camera_names
         total_frames = video_set.frame_count
+        total_to_process = max(1, total_frames // frame_step)
+        processed_count = 0
         frames: dict[int, FrameDetections] = {}
 
         for frame_idx, frame_dict in video_set.iterate_frames(step=frame_step):
+            processed_count += 1
             frame_detections: dict[str, Detection] = {}
 
             for cam_name, image in frame_dict.items():
@@ -158,7 +161,7 @@ def detect_all_frames(
 
             # Progress callback
             if progress_callback is not None:
-                progress_callback(frame_idx + 1, total_frames)
+                progress_callback(processed_count, total_to_process)
 
         return DetectionResult(
             frames=frames,

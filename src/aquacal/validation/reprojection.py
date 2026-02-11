@@ -1,6 +1,7 @@
 """Reprojection error computation for calibration validation."""
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
@@ -104,7 +105,8 @@ def compute_reprojection_errors(
     def compute_rms(residuals: list[NDArray]) -> float:
         """Compute RMS from list of (2,) residual arrays."""
         if not residuals:
-            return 0.0
+            warnings.warn("No residuals to compute RMS — returning NaN")
+            return float("nan")
         arr = np.array(residuals)  # (N, 2)
         return np.sqrt(np.mean(arr[:, 0] ** 2 + arr[:, 1] ** 2))
 

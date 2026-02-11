@@ -429,7 +429,7 @@ class TestReprojectionErrors:
 
         # Should have zero observations
         assert errors.num_observations == 0
-        assert errors.rms == 0.0
+        assert np.isnan(errors.rms)
         assert errors.residuals.shape == (0, 2)
         assert len(errors.per_camera) == 0
         assert len(errors.per_frame) == 0

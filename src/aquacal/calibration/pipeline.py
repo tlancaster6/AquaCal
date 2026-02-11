@@ -29,7 +29,10 @@ from aquacal.config.schema import (
 from aquacal.core.board import BoardGeometry
 from aquacal.calibration.intrinsics import calibrate_intrinsics_all
 from aquacal.calibration.extrinsics import build_pose_graph, estimate_extrinsics
-from aquacal.calibration.interface_estimation import optimize_interface
+from aquacal.calibration.interface_estimation import (
+    optimize_interface,
+    _compute_initial_board_poses,
+)
 from aquacal.calibration.refinement import joint_refinement
 from aquacal.io.detection import detect_all_frames
 from aquacal.io.serialization import save_calibration
@@ -261,7 +264,7 @@ def _save_board_reference_images(
         cv2.imwrite(str(output_dir / "board_intrinsic.png"), intr_img)
 
 
-def run_calibration(config_path: str | Path) -> CalibrationResult:
+def run_calibration(config_path: str | Path, verbose: bool = False) -> CalibrationResult:
     """
     Run complete calibration pipeline from config file.
 
@@ -269,6 +272,7 @@ def run_calibration(config_path: str | Path) -> CalibrationResult:
 
     Args:
         config_path: Path to config.yaml file
+        verbose: If True, enable per-iteration progress output from optimizers
 
     Returns:
         Complete CalibrationResult
@@ -278,10 +282,10 @@ def run_calibration(config_path: str | Path) -> CalibrationResult:
         CalibrationError: If any calibration stage fails
     """
     config = load_config(config_path)
-    return run_calibration_from_config(config)
+    return run_calibration_from_config(config, verbose=verbose)
 
 
-def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
+def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False) -> CalibrationResult:
     """
     Run complete calibration pipeline from configuration object.
 
@@ -299,6 +303,7 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
 
     Args:
         config: Complete calibration configuration
+        verbose: If True, enable per-iteration progress output from optimizers
 
     Returns:
         CalibrationResult with all calibrations and diagnostics
@@ -390,6 +395,7 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
         loss=config.robust_loss,
         loss_scale=config.loss_scale,
         min_corners=config.min_corners_per_frame,
+        verbose=2 if verbose else 0,
     )
     elapsed = time.perf_counter() - t0
     print(f"  Stage 3 RMS: {stage3_rms:.3f} pixels ({elapsed:.1f}s)")
@@ -420,6 +426,7 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
             n_water=config.n_water,
             loss=config.robust_loss,
             loss_scale=config.loss_scale,
+            verbose=2 if verbose else 0,
         )
         elapsed = time.perf_counter() - t0
         print(f"  Stage 4 RMS: {final_rms:.3f} pixels ({elapsed:.1f}s)")
@@ -433,6 +440,31 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
 
     # Convert poses list to dict
     board_poses_dict = {bp.frame_idx: bp for bp in final_poses}
+
+    # Estimate board poses for validation frames
+    print("\n[Validation] Estimating board poses for held-out frames...")
+    val_initial_poses = _compute_initial_board_poses(
+        val_detections,
+        final_intrinsics,
+        final_extrinsics,
+        board,
+        min_corners=config.min_corners_per_frame,
+        n_water=config.n_water,
+    )
+
+    val_refined_poses = _estimate_validation_poses(
+        val_detections,
+        val_initial_poses,
+        final_intrinsics,
+        final_extrinsics,
+        final_distances,
+        board,
+        interface_normal,
+        config.n_air,
+        config.n_water,
+    )
+    board_poses_dict.update(val_refined_poses)
+    print(f"  Estimated {len(val_refined_poses)} validation frame poses")
 
     # --- Validation ---
     print("\n[Validation] Computing errors on held-out data...")
@@ -469,13 +501,19 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
     reproj_errors = compute_reprojection_errors(
         temp_result, val_detections, board_poses_dict
     )
-    print(f"  Validation reprojection RMS: {reproj_errors.rms:.3f} pixels")
+    if np.isnan(reproj_errors.rms):
+        print("  WARNING: Validation reprojection RMS: N/A (no valid observations)")
+    else:
+        print(f"  Validation reprojection RMS: {reproj_errors.rms:.3f} pixels")
 
     # 3D reconstruction errors
     reconstruction_errors = compute_3d_distance_errors(
         temp_result, val_detections, board
     )
-    print(f"  3D reconstruction mean error: {reconstruction_errors.mean*1000:.2f} mm")
+    if np.isnan(reconstruction_errors.mean):
+        print("  WARNING: 3D reconstruction mean error: N/A (no valid comparisons)")
+    else:
+        print(f"  3D reconstruction mean error: {reconstruction_errors.mean*1000:.2f} mm")
 
     # --- Generate Diagnostics ---
     print("\n[Diagnostics] Generating report...")
@@ -538,14 +576,117 @@ def run_calibration_from_config(config: CalibrationConfig) -> CalibrationResult:
 
     print("\n" + "=" * 60)
     print("Calibration complete!")
-    print(f"  Reprojection RMS: {reproj_errors.rms:.3f} pixels")
-    print(
-        f"  3D error: {reconstruction_errors.mean*1000:.2f} "
-        f"± {reconstruction_errors.std*1000:.2f} mm"
-    )
+    if np.isnan(reproj_errors.rms):
+        print("  Reprojection RMS: N/A")
+    else:
+        print(f"  Reprojection RMS: {reproj_errors.rms:.3f} pixels")
+    if np.isnan(reconstruction_errors.mean):
+        print("  3D error: N/A")
+    else:
+        print(
+            f"  3D error: {reconstruction_errors.mean*1000:.2f} "
+            f"± {reconstruction_errors.std*1000:.2f} mm"
+        )
     print("=" * 60)
 
     return result
+
+
+def _estimate_validation_poses(
+    detections: DetectionResult,
+    initial_poses: dict[int, BoardPose],
+    intrinsics: dict[str, CameraIntrinsics],
+    extrinsics: dict[str, CameraExtrinsics],
+    interface_distances: dict[str, float],
+    board: BoardGeometry,
+    interface_normal: np.ndarray,
+    n_air: float,
+    n_water: float,
+) -> dict[int, BoardPose]:
+    """Refine board poses for validation frames via per-frame optimization.
+
+    For each frame, minimizes refractive reprojection error over the 6 pose
+    parameters (rvec, tvec) while holding all camera parameters fixed.
+
+    Args:
+        detections: Detection results for validation frames
+        initial_poses: PnP-initialized board poses
+        intrinsics: Per-camera intrinsics
+        extrinsics: Per-camera extrinsics
+        interface_distances: Per-camera interface distances
+        board: Board geometry
+        interface_normal: Interface normal vector
+        n_air: Refractive index of air
+        n_water: Refractive index of water
+
+    Returns:
+        Dict mapping frame_idx to refined BoardPose
+    """
+    from scipy.optimize import least_squares
+
+    from aquacal.core.camera import Camera
+    from aquacal.core.interface_model import Interface
+    from aquacal.core.refractive_geometry import refractive_project_fast
+
+    refined_poses = {}
+
+    for frame_idx, initial_pose in initial_poses.items():
+        if frame_idx not in detections.frames:
+            continue
+        frame_det = detections.frames[frame_idx]
+
+        # Build cameras and interface objects
+        cameras = {}
+        for cam_name in frame_det.detections:
+            if cam_name not in intrinsics:
+                continue
+            cameras[cam_name] = Camera(
+                cam_name, intrinsics[cam_name], extrinsics[cam_name]
+            )
+
+        interface = Interface(
+            normal=interface_normal,
+            base_height=0.0,
+            camera_offsets=interface_distances,
+            n_air=n_air,
+            n_water=n_water,
+        )
+
+        # Cost function: refractive reprojection residuals for this frame
+        def frame_residuals(params):
+            rvec = params[:3]
+            tvec = params[3:]
+            corners_3d = board.transform_corners(rvec, tvec)
+
+            residuals = []
+            for cam_name, det in frame_det.detections.items():
+                if cam_name not in cameras:
+                    continue
+                camera = cameras[cam_name]
+                for i, corner_id in enumerate(det.corner_ids):
+                    pt_3d = corners_3d[int(corner_id)]
+                    projected = refractive_project_fast(
+                        camera, interface, pt_3d
+                    )
+                    if projected is not None:
+                        residuals.append(det.corners_2d[i, 0] - projected[0])
+                        residuals.append(det.corners_2d[i, 1] - projected[1])
+
+            return residuals if residuals else [0.0, 0.0]
+
+        x0 = np.concatenate([initial_pose.rvec, initial_pose.tvec])
+
+        result = least_squares(
+            frame_residuals, x0, method="lm", max_nfev=100
+        )
+
+        refined_poses[frame_idx] = BoardPose(
+            frame_idx=frame_idx,
+            rvec=result.x[:3],
+            tvec=result.x[3:],
+        )
+
+    return refined_poses
 
 
 def _build_calibration_result(

@@ -84,6 +84,11 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.12** Add legacy ChArUco board pattern support: Add `legacy_pattern: bool = False` to `BoardConfig`, call `setLegacyPattern(True)` in `get_opencv_board()` when set. Parse from both `board` and `intrinsic_board` config sections. Needed for older printed boards that have a marker in the top-left cell instead of a solid square.
 
+- [x] **P.13** Fix validation metrics reporting zero
+
+- [x] **P.14** Fix progress feedback gaps: Fix detection callback passing raw frame indices instead of processed count, add `verbose` parameter to `optimize_interface()` and `joint_refinement()`, and pass `verbose=1` from pipeline for Stage 3/4 optimizer progress.: Estimate board poses for held-out validation frames via per-frame refractive optimization (6 params, camera params fixed), and change silent 0.0 fallbacks in validation modules to warn and return NaN.
+
+
 ---
 
 ## Future: Advanced Optimization

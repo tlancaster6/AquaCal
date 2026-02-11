@@ -1,6 +1,7 @@
 """3D reconstruction metrics using known ChArUco geometry."""
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
@@ -139,10 +140,11 @@ def compute_3d_distance_errors(
                         per_pair[pair_key] = error
 
     if not all_errors:
+        warnings.warn("No valid 3D distance comparisons — returning NaN")
         return DistanceErrors(
-            mean=0.0,
-            std=0.0,
-            max_error=0.0,
+            mean=float("nan"),
+            std=float("nan"),
+            max_error=float("nan"),
             num_comparisons=0,
             per_corner_pair=per_pair,
         )

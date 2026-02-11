@@ -47,6 +47,7 @@ def joint_refinement(
     min_corners: int = 4,
     use_fast_projection: bool = True,
     use_sparse_jacobian: bool = True,
+    verbose: int = 0,
 ) -> tuple[
     dict[str, CameraExtrinsics],
     dict[str, float],
@@ -79,6 +80,8 @@ def joint_refinement(
             Only works with horizontal interface (normal = [0, 0, -1]).
         use_sparse_jacobian: Use sparse Jacobian structure (default True).
             Dramatically improves performance for large parameter counts.
+        verbose: Verbosity level for scipy.optimize.least_squares (default 0).
+            0 = silent, 1 = one-line per iteration, 2 = full per-iteration report.
 
     Returns:
         Tuple of:
@@ -186,7 +189,7 @@ def joint_refinement(
         f_scale=loss_scale,
         bounds=(lower, upper),
         jac=jac,
-        verbose=0,
+        verbose=verbose,
     )
 
     if result.status <= 0:

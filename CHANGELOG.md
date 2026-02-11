@@ -8,6 +8,60 @@ Format: Agents append entries at the top (below this header) with the date, file
 
 <!-- Agents: add new entries below this line, above previous entries -->
 
+## 2026-02-10 (Task P.14)
+### [src/aquacal/io/detection.py]
+- Fixed progress callback to report processed frame count instead of raw video frame indices
+- Added `total_to_process` calculation and `processed_count` tracking in `detect_all_frames()` loop
+- Pipeline's 10%-interval progress logic now triggers correctly with frame_step > 1
+
+### [src/aquacal/calibration/interface_estimation.py]
+- Added `verbose: int = 0` parameter to `optimize_interface()` function signature
+- Pass-through verbose level to scipy.optimize.least_squares for intermediate optimization output
+- Updated docstring to document new verbose parameter
+
+### [src/aquacal/calibration/refinement.py]
+- Added `verbose: int = 0` parameter to `joint_refinement()` function signature
+- Pass-through verbose level to scipy.optimize.least_squares for intermediate optimization output
+- Updated docstring to document new verbose parameter
+
+### [src/aquacal/calibration/pipeline.py]
+- Added `verbose: bool = False` parameter to `run_calibration()` and `run_calibration_from_config()`
+- Stage 3 and Stage 4 optimizers now pass `verbose=2 if verbose else 0` for per-iteration progress when requested
+- Updated docstrings for both functions to document verbose parameter
+
+### [src/aquacal/cli.py]
+- Wired `args.verbose` flag through to `run_calibration()` in `cmd_calibrate()`
+- CLI `-v`/`--verbose` flag now enables scipy `verbose=2` output for detailed per-iteration optimizer progress
+
+### [tests/unit/test_detection.py]
+- Added `test_progress_callback_with_frame_step()` to verify sequential processed frame counts (1..N) with frame_step > 1
+
+## 2026-02-10
+### [src/aquacal/calibration/pipeline.py]
+- Fixed bug where validation metrics always reported 0.000 by estimating board poses for validation frames
+- Added `_estimate_validation_poses()` helper that refines PnP-initialized poses via per-frame refractive optimization
+- Added import of `_compute_initial_board_poses` from interface_estimation module
+- Updated validation section to estimate and merge validation frame poses into `board_poses_dict` before computing metrics
+- Updated print statements to handle NaN gracefully when no valid observations or comparisons exist
+
+### [src/aquacal/validation/reprojection.py]
+- Fixed silent 0.0 fallback in `compute_rms()` helper to return NaN and emit warning when no residuals exist
+- Added `import warnings` for warning emission
+
+### [src/aquacal/validation/reconstruction.py]
+- Fixed silent 0.0 fallback in `compute_3d_distance_errors()` to return NaN and emit warning when no valid comparisons exist
+- Added `import warnings` for warning emission
+
+### [tests/unit/test_pipeline.py]
+- Added `test_run_calibration_from_config_estimates_validation_poses()` to verify validation pose estimation
+
+### [tests/unit/test_reprojection.py]
+- Updated `test_empty_detections()` to check for NaN instead of 0.0 when no residuals exist
+
+### [tests/unit/test_reconstruction.py]
+- Updated `test_compute_3d_distance_errors_empty()` to check for NaN instead of 0.0 when no comparisons exist
+- Updated test docstring to reflect NaN-valued returns
+
 ## 2026-02-10
 ### [src/aquacal/config/schema.py]
 - Added `legacy_pattern: bool = False` field to `BoardConfig` dataclass

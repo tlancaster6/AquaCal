@@ -205,6 +205,19 @@ class TestDetectAllFrames:
         assert len(calls) == 10  # 10 frames
         assert all(total == 10 for _, total in calls)
 
+    def test_progress_callback_with_frame_step(self, board, test_videos_with_charuco):
+        """Callback receives sequential processed counts with frame_step > 1."""
+        calls = []
+        def callback(current, total):
+            calls.append((current, total))
+
+        # With 10 total frames and frame_step=2, should process 5 frames
+        detect_all_frames(test_videos_with_charuco, board, frame_step=2, progress_callback=callback)
+
+        # Should have 5 calls with sequential counts
+        assert len(calls) == 5
+        assert calls == [(1, 5), (2, 5), (3, 5), (4, 5), (5, 5)]
+
     def test_returns_correct_structure(self, board, test_videos_with_charuco):
         """Returns properly structured DetectionResult."""
         result = detect_all_frames(test_videos_with_charuco, board)

@@ -138,6 +138,7 @@ def optimize_interface(
     min_corners: int = 4,
     use_fast_projection: bool = True,
     use_sparse_jacobian: bool = True,
+    verbose: int = 0,
 ) -> tuple[dict[str, CameraExtrinsics], dict[str, float], list[BoardPose], float]:
     """
     Jointly optimize camera extrinsics, interface distances, and board poses.
@@ -164,6 +165,8 @@ def optimize_interface(
             Only works with horizontal interface (normal = [0, 0, -1]).
         use_sparse_jacobian: Use sparse Jacobian structure (default True).
             Dramatically improves performance for large camera arrays.
+        verbose: Verbosity level for scipy.optimize.least_squares (default 0).
+            0 = silent, 1 = one-line per iteration, 2 = full per-iteration report.
 
     Returns:
         Tuple of:
@@ -271,7 +274,7 @@ def optimize_interface(
         f_scale=loss_scale,
         bounds=(lower, upper),
         jac=jac,
-        verbose=0,
+        verbose=verbose,
     )
 
     if result.status <= 0:
