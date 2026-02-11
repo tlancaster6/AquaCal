@@ -187,6 +187,7 @@ def build_jacobian_sparsity(
     frame_order: list[int],
     min_corners: int,
     refine_intrinsics: bool = False,
+    water_z_weight: float = 0.0,
 ) -> NDArray[np.int8]:
     """
     Build sparse Jacobian structure matrix.
@@ -197,6 +198,9 @@ def build_jacobian_sparsity(
     - Board pose for that frame: 6 params
     - Camera intrinsics for that camera: 4 params (if refine_intrinsics)
 
+    When water_z_weight > 0, appends N_cameras rows for regularization
+    residuals that depend on all extrinsic and interface distance params.
+
     Args:
         detections: Detection results
         reference_camera: Name of reference camera (no extrinsic params)
@@ -204,6 +208,7 @@ def build_jacobian_sparsity(
         frame_order: Ordered list of frame indices
         min_corners: Minimum corners per detection
         refine_intrinsics: Whether intrinsics are in the parameter vector
+        water_z_weight: Weight for water surface regularization (0.0 = disabled)
 
     Returns:
         Sparse matrix of shape (n_residuals, n_params) with 1s where
@@ -277,6 +282,16 @@ def build_jacobian_sparsity(
                 # Two residuals (x and y) with same sparsity pattern
                 residual_rows.append(row)
                 residual_rows.append(row.copy())
+
+    # Append sparsity rows for water surface regularization residuals
+    if water_z_weight > 0.0:
+        for _ in camera_order:
+            row = np.zeros(n_params, dtype=np.int8)
+            # Each regularization residual depends on all extrinsic and
+            # interface distance params (through the mean coupling)
+            row[:n_extrinsic_params] = 1
+            row[n_extrinsic_params : n_extrinsic_params + n_distance_params] = 1
+            residual_rows.append(row)
 
     return np.array(residual_rows, dtype=np.int8)
 
@@ -354,12 +369,16 @@ def compute_residuals(
     min_corners: int,
     refine_intrinsics: bool = False,
     use_fast_projection: bool = True,
+    water_z_weight: float = 0.0,
 ) -> NDArray[np.float64]:
     """
     Compute reprojection residuals for all observations.
 
     When refine_intrinsics=False, intrinsics are taken from base_intrinsics.
     When refine_intrinsics=True, intrinsics are unpacked from the parameter vector.
+
+    When water_z_weight > 0, appends N_cameras regularization residuals that
+    penalize inconsistency in the inferred water surface Z across cameras.
 
     Args:
         params: Current parameter vector
@@ -377,9 +396,12 @@ def compute_residuals(
         min_corners: Minimum corners per detection
         refine_intrinsics: Whether intrinsics are being refined
         use_fast_projection: If True, use fast Newton-based projection
+        water_z_weight: Weight for water surface consistency regularization.
+            0.0 disables regularization (default).
 
     Returns:
-        1D array of residuals [r0_x, r0_y, r1_x, r1_y, ...] in pixels
+        1D array of residuals [r0_x, r0_y, r1_x, r1_y, ...] in pixels,
+        optionally followed by N_cameras regularization residuals.
     """
     extrinsics, interface_distances, board_poses, intrinsics = unpack_params(
         params,
@@ -437,6 +459,17 @@ def compute_residuals(
                             projected[1] - detected_px[1],
                         ]
                     )
+
+    # Append water surface consistency regularization residuals
+    if water_z_weight > 0.0:
+        water_zs = []
+        for cam_name in camera_order:
+            C = extrinsics[cam_name].C
+            water_zs.append(C[2] + interface_distances[cam_name])
+        water_zs = np.array(water_zs)
+        water_z_mean = np.mean(water_zs)
+        for wz in water_zs:
+            residuals.append(water_z_weight * (wz - water_z_mean))
 
     return np.array(residuals, dtype=np.float64)
 

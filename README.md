@@ -199,9 +199,9 @@ The pipeline estimates camera parameters in four stages, progressing from simple
 - Per-camera interface distances (1 parameter per camera)
 - Board poses (6 DOF per observed frame)
 
-The cost function minimizes reprojection error: for each detected corner, the known 3D board point is projected through the refractive model to a predicted pixel, and the residual against the detected pixel is computed. A Huber robust loss reduces sensitivity to outlier detections.
+The cost function minimizes reprojection error: for each detected corner, the known 3D board point is projected through the refractive model to a predicted pixel, and the residual against the detected pixel is computed. A Huber robust loss reduces sensitivity to outlier detections. An optional water surface consistency regularization (`water_z_weight`) adds soft residuals that penalize disagreement in the inferred water surface Z-coordinate (camera Z + interface distance) across cameras, breaking the degeneracy between camera height and interface distance that arises with downward-looking geometries.
 
-**Stage 4 — Optional Intrinsic Refinement**: Optionally re-refines focal lengths and principal points alongside extrinsics and interface distances. Useful when in-air intrinsics are not fully representative of the underwater imaging condition.
+**Stage 4 — Optional Intrinsic Refinement**: Optionally re-refines focal lengths and principal points alongside extrinsics and interface distances, with the same water surface regularization applied. Useful when in-air intrinsics are not fully representative of the underwater imaging condition.
 
 ### Scalability
 

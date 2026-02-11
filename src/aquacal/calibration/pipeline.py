@@ -160,6 +160,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     loss_scale = opt.get("loss_scale", 1.0)
     max_cal_frames_raw = opt.get("max_calibration_frames", None)
     max_cal_frames = int(max_cal_frames_raw) if max_cal_frames_raw is not None else None
+    water_z_weight = opt.get("water_z_weight", 0.0)
 
     # Detection settings
     det = data.get("detection", {})
@@ -195,6 +196,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         save_detailed_residuals=save_detailed,
         initial_interface_distances=initial_interface_distances,
         rational_model_cameras=rational_model_cameras,
+        water_z_weight=water_z_weight,
     )
 
 
@@ -487,6 +489,7 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         loss_scale=config.loss_scale,
         min_corners=config.min_corners_per_frame,
         verbose=2 if verbose else 0,
+        water_z_weight=config.water_z_weight,
     )
     elapsed = time.perf_counter() - t0
     print(f"  Stage 3 RMS: {stage3_rms:.3f} pixels ({elapsed:.1f}s)")
@@ -532,6 +535,7 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
             loss=config.robust_loss,
             loss_scale=config.loss_scale,
             verbose=2 if verbose else 0,
+            water_z_weight=config.water_z_weight,
         )
         elapsed = time.perf_counter() - t0
         print(f"  Stage 4 RMS: {final_rms:.3f} pixels ({elapsed:.1f}s)")

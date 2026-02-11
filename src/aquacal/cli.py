@@ -364,6 +364,8 @@ def _generate_config_yaml(
         "optimization:",
         '  robust_loss: "huber"   # Options: "huber", "soft_l1", "linear"',
         "  loss_scale: 1.0        # Residual scale for robust loss (pixels)",
+        "  # max_calibration_frames: 150  # Max frames for Stage 3/4 (null = no limit)",
+        "  # water_z_weight: 10.0  # Regularization for water surface consistency (0 = disabled)",
         "",
         "detection:",
         "  min_corners: 8         # Minimum corners per frame to use detection",

@@ -62,6 +62,9 @@ optimization:
   loss_scale: 1.0        # Residual scale for robust loss (pixels)
   # max_calibration_frames: 150  # Max frames for Stage 3/4 optimization (null = no limit)
                                   # Stages 1-2 still use all frames. Reduces memory and runtime.
+  # water_z_weight: 10.0  # Regularization for water surface consistency (0 = disabled)
+                           # Penalizes disagreement in inferred water surface Z across cameras.
+                           # Breaks the camera-height / interface-distance degeneracy.
 
 detection:
   min_corners: 8         # Minimum corners per frame to use detection

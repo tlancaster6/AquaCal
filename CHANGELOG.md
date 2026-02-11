@@ -9,6 +9,19 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-11
+### [src/aquacal/calibration/_optim_common.py]
+- Added `water_z_weight` parameter to `compute_residuals()` and `build_jacobian_sparsity()`
+- When weight > 0, appends N_cameras soft regularization residuals penalizing water surface Z inconsistency across cameras, breaking the depth-interface distance degeneracy
+- Sparsity rows cover all extrinsic + interface distance params (mean couples all cameras)
+
+### [src/aquacal/calibration/interface_estimation.py, refinement.py]
+- Added `water_z_weight` parameter to `optimize_interface()` and `joint_refinement()`, forwarded to cost_args and sparsity builder
+
+### [src/aquacal/config/schema.py, src/aquacal/calibration/pipeline.py]
+- Added `water_z_weight: float = 0.0` to `CalibrationConfig`; parsed from `optimization.water_z_weight` in YAML
+- Pipeline passes `water_z_weight` to Stage 3 and Stage 4 optimizer calls
+
+## 2026-02-11
 ### [src/aquacal/config/schema.py]
 - Added `max_calibration_frames: int | None` field to `CalibrationConfig` dataclass
 - When set, uniformly subsamples calibration frames to this limit before Stage 3/4 optimization

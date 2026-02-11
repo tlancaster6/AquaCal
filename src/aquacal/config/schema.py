@@ -221,6 +221,7 @@ class CalibrationConfig:
     save_detailed_residuals: bool = True
     initial_interface_distances: dict[str, float] | None = None
     rational_model_cameras: list[str] = field(default_factory=list)
+    water_z_weight: float = 0.0  # 0.0 = disabled
 
 
 @dataclass

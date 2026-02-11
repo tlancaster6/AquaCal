@@ -48,6 +48,7 @@ def joint_refinement(
     use_fast_projection: bool = True,
     use_sparse_jacobian: bool = True,
     verbose: int = 0,
+    water_z_weight: float = 0.0,
 ) -> tuple[
     dict[str, CameraExtrinsics],
     dict[str, float],
@@ -82,6 +83,8 @@ def joint_refinement(
             Dramatically improves performance for large parameter counts.
         verbose: Verbosity level for scipy.optimize.least_squares (default 0).
             0 = silent, 1 = one-line per iteration, 2 = full per-iteration report.
+        water_z_weight: Weight for water surface consistency regularization.
+            0.0 disables regularization (default).
 
     Returns:
         Tuple of:
@@ -162,6 +165,7 @@ def joint_refinement(
         min_corners,
         refine_intrinsics,
         use_fast_projection,
+        water_z_weight,
     )
 
     # Build sparse Jacobian if enabled
@@ -174,6 +178,7 @@ def joint_refinement(
             frame_order,
             min_corners,
             refine_intrinsics=refine_intrinsics,
+            water_z_weight=water_z_weight,
         )
         jac = make_sparse_jacobian_func(
             compute_residuals, cost_args, jac_sparsity, (lower, upper),

@@ -130,6 +130,7 @@ def optimize_interface(
     use_fast_projection: bool = True,
     use_sparse_jacobian: bool = True,
     verbose: int = 0,
+    water_z_weight: float = 0.0,
 ) -> tuple[dict[str, CameraExtrinsics], dict[str, float], list[BoardPose], float]:
     """
     Jointly optimize camera extrinsics, interface distances, and board poses.
@@ -158,6 +159,8 @@ def optimize_interface(
             Dramatically improves performance for large camera arrays.
         verbose: Verbosity level for scipy.optimize.least_squares (default 0).
             0 = silent, 1 = one-line per iteration, 2 = full per-iteration report.
+        water_z_weight: Weight for water surface consistency regularization.
+            0.0 disables regularization (default).
 
     Returns:
         Tuple of:
@@ -242,6 +245,7 @@ def optimize_interface(
         min_corners,
         False,  # refine_intrinsics
         use_fast_projection,
+        water_z_weight,
     )
 
     # Build sparse Jacobian if enabled
@@ -253,6 +257,7 @@ def optimize_interface(
             camera_order,
             frame_order,
             min_corners,
+            water_z_weight=water_z_weight,
         )
         jac = make_sparse_jacobian_func(
             compute_residuals, cost_args, jac_sparsity, (lower, upper),
