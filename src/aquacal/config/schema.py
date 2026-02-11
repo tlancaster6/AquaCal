@@ -190,6 +190,9 @@ class CalibrationConfig:
         min_cameras_per_frame: Minimum cameras required to use a frame
         frame_step: Process every Nth frame (1 = all frames, default 1)
         holdout_fraction: Fraction of frames to hold out for validation
+        max_calibration_frames: Maximum number of frames for Stages 3-4 optimization.
+            None (default) = use all calibration frames. When set, calibration frames
+            are uniformly subsampled to this limit before optimization.
         save_detailed_residuals: Whether to save per-corner residuals
         initial_interface_distances: Optional dict mapping camera names to approximate
             camera-to-water-surface distances in meters. When None, all cameras default
@@ -214,6 +217,7 @@ class CalibrationConfig:
     min_cameras_per_frame: int = 2
     frame_step: int = 1  # Process every Nth frame (1 = all frames)
     holdout_fraction: float = 0.2  # Random selection; frames are held out entirely (not per-detection)
+    max_calibration_frames: int | None = None  # None = no limit, use all frames
     save_detailed_residuals: bool = True
     initial_interface_distances: dict[str, float] | None = None
     rational_model_cameras: list[str] = field(default_factory=list)

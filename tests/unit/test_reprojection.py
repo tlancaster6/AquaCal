@@ -425,7 +425,8 @@ class TestReprojectionErrors:
         board_poses = {}
 
         # Should not crash
-        errors = compute_reprojection_errors(calibration_result, detections, board_poses)
+        with pytest.warns(UserWarning, match="No residuals to compute RMS"):
+            errors = compute_reprojection_errors(calibration_result, detections, board_poses)
 
         # Should have zero observations
         assert errors.num_observations == 0

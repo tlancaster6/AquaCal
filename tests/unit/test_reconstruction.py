@@ -553,7 +553,8 @@ def test_compute_3d_distance_errors_empty(
 
     detections = DetectionResult(frames={}, camera_names=["cam1"], total_frames=0)
 
-    errors = compute_3d_distance_errors(calibration, detections, board_geometry)
+    with pytest.warns(UserWarning, match="No valid 3D distance comparisons"):
+        errors = compute_3d_distance_errors(calibration, detections, board_geometry)
 
     assert np.isnan(errors.mean)
     assert np.isnan(errors.std)

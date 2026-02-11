@@ -60,6 +60,8 @@ interface:
 optimization:
   robust_loss: "huber"   # Options: "huber", "soft_l1", "linear"
   loss_scale: 1.0        # Residual scale for robust loss (pixels)
+  # max_calibration_frames: 150  # Max frames for Stage 3/4 optimization (null = no limit)
+                                  # Stages 1-2 still use all frames. Reduces memory and runtime.
 
 detection:
   min_corners: 8         # Minimum corners per frame to use detection

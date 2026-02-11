@@ -158,6 +158,8 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     opt = data.get("optimization", {})
     robust_loss = opt.get("robust_loss", "huber")
     loss_scale = opt.get("loss_scale", 1.0)
+    max_cal_frames_raw = opt.get("max_calibration_frames", None)
+    max_cal_frames = int(max_cal_frames_raw) if max_cal_frames_raw is not None else None
 
     # Detection settings
     det = data.get("detection", {})
@@ -189,6 +191,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         min_cameras_per_frame=min_cameras,
         frame_step=frame_step,
         holdout_fraction=holdout_fraction,
+        max_calibration_frames=max_cal_frames,
         save_detailed_residuals=save_detailed,
         initial_interface_distances=initial_interface_distances,
         rational_model_cameras=rational_model_cameras,
@@ -237,6 +240,39 @@ def split_detections(
     )
 
     return cal_detections, val_detections
+
+
+def _subsample_detections(
+    detections: DetectionResult,
+    max_frames: int,
+) -> DetectionResult:
+    """Uniformly subsample detection frames to at most max_frames.
+
+    Selects frames at uniform temporal intervals from the sorted frame indices,
+    preserving the first and last frames.
+
+    Args:
+        detections: Full detection result
+        max_frames: Maximum number of frames to keep
+
+    Returns:
+        New DetectionResult with at most max_frames frames
+    """
+    frame_indices = sorted(detections.frames.keys())
+    if len(frame_indices) <= max_frames:
+        return detections
+
+    # Uniform selection: np.linspace to pick evenly spaced indices
+    selected_positions = np.round(
+        np.linspace(0, len(frame_indices) - 1, max_frames)
+    ).astype(int)
+    selected_frames = {frame_indices[i] for i in selected_positions}
+
+    return DetectionResult(
+        frames={k: v for k, v in detections.frames.items() if k in selected_frames},
+        camera_names=detections.camera_names,
+        total_frames=detections.total_frames,
+    )
 
 
 def _save_board_reference_images(
@@ -402,11 +438,16 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         temp_cameras = {}
         for cam_name, ext in extrinsics.items():
             temp_cameras[cam_name] = CameraCalibration(
+                name=cam_name,
                 intrinsics=intrinsics[cam_name],
                 extrinsics=ext,
                 interface_distance=config.initial_interface_distances.get(cam_name, 0.15),
             )
-        temp_result = CalibrationResult(cameras=temp_cameras, board_poses={})
+        # Lightweight stand-in: plot_camera_rig only reads .cameras
+        class _MinimalResult:
+            def __init__(self, cameras):
+                self.cameras = cameras
+        temp_result = _MinimalResult(cameras=temp_cameras)
 
         fig = plot_camera_rig(
             temp_result,
@@ -422,12 +463,18 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
     except Exception as e:
         print(f"  Warning: Could not save camera_rig_initial.png: {e}")
 
+    # --- Subsample for optimization if configured ---
+    optim_detections = cal_detections
+    if config.max_calibration_frames is not None and len(cal_detections.frames) > config.max_calibration_frames:
+        optim_detections = _subsample_detections(cal_detections, config.max_calibration_frames)
+        print(f"\n[Frame Selection] Subsampled {len(cal_detections.frames)} → {len(optim_detections.frames)} frames for optimization")
+
     # --- Stage 3: Interface Optimization ---
     print("\n[Stage 3] Interface and pose optimization...")
 
     t0 = time.perf_counter()
     stage3_extrinsics, stage3_distances, stage3_poses, stage3_rms = optimize_interface(
-        detections=cal_detections,
+        detections=optim_detections,
         intrinsics=intrinsics,
         initial_extrinsics=extrinsics,
         board=board,
@@ -474,7 +521,7 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
             final_rms,
         ) = joint_refinement(
             stage3_result=stage3_result,
-            detections=cal_detections,
+            detections=optim_detections,
             intrinsics=intrinsics,
             board=board,
             reference_camera=reference_camera,
@@ -636,7 +683,7 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         calibration_date=datetime.now().isoformat(),
         software_version="0.1.0",  # TODO: get from package
         config_hash=_compute_config_hash(config),
-        num_frames_used=len(cal_detections.frames),
+        num_frames_used=len(optim_detections.frames),
         num_frames_holdout=len(val_detections.frames),
     )
 

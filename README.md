@@ -1,4 +1,4 @@
-# AquaCal
+Wwhy# AquaCal
 
 Refractive multi-camera calibration library for arrays of cameras in air viewing an underwater volume through the water surface. AquaCal jointly optimizes camera intrinsics, extrinsics, per-camera interface distances, and board poses to achieve accurate 3D reconstruction in refractive multi-camera systems. Designed for researchers and engineers working with multi-camera underwater imaging setups.
 
@@ -170,17 +170,48 @@ validation:
 
 **validation**: Controls held-out validation. A random selection of complete frames (across all cameras) is held out for validation. `save_detailed_residuals` includes per-corner reprojection errors in the output.
 
-## Pipeline Overview
+## Technical Methodology
 
-The calibration pipeline consists of the following stages:
+### Problem Setting
 
-1. **Intrinsic Calibration**: Standard in-air calibration using the ChArUco board to estimate camera intrinsic parameters (focal length, principal point, distortion coefficients) for each camera independently.
+AquaCal calibrates a rigid array of cameras mounted in air, viewing downward through a flat water surface into an underwater volume. Standard multi-camera calibration ignores refraction and produces systematic errors when applied across an air-water interface. AquaCal explicitly models refraction at the water surface using Snell's law, treating the interface as a horizontal plane at a per-camera distance below each camera's optical center.
 
-2. **Extrinsic Initialization**: Detects the ChArUco board in underwater videos and builds a pose graph to initialize camera extrinsics (rotation and translation relative to a reference camera) and board poses in 3D space.
+### Refractive Camera Model
 
-3. **Interface and Pose Optimization**: Jointly optimizes camera extrinsics, per-camera interface distances (distance from each camera to the water surface), and all board poses to minimize reprojection error. This is the core refractive calibration stage that accounts for refraction at the water surface using Snell's law.
+Each camera's projection is modeled as a two-segment ray path:
 
-4. **Validation**: Evaluates calibration quality on held-out frames by computing reprojection errors and 3D reconstruction accuracy. Diagnostics include RMS reprojection error per camera and mean 3D reconstruction error.
+1. **Air segment**: A ray from the camera center through the lens (standard pinhole + distortion model) travels in air to the water surface.
+2. **Refraction**: At the air-water interface, the ray refracts according to Snell's law in 3D, bending toward the surface normal as it enters the denser medium.
+3. **Water segment**: The refracted ray continues in a straight line to the target point underwater.
+
+Forward projection (3D point to pixel) inverts this path using a Newton-Raphson solver to find the interface intersection point that connects the 3D target to the camera via a physically consistent refracted ray. This replaces the standard pinhole projection used in conventional calibration.
+
+### Calibration Stages
+
+The pipeline estimates camera parameters in four stages, progressing from simple per-camera estimates to a joint global optimization:
+
+**Stage 1 — Intrinsic Calibration**: Each camera is calibrated independently using in-air ChArUco board observations (no refraction). This yields per-camera intrinsic matrices (focal length, principal point) and distortion coefficients via standard OpenCV calibration.
+
+**Stage 2 — Extrinsic Initialization**: Underwater ChArUco detections are used to build a pose graph linking cameras that observe the same board frame. Camera extrinsics (rotation and translation relative to a reference camera) are initialized by chaining pairwise transforms through the graph. Board poses are initialized via refractive PnP — a 6-DOF least-squares refinement of standard PnP that accounts for refraction.
+
+**Stage 3 — Joint Refractive Optimization**: The core calibration step. A nonlinear least-squares optimizer (Levenberg-Marquardt) jointly refines:
+- Camera extrinsics (6 DOF per camera, reference camera fixed)
+- Per-camera interface distances (1 parameter per camera)
+- Board poses (6 DOF per observed frame)
+
+The cost function minimizes reprojection error: for each detected corner, the known 3D board point is projected through the refractive model to a predicted pixel, and the residual against the detected pixel is computed. A Huber robust loss reduces sensitivity to outlier detections.
+
+**Stage 4 — Optional Intrinsic Refinement**: Optionally re-refines focal lengths and principal points alongside extrinsics and interface distances. Useful when in-air intrinsics are not fully representative of the underwater imaging condition.
+
+### Scalability
+
+For large camera arrays (10+ cameras) and many frames, the Jacobian matrix in Stage 3 can become very large. AquaCal exploits the block-sparse structure of the problem — each residual depends only on one camera's parameters and one board pose — to compute finite-difference Jacobians efficiently via column grouping, reducing the number of function evaluations by 10-15x. A configurable frame budget (`max_calibration_frames`) allows uniform temporal subsampling of frames entering optimization while retaining all frames for the earlier initialization stages.
+
+### Validation
+
+A random fraction of detected frames (default 20%) is held out from optimization. Calibration quality is assessed on these held-out frames via:
+- **Reprojection error**: RMS pixel distance between detected and predicted corner positions (per-camera and overall).
+- **3D reconstruction error**: Adjacent ChArUco corners are triangulated from multi-camera observations and compared to the known board geometry (square size), providing a metric in physical units (mm).
 
 For details on coordinate conventions (world frame, camera frame, interface normal direction), see [`docs/COORDINATES.md`](docs/COORDINATES.md).
 

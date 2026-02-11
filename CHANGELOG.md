@@ -9,6 +9,20 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-11
+### [src/aquacal/config/schema.py]
+- Added `max_calibration_frames: int | None` field to `CalibrationConfig` dataclass
+- When set, uniformly subsamples calibration frames to this limit before Stage 3/4 optimization
+- Stage 2 (extrinsic init) continues to use all calibration frames for better pose graph connectivity
+
+### [src/aquacal/calibration/pipeline.py]
+- Added `_subsample_detections()` helper function for uniform temporal frame subsampling
+- Modified `load_config()` to parse `optimization.max_calibration_frames` from YAML config
+- Applied frame subsampling between data split and Stage 3, creating `optim_detections` subset
+- Updated Stage 3 and Stage 4 to use `optim_detections` instead of full `cal_detections`
+- Updated metadata to reflect actual number of frames used in optimization
+- Added printout when subsampling occurs showing frame count reduction
+
+## 2026-02-11
 ### [src/aquacal/calibration/_optim_common.py]
 - Added `dense_threshold` parameter to `make_sparse_jacobian_func()` to prevent OOM on large problems
 - Problems exceeding threshold (default 500M elements / ~4 GiB) return sparse Jacobian (LSMR solver) instead of dense (exact solver)
