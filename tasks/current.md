@@ -1,203 +1,145 @@
-# Task: P.5 Standardize Synthetic Pipeline Tests
+# Task: 7.3c Top-Level Exports
 
 ## Objective
 
-Make the test structure consistent across all calibration scenarios in `test_full_pipeline.py`. Each scenario should test the same metrics with scenario-appropriate thresholds. Remove misplaced ground-truth fixture tests from calibration test classes.
+Update `src/aquacal/__init__.py` to re-export the essential public API so downstream consumers can write `from aquacal import load_calibration, CalibrationResult` without knowing the internal package structure.
 
 ## Background
 
-The three calibration scenario test classes (`TestIdealScenario`, `TestRealisticScenario`, `TestMinimalScenario`) currently have inconsistent structure:
+Currently `src/aquacal/__init__.py` exports only `__version__`. All the re-exports are commented out with "uncomment as modules are implemented" — they're all implemented now.
 
-- **`TestIdealScenario`** (good): Tests rotation, translation, interface distance errors AND RMS reprojection error.
-- **`TestRealisticScenario`** (mixed): Tests rotation, translation, interface distance errors but NOT RMS error. Also contains `test_has_13_cameras` and `test_geometry` which test the ground-truth fixture properties, not calibration accuracy. These are duplicates of tests already in `TestGenerateRealRigArray`.
-- **`TestMinimalScenario`** (weak): Only tests that 2 cameras exist in the result — no accuracy checks at all.
+**Prerequisites**: Tasks 7.3a (unified projection) and 7.3b (convenience methods) should be complete.
 
 ## Context Files
 
 Read these files before starting (in order):
 
-1. `tests/synthetic/test_full_pipeline.py` — The file to modify. Read the full file.
-2. `tests/synthetic/ground_truth.py` (lines 605-686) — `compute_calibration_errors()` returns: `rotation_error_deg`, `translation_error_mm`, `interface_distance_error_mm`, `focal_length_error_percent`, `principal_point_error_px`.
+1. `src/aquacal/__init__.py` — Current top-level exports (mostly commented out)
+2. `tasks/public_api.md` — Section 1 "Tiered Top-Level Exports" defines the target API surface
+3. `src/aquacal/io/serialization.py` — `load_calibration()`, `save_calibration()`
+4. `src/aquacal/calibration/pipeline.py` — `run_calibration()`, `load_config()`
+5. `src/aquacal/config/schema.py` — `CalibrationResult`, `CameraCalibration`, `CameraIntrinsics`, `CameraExtrinsics`
 
 ## Modify
 
-- `tests/synthetic/test_full_pipeline.py`
-- `tests/synthetic/conftest.py` — change scenario fixture scopes from function to class
+- `src/aquacal/__init__.py`
+- `tests/unit/test_schema.py` (add import smoke tests — file created by 7.3b)
 
 ## Do Not Modify
 
 Everything not listed above. In particular:
-- `tests/synthetic/ground_truth.py` — test infrastructure stays as-is
+- Subpackage `__init__.py` files — their exports stay as-is for power users
 - `TASKS.md` — orchestrator maintains this
 
 ## Design
 
-### Part 1: Remove Misplaced Tests from `TestRealisticScenario`
+### Part 1: Update `src/aquacal/__init__.py`
 
-Delete these two tests from `TestRealisticScenario`:
+Replace the commented-out stubs with actual imports. The tiered strategy from `public_api.md`:
 
-- `test_has_13_cameras` (lines 408-412): Duplicates `TestGenerateRealRigArray.test_creates_13_cameras`
-- `test_geometry` (lines 414-431): Duplicates `TestGenerateRealRigArray.test_inner_ring_radius` and `test_outer_ring_radius`
-
-These test the ground-truth fixture, not calibration accuracy. They already exist in `TestGenerateRealRigArray` (lines 226-298).
-
-### Part 2: Add Class-Scoped Result Fixtures
-
-Add three class-scoped fixtures that run the calibration once per scenario class, avoiding redundant optimization runs (especially important for the 13-camera realistic scenario):
+**Tier 1 — Top-level** (`from aquacal import X`): The essentials every downstream consumer needs.
 
 ```python
-@pytest.fixture(scope="class")
-def ideal_result(scenario_ideal):
-    """Run calibration once for all ideal scenario tests."""
-    result = _run_calibration_stages(scenario_ideal, noise_std=0.0)
-    errors = compute_calibration_errors(result, scenario_ideal)
-    return result, errors
+"""AquaCal: Refractive multi-camera calibration library."""
 
+__version__ = "0.1.0"
 
-@pytest.fixture(scope="class")
-def realistic_result(scenario_realistic):
-    """Run calibration once for all realistic scenario tests."""
-    result = _run_calibration_stages(scenario_realistic)
-    errors = compute_calibration_errors(result, scenario_realistic)
-    return result, errors
+# Load/save calibration results
+from aquacal.io.serialization import load_calibration, save_calibration
 
+# Core types
+from aquacal.config.schema import (
+    CalibrationResult,
+    CameraCalibration,
+    CameraIntrinsics,
+    CameraExtrinsics,
+)
 
-@pytest.fixture(scope="class")
-def minimal_result(scenario_minimal):
-    """Run calibration once for all minimal scenario tests."""
-    result = _run_calibration_stages(scenario_minimal)
-    errors = compute_calibration_errors(result, scenario_minimal)
-    return result, errors
+# Run calibration
+from aquacal.calibration.pipeline import run_calibration, load_config
+
+__all__ = [
+    "__version__",
+    # Load/save
+    "load_calibration",
+    "save_calibration",
+    # Core types
+    "CalibrationResult",
+    "CameraCalibration",
+    "CameraIntrinsics",
+    "CameraExtrinsics",
+    # Run calibration
+    "run_calibration",
+    "load_config",
+]
 ```
 
-Place these after `_run_calibration_stages()` and before the test classes.
+**Tier 2 — Subpackage imports** (unchanged, already work for power users):
+- `from aquacal.core import Camera, Interface, refractive_project, refractive_project_batch`
+- `from aquacal.calibration import optimize_interface, build_pose_graph`
+- `from aquacal.triangulation import triangulate_point`
 
-**Important**: For class-scoped fixtures to work with session/module-scoped scenario fixtures, the `conftest.py` scenario fixtures need to be at least class scope too. Currently they are function-scoped (the default). Update `tests/synthetic/conftest.py` to use `scope="class"`:
+These are not promoted to the top level — they stay as reach-in imports via their subpackages.
+
+### Part 2: Import smoke tests
+
+Add a small test class to `tests/unit/test_schema.py` (created in 7.3b) that verifies the public API is importable. These are not functional tests — just import checks that catch broken re-exports.
 
 ```python
-@pytest.fixture(scope="class")
-def scenario_ideal() -> SyntheticScenario:
-    ...
+class TestPublicAPI:
+    """Verify top-level imports work."""
+
+    def test_top_level_imports(self):
+        """All tier-1 exports are importable from aquacal."""
+        from aquacal import (
+            load_calibration,
+            save_calibration,
+            CalibrationResult,
+            CameraCalibration,
+            CameraIntrinsics,
+            CameraExtrinsics,
+            run_calibration,
+            load_config,
+        )
+        # Verify they're the real objects, not None
+        assert callable(load_calibration)
+        assert callable(save_calibration)
+        assert callable(run_calibration)
+        assert callable(load_config)
+
+    def test_version_string(self):
+        """__version__ is a non-empty string."""
+        import aquacal
+        assert isinstance(aquacal.__version__, str)
+        assert len(aquacal.__version__) > 0
+
+    def test_subpackage_imports(self):
+        """Tier-2 subpackage imports still work."""
+        from aquacal.core import Camera, Interface, refractive_project
+        from aquacal.calibration import optimize_interface
+        from aquacal.triangulation import triangulate_point
+        assert callable(refractive_project)
 ```
-
-Do the same for `scenario_minimal` and `scenario_realistic`.
-
-### Part 3: Standardize Test Structure
-
-Each scenario class should have exactly 4 tests with scenario-appropriate thresholds. Tests use the class-scoped result fixtures to avoid redundant optimization runs:
-
-```python
-@pytest.mark.slow
-class TestIdealScenario:
-    """Test with zero noise - should recover ground truth exactly."""
-
-    def test_rotation_accuracy(self, ideal_result):
-        result, errors = ideal_result
-        assert errors["rotation_error_deg"] < 0.5
-
-    def test_translation_accuracy(self, ideal_result):
-        result, errors = ideal_result
-        assert errors["translation_error_mm"] < 5.0
-
-    def test_interface_distance_accuracy(self, ideal_result):
-        result, errors = ideal_result
-        assert errors["interface_distance_error_mm"] < 10.0
-
-    def test_rms_reprojection_error(self, ideal_result):
-        result, errors = ideal_result
-        assert result.diagnostics.reprojection_error_rms < 1.0
-
-
-@pytest.mark.slow
-class TestRealisticScenario:
-    """Test with 13-camera rig matching actual hardware."""
-
-    def test_rotation_accuracy(self, realistic_result):
-        result, errors = realistic_result
-        assert errors["rotation_error_deg"] < 1.5
-
-    def test_translation_accuracy(self, realistic_result):
-        result, errors = realistic_result
-        assert errors["translation_error_mm"] < 15.0
-
-    def test_interface_distance_accuracy(self, realistic_result):
-        result, errors = realistic_result
-        assert errors["interface_distance_error_mm"] < 20.0
-
-    def test_rms_reprojection_error(self, realistic_result):
-        result, errors = realistic_result
-        assert result.diagnostics.reprojection_error_rms < 2.0
-
-
-@pytest.mark.slow
-class TestMinimalScenario:
-    """Test edge case: minimum viable configuration (2 cameras)."""
-
-    def test_rotation_accuracy(self, minimal_result):
-        result, errors = minimal_result
-        assert errors["rotation_error_deg"] < 3.0
-
-    def test_translation_accuracy(self, minimal_result):
-        result, errors = minimal_result
-        assert errors["translation_error_mm"] < 30.0
-
-    def test_interface_distance_accuracy(self, minimal_result):
-        result, errors = minimal_result
-        assert errors["interface_distance_error_mm"] < 30.0
-
-    def test_rms_reprojection_error(self, minimal_result):
-        result, errors = minimal_result
-        assert result.diagnostics.reprojection_error_rms < 3.0
-```
-
-### Threshold Rationale
-
-| Metric | Ideal (0px noise) | Realistic (0.5px noise, 13 cams) | Minimal (0.5px noise, 2 cams) |
-|---|---|---|---|
-| Rotation (deg) | < 0.5 | < 1.5 | < 3.0 |
-| Translation (mm) | < 5.0 | < 15.0 | < 30.0 |
-| Interface dist (mm) | < 10.0 | < 20.0 | < 30.0 |
-| RMS (px) | < 1.0 | < 2.0 | < 3.0 |
-
-Ideal thresholds are kept from the existing tests. Realistic thresholds are kept from the existing tests. Minimal thresholds are looser — 2 cameras provide much less geometric constraint.
-
-### Part 4: `@pytest.mark.slow` Markers
-
-All three calibration scenario test classes must be marked `@pytest.mark.slow`. This lets developers skip the optimization-heavy tests during quick iteration:
-
-```bash
-pytest tests/synthetic/ -m "not slow" -v   # fast fixture/utility tests only
-pytest tests/synthetic/ -v                  # everything including slow calibration tests
-```
-
-The `slow` marker is already registered in `pyproject.toml`. Do NOT mark the non-calibration test classes (`TestGenerateCameraIntrinsics`, `TestGenerateCameraArray`, `TestGenerateRealRigArray`, `TestCreateScenario`, `TestGenerateSyntheticDetections`, `TestComputeCalibrationErrors`) — those are fast.
 
 ## Acceptance Criteria
 
-- [ ] `TestIdealScenario` has 4 tests: rotation, translation, interface distance, RMS
-- [ ] `TestRealisticScenario` has 4 tests: rotation, translation, interface distance, RMS
-- [ ] `TestMinimalScenario` has 4 tests: rotation, translation, interface distance, RMS
-- [ ] All three calibration scenario classes marked `@pytest.mark.slow`
-- [ ] Class-scoped result fixtures (`ideal_result`, `realistic_result`, `minimal_result`) run optimization once per class
-- [ ] `conftest.py` scenario fixtures use `scope="class"`
-- [ ] No ground-truth fixture tests in calibration scenario classes (no camera count checks, no geometry checks)
-- [ ] `TestGenerateRealRigArray` unchanged (still has fixture geometry tests)
-- [ ] `TestGenerateSyntheticDetections` unchanged
-- [ ] `TestCreateScenario` unchanged
-- [ ] `TestComputeCalibrationErrors` unchanged
-- [ ] `_run_calibration_stages()` helper unchanged
-- [ ] All tests pass: `pytest tests/synthetic/test_full_pipeline.py -v`
-- [ ] Slow marker works: `pytest tests/synthetic/ -m "not slow" -v` runs only fast tests
+- [ ] `from aquacal import load_calibration, save_calibration` works
+- [ ] `from aquacal import CalibrationResult, CameraCalibration, CameraIntrinsics, CameraExtrinsics` works
+- [ ] `from aquacal import run_calibration, load_config` works
+- [ ] `__all__` lists exactly the intended exports (no internal leakage)
+- [ ] Subpackage imports (`from aquacal.core import ...`) still work
+- [ ] Import smoke tests pass: `pytest tests/unit/test_schema.py -v`
+- [ ] Full unit test suite still passes: `pytest tests/unit/ -v`
 - [ ] No modifications to files outside "Modify" list
 
 ## Notes
 
-1. **Minimal scenario thresholds are guesses**: The minimal scenario (2 cameras, 0.5px noise) has never been tested for accuracy before — only that it runs. The thresholds above (3 deg, 30mm, 30mm, 3px) are generous starting points. If tests fail, loosen them — the important thing is that *some* accuracy check exists, not that it's tight.
+1. **Why not export `Camera`, `Interface`, `refractive_project` at top level**: These are power-user primitives. The typical downstream workflow (load result → project/back-project) never needs them directly, thanks to the 7.3b convenience methods. Promoting them would clutter the top-level namespace and create a confusing "two ways to do it" situation for beginners.
 
-2. **`compute_calibration_errors` uses ground-truth intrinsics**: Since `_run_calibration_stages()` passes ground-truth intrinsics to the result (line 90), `focal_length_error_percent` and `principal_point_error_px` will always be 0. No need to test these — they're trivially zero. Only test the 3 estimated quantities: rotation, translation, interface distance.
+2. **Import ordering**: The top-level `__init__.py` imports trigger loading of `io.serialization`, `config.schema`, and `calibration.pipeline` (and their transitive deps) at `import aquacal` time. This is fine — all these modules are lightweight. The heavy dependencies (OpenCV, scipy) are already imported by these modules at their own module level.
 
-3. **Existing `TestComputeCalibrationErrors.test_perfect_match_gives_zero_errors`** already tests all 5 error metrics with a perfect-match result. That test stays as-is.
+3. **No `InterfaceParams` at top level**: Users rarely need the raw interface parameters. They access them via `result.interface` if needed. Keeping the export list tight makes it more approachable.
 
 ## Model Recommendation
 
-**Sonnet** — Straightforward restructuring. Delete 2 tests, add missing tests with specified thresholds, refactor existing tests into consistent 4-test pattern. No logic changes.
+**Sonnet** — Trivial task: edit one `__init__.py` file and add a few import assertions to an existing test file.

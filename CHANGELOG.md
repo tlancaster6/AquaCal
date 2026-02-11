@@ -9,6 +9,37 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-11
+### [7.3c] Top-Level Exports
+- Updated `src/aquacal/__init__.py` to export essential public API: `load_calibration`, `save_calibration`, `run_calibration`, `load_config`, `CalibrationResult`, `CameraCalibration`, `CameraIntrinsics`, `CameraExtrinsics`
+- Added `TestPublicAPI` class to `tests/unit/test_schema.py` with import smoke tests verifying tier-1 top-level imports and tier-2 subpackage imports
+- All 412 unit tests pass; downstream consumers can now use `from aquacal import load_calibration, CalibrationResult` without knowing internal package structure
+
+## 2026-02-11
+### [7.3a] Unify Projection API
+- Merged `refractive_project_fast()` into `refractive_project()` in `src/aquacal/core/refractive_geometry.py`
+- Renamed internal functions: `refractive_project()` → `_refractive_project_brent()`, `refractive_project_fast()` → `_refractive_project_newton()`, `refractive_project_fast_batch()` → `_refractive_project_newton_batch()`
+- New public `refractive_project()` auto-selects Newton-Raphson for flat interfaces ([0,0,-1]) and Brent-search fallback for tilted interfaces
+- New public `refractive_project_batch()` for vectorized projection (flat interfaces only)
+- Added deprecated shims for `refractive_project_fast()` and `refractive_project_fast_batch()` with DeprecationWarning
+- Removed `use_fast_projection` parameter from `compute_residuals()` in `src/aquacal/calibration/_optim_common.py`
+- Removed `use_fast_projection` parameter from `optimize_interface()` in `src/aquacal/calibration/interface_estimation.py`
+- Removed `use_fast_projection` parameter from `joint_refinement()` in `src/aquacal/calibration/refinement.py`
+- Updated imports and function calls in `src/aquacal/calibration/extrinsics.py`, `src/aquacal/calibration/pipeline.py`
+- Updated all test files: `tests/unit/test_refractive_geometry.py`, `tests/unit/test_extrinsics.py`, `tests/unit/test_interface_estimation.py`
+- Removed obsolete `test_fast_projection_gives_same_result` test (fast/original distinction no longer exists)
+- All 409 unit tests + 33 synthetic tests pass
+- Benefit: Simpler API, automatic performance optimization, existing code using `refractive_project()` now automatically uses fast path for flat interfaces
+
+## 2026-02-11
+### [B.3] Fix Water-Z Regularization Sparsity
+- Replaced global-mean water_z regularization with pairwise consistency residuals in `src/aquacal/calibration/_optim_common.py`
+- Changed `compute_residuals()` to use N*(N-1)/2 pairwise residuals `w*(water_z_i - water_z_j)` instead of N residuals against mean
+- Updated `build_jacobian_sparsity()` to mark only 2 cameras' parameters (~14 columns) per pairwise residual instead of all cameras
+- Added weight scaling by `1/sqrt(N-1)` to maintain consistent regularization strength across different camera counts
+- Added sparsity regression tests in `tests/unit/test_interface_estimation.py`: column group count and residual count verification
+- Fixes 8x slowdown (15 min → 2 hours) and poor convergence caused by dense Jacobian rows coupling all cameras
+
+## 2026-02-11
 ### [tests/synthetic/test_full_pipeline.py, tests/synthetic/conftest.py]
 - Standardized calibration scenario test structure: all three classes (TestIdealScenario, TestRealisticScenario, TestMinimalScenario) now have 4 tests each (rotation, translation, interface distance, RMS) with scenario-appropriate thresholds
 - Added class-scoped result fixtures (ideal_result, realistic_result, minimal_result) to run calibration once per scenario class, avoiding redundant optimization runs

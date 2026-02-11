@@ -432,3 +432,38 @@ class TestExceptionHierarchy:
 
         with pytest.raises(CalibrationError):
             raise ConnectivityError("test")
+
+
+class TestPublicAPI:
+    """Verify top-level imports work."""
+
+    def test_top_level_imports(self):
+        """All tier-1 exports are importable from aquacal."""
+        from aquacal import (
+            load_calibration,
+            save_calibration,
+            CalibrationResult,
+            CameraCalibration,
+            CameraIntrinsics,
+            CameraExtrinsics,
+            run_calibration,
+            load_config,
+        )
+        # Verify they're the real objects, not None
+        assert callable(load_calibration)
+        assert callable(save_calibration)
+        assert callable(run_calibration)
+        assert callable(load_config)
+
+    def test_version_string(self):
+        """__version__ is a non-empty string."""
+        import aquacal
+        assert isinstance(aquacal.__version__, str)
+        assert len(aquacal.__version__) > 0
+
+    def test_subpackage_imports(self):
+        """Tier-2 subpackage imports still work."""
+        from aquacal.core import Camera, Interface, refractive_project
+        from aquacal.calibration import optimize_interface
+        from aquacal.triangulation import triangulate_point
+        assert callable(refractive_project)

@@ -872,7 +872,7 @@ def _estimate_validation_poses(
 
     from aquacal.core.camera import Camera
     from aquacal.core.interface_model import Interface
-    from aquacal.core.refractive_geometry import refractive_project_fast
+    from aquacal.core.refractive_geometry import refractive_project
 
     refined_poses = {}
 
@@ -910,7 +910,7 @@ def _estimate_validation_poses(
                 camera = cameras[cam_name]
                 for i, corner_id in enumerate(det.corner_ids):
                     pt_3d = corners_3d[int(corner_id)]
-                    projected = refractive_project_fast(
+                    projected = refractive_project(
                         camera, interface, pt_3d
                     )
                     if projected is not None:

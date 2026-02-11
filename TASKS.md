@@ -54,7 +54,8 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **7.1** Synthetic data tests (full pipeline with known ground truth)
 - [x] **7.2** Real data validation
-- [ ] **7.3** Documentation and examples
+- [x] **7.3** improved public API
+- [ ] **7.4** Documentation and examples
 
 ---
 
@@ -84,10 +85,6 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.12** Add legacy ChArUco board pattern support: Add `legacy_pattern: bool = False` to `BoardConfig`, call `setLegacyPattern(True)` in `get_opencv_board()` when set. Parse from both `board` and `intrinsic_board` config sections. Needed for older printed boards that have a marker in the top-left cell instead of a solid square.
 
-- [x] **P.13** Fix validation metrics reporting zero
-
-- [x] **P.14** Fix progress feedback gaps: Fix detection callback passing raw frame indices instead of processed count, add `verbose` parameter to `optimize_interface()` and `joint_refinement()`, wire CLI `-v` flag to enable scipy `verbose=2` for per-iteration optimizer progress.
-
 - [x] **P.15** Refractive PnP initialization: Replace standard `cv2.solvePnP` with refractive-corrected PnP (6-param least_squares refinement) for Stage 2 extrinsic initialization and Stage 3 initial board poses. Standard PnP ignores refraction, causing ~2m Z spread in cameras that should be coplanar and preventing Stage 3 convergence.
 
 - [ ] **P.16** Expose Stage 4 joint refinement in config: Add `refine_intrinsics: bool` to `CalibrationConfig`, parse from `optimization.refine_intrinsics` in YAML, and wire through to pipeline. Currently hardcoded to False via `getattr` fallback. Stage 4 jointly refines extrinsics, interface distances, board poses, and per-camera `fx, fy, cx, cy`. Should only be enabled after Stage 3 converges reliably.
@@ -109,6 +106,14 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 - [x] **P.24** Add option to set some cameras as auxillary cameras. These cameras will be excluded from the stage 3 and 4 optimization, and then added in after-the-fact without modifying the non-auxillary camera parameters. Useful when you don't want a particular camera "poisoning" the optimization -- for example, a wide-angle overview that has significantly higher distortion and associated RMS errors. 
 
 ---
+
+## Bug Fixes
+
+- [x] **B.1** Fix validation metrics reporting zero (was P.13)
+
+- [x] **B.2** Fix progress feedback gaps: Fix detection callback passing raw frame indices instead of processed count, add `verbose` parameter to `optimize_interface()` and `joint_refinement()`, wire CLI `-v` flag to enable scipy `verbose=2` for per-iteration optimizer progress. (was P.14)
+
+- [ ] **B.3** Fix water_z regularization destroying Jacobian sparsity: The `compute_residuals()` water_z penalty uses a live mean across all cameras, making each regularization residual depend on all extrinsic+distance parameters. This creates 12 dense rows in the sparsity pattern, blowing up `group_columns()` from ~50 to ~80+ groups and causing an 8x slowdown (15 min → 2 hours). Fix: replace with pairwise residuals `w * (water_z_i - water_z_j)` that enforce consistency without a global mean, keeping each residual dependent on only 2 cameras' parameters.
 
 ## Future: Advanced Optimization and Potential feature additions
 

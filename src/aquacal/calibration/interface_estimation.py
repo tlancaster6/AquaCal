@@ -127,7 +127,6 @@ def optimize_interface(
     loss: str = "huber",
     loss_scale: float = 1.0,
     min_corners: int = 4,
-    use_fast_projection: bool = True,
     use_sparse_jacobian: bool = True,
     verbose: int = 0,
     water_z_weight: float = 0.0,
@@ -153,8 +152,6 @@ def optimize_interface(
         loss: Robust loss function ("linear", "huber", "soft_l1", "cauchy")
         loss_scale: Scale parameter for robust loss in pixels
         min_corners: Minimum corners per detection to include in optimization
-        use_fast_projection: Use fast Newton-based projection (default True).
-            Only works with horizontal interface (normal = [0, 0, -1]).
         use_sparse_jacobian: Use sparse Jacobian structure (default True).
             Dramatically improves performance for large camera arrays.
         verbose: Verbosity level for scipy.optimize.least_squares (default 0).
@@ -244,7 +241,6 @@ def optimize_interface(
         frame_order,
         min_corners,
         False,  # refine_intrinsics
-        use_fast_projection,
         water_z_weight,
     )
 
@@ -344,7 +340,7 @@ def register_auxiliary_camera(
     """
     from aquacal.core.camera import Camera
     from aquacal.core.interface_model import Interface
-    from aquacal.core.refractive_geometry import refractive_project_fast
+    from aquacal.core.refractive_geometry import refractive_project
 
     if interface_normal is None:
         interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
@@ -430,7 +426,7 @@ def register_auxiliary_camera(
 
             for i, cid in enumerate(corner_ids):
                 pt_3d = corners_3d[int(cid)]
-                projected = refractive_project_fast(camera, interface, pt_3d)
+                projected = refractive_project(camera, interface, pt_3d)
                 if projected is not None:
                     resid.append(projected[0] - corners_2d[i, 0])
                     resid.append(projected[1] - corners_2d[i, 1])

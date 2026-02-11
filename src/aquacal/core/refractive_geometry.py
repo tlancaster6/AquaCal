@@ -144,15 +144,16 @@ def refractive_back_project(
     return trace_ray_air_to_water(camera, interface, pixel)
 
 
-def refractive_project(
+def _refractive_project_brent(
     camera: Camera,
     interface: Interface,
     point_3d: Vec3
 ) -> Vec2 | None:
     """
-    Project 3D underwater point to 2D pixel through refractive interface.
+    Project 3D underwater point to 2D pixel through refractive interface (Brent-search).
 
-    This is the forward projection used for computing reprojection error.
+    This is the general-purpose projection that works for any interface normal.
+    Uses 1D Brent-search optimization to find the interface intersection point.
 
     Args:
         camera: Camera object
@@ -315,7 +316,7 @@ def refractive_project(
     return camera.project(point_for_projection, apply_distortion=True)
 
 
-def refractive_project_fast(
+def _refractive_project_newton(
     camera: Camera,
     interface: Interface,
     point_3d: Vec3,
@@ -323,30 +324,22 @@ def refractive_project_fast(
     tolerance: float = 1e-9,
 ) -> Vec2 | None:
     """
-    Project 3D underwater point to 2D pixel through flat refractive interface.
+    Project 3D underwater point to 2D pixel through flat refractive interface (Newton-Raphson).
 
     Uses Newton-Raphson iteration for fast convergence (typically 2-4 iterations).
-    Assumes interface is horizontal (normal = [0, 0, -1]).
+    Only works for horizontal interface (normal = [0, 0, -1]).
+    Caller must check interface orientation before calling.
 
     Args:
         camera: Camera object
-        interface: Interface object (must have horizontal normal)
+        interface: Interface object (assumes horizontal normal)
         point_3d: 3D point in water (world coordinates, Z > interface_z)
         max_iterations: Maximum Newton iterations (default 10)
         tolerance: Convergence tolerance for r_p (default 1e-9 meters)
 
     Returns:
         2D pixel coordinates, or None if projection fails.
-
-    Raises:
-        ValueError: If interface normal is not horizontal [0, 0, -1]
     """
-    # Validate horizontal interface
-    normal = interface.normal
-    if abs(normal[0]) > 1e-6 or abs(normal[1]) > 1e-6 or abs(normal[2] + 1) > 1e-6:
-        raise ValueError(
-            "refractive_project_fast requires horizontal interface (normal = [0,0,-1])"
-        )
 
     C = camera.C
     Q = np.asarray(point_3d, dtype=np.float64)
@@ -420,7 +413,7 @@ def refractive_project_fast(
     return camera.project(P, apply_distortion=True)
 
 
-def refractive_project_fast_batch(
+def _refractive_project_newton_batch(
     camera: Camera,
     interface: Interface,
     points_3d: NDArray[np.float64],
@@ -428,11 +421,14 @@ def refractive_project_fast_batch(
     tolerance: float = 1e-9,
 ) -> NDArray[np.float64]:
     """
-    Project multiple 3D underwater points to 2D pixels (vectorized).
+    Project multiple 3D underwater points to 2D pixels (vectorized Newton-Raphson).
+
+    Only works for horizontal interface (normal = [0, 0, -1]).
+    Caller must check interface orientation before calling.
 
     Args:
         camera: Camera object
-        interface: Interface object (must have horizontal normal)
+        interface: Interface object (assumes horizontal normal)
         points_3d: Array of shape (N, 3) with 3D points
         max_iterations: Maximum Newton iterations
         tolerance: Convergence tolerance
@@ -440,16 +436,7 @@ def refractive_project_fast_batch(
     Returns:
         Array of shape (N, 2) with pixel coordinates.
         Invalid projections have NaN values.
-
-    Raises:
-        ValueError: If interface normal is not horizontal [0, 0, -1]
     """
-    # Validate horizontal interface
-    normal = interface.normal
-    if abs(normal[0]) > 1e-6 or abs(normal[1]) > 1e-6 or abs(normal[2] + 1) > 1e-6:
-        raise ValueError(
-            "refractive_project_fast_batch requires horizontal interface (normal = [0,0,-1])"
-        )
 
     points = np.asarray(points_3d, dtype=np.float64)
     n_points = len(points)
@@ -539,3 +526,143 @@ def refractive_project_fast_batch(
             result[idx] = projected
 
     return result
+
+
+def _is_flat_interface(normal: Vec3) -> bool:
+    """Check if interface normal is approximately [0, 0, -1] (flat horizontal)."""
+    return (
+        abs(normal[0]) < 1e-6
+        and abs(normal[1]) < 1e-6
+        and abs(normal[2] + 1) < 1e-6
+    )
+
+
+def refractive_project(
+    camera: Camera,
+    interface: Interface,
+    point_3d: Vec3,
+    max_iterations: int = 10,
+    tolerance: float = 1e-9,
+) -> Vec2 | None:
+    """
+    Project 3D underwater point to 2D pixel through refractive interface.
+
+    Auto-selects the fastest algorithm:
+    - Flat interface (normal ≈ [0,0,-1]): Newton-Raphson (2-4 iterations, ~50x faster)
+    - General interface: Brent-search fallback
+
+    This is the forward projection used for computing reprojection error.
+
+    Args:
+        camera: Camera object
+        interface: Interface object
+        point_3d: 3D point in water (world coordinates, Z > interface_z)
+        max_iterations: Maximum Newton iterations for flat interface (default 10)
+        tolerance: Convergence tolerance for flat interface (default 1e-9 meters)
+
+    Returns:
+        2D pixel coordinates, or None if projection fails.
+
+    Notes:
+        - Returns None if: point above interface, TIR, optimization fails,
+          or refracted ray doesn't reach camera
+    """
+    if _is_flat_interface(interface.normal):
+        return _refractive_project_newton(
+            camera, interface, point_3d, max_iterations, tolerance
+        )
+    else:
+        return _refractive_project_brent(camera, interface, point_3d)
+
+
+def refractive_project_batch(
+    camera: Camera,
+    interface: Interface,
+    points_3d: NDArray[np.float64],
+    max_iterations: int = 10,
+    tolerance: float = 1e-9,
+) -> NDArray[np.float64]:
+    """
+    Project multiple 3D underwater points to 2D pixels (vectorized).
+
+    Currently only supports flat interfaces (normal ≈ [0,0,-1]).
+    Uses vectorized Newton-Raphson for fast batch projection.
+
+    Args:
+        camera: Camera object
+        interface: Interface object
+        points_3d: Array of shape (N, 3) with 3D points
+        max_iterations: Maximum Newton iterations (default 10)
+        tolerance: Convergence tolerance (default 1e-9 meters)
+
+    Returns:
+        Array of shape (N, 2) with pixel coordinates.
+        Invalid projections have NaN values.
+
+    Raises:
+        ValueError: If interface normal is not horizontal [0, 0, -1]
+
+    Notes:
+        - Batch Brent-search is not implemented. For non-flat interfaces,
+          use refractive_project() in a loop instead.
+    """
+    # Check for flat interface
+    if not _is_flat_interface(interface.normal):
+        raise ValueError(
+            "refractive_project_batch currently only supports flat interfaces "
+            "(normal = [0,0,-1]). For tilted interfaces, use refractive_project() "
+            "in a loop instead."
+        )
+
+    return _refractive_project_newton_batch(
+        camera, interface, points_3d, max_iterations, tolerance
+    )
+
+
+# Deprecated backward-compatibility shims
+def refractive_project_fast(
+    camera: Camera,
+    interface: Interface,
+    point_3d: Vec3,
+    max_iterations: int = 10,
+    tolerance: float = 1e-9,
+) -> Vec2 | None:
+    """
+    Deprecated: use refractive_project() instead.
+
+    refractive_project() auto-selects the fast Newton-Raphson path for flat
+    interfaces, making this function redundant.
+    """
+    import warnings
+
+    warnings.warn(
+        "refractive_project_fast() is deprecated. Use refractive_project(), "
+        "which auto-selects the fast path for flat interfaces.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return refractive_project(camera, interface, point_3d, max_iterations, tolerance)
+
+
+def refractive_project_fast_batch(
+    camera: Camera,
+    interface: Interface,
+    points_3d: NDArray[np.float64],
+    max_iterations: int = 10,
+    tolerance: float = 1e-9,
+) -> NDArray[np.float64]:
+    """
+    Deprecated: use refractive_project_batch() instead.
+
+    refractive_project_batch() provides the same functionality with a clearer name.
+    """
+    import warnings
+
+    warnings.warn(
+        "refractive_project_fast_batch() is deprecated. Use refractive_project_batch() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return refractive_project_batch(
+        camera, interface, points_3d, max_iterations, tolerance
+    )

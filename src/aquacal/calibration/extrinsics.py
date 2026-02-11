@@ -19,7 +19,7 @@ from aquacal.config.schema import (
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project_fast
+from aquacal.core.refractive_geometry import refractive_project
 from aquacal.utils.transforms import compose_poses, invert_pose, rvec_to_matrix
 
 
@@ -173,7 +173,7 @@ def refractive_solve_pnp(
         pts_cam = (R @ object_points.T).T + tvec
         resid = np.empty(n_pts * 2, dtype=np.float64)
         for i, pt in enumerate(pts_cam):
-            projected = refractive_project_fast(camera, interface, pt)
+            projected = refractive_project(camera, interface, pt)
             if projected is None:
                 resid[2 * i] = 100.0
                 resid[2 * i + 1] = 100.0

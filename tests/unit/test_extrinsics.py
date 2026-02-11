@@ -15,7 +15,7 @@ from aquacal.config.schema import (
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project_fast
+from aquacal.core.refractive_geometry import refractive_project
 from aquacal.calibration.extrinsics import (
     Observation,
     PoseGraph,
@@ -418,7 +418,7 @@ def _generate_refractive_detections(
     # Project through refractive interface
     pixels = []
     for pt in world_pts:
-        px = refractive_project_fast(camera, interface, pt)
+        px = refractive_project(camera, interface, pt)
         if px is None:
             return None
         pixels.append(px)

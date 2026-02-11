@@ -19,7 +19,7 @@ from aquacal.config.schema import (
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project, refractive_project_fast
+from aquacal.core.refractive_geometry import refractive_project
 from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
 
 
@@ -285,13 +285,27 @@ def build_jacobian_sparsity(
 
     # Append sparsity rows for water surface regularization residuals
     if water_z_weight > 0.0:
-        for _ in camera_order:
-            row = np.zeros(n_params, dtype=np.int8)
-            # Each regularization residual depends on all extrinsic and
-            # interface distance params (through the mean coupling)
-            row[:n_extrinsic_params] = 1
-            row[n_extrinsic_params : n_extrinsic_params + n_distance_params] = 1
-            residual_rows.append(row)
+        for i in range(len(camera_order)):
+            for j in range(i + 1, len(camera_order)):
+                row = np.zeros(n_params, dtype=np.int8)
+                cam_i = camera_order[i]
+                cam_j = camera_order[j]
+
+                # Camera i extrinsics (all 6, since C_z depends on R and t)
+                if cam_i in cam_to_ext_idx:
+                    ext_start = cam_to_ext_idx[cam_i] * 6
+                    row[ext_start : ext_start + 6] = 1
+
+                # Camera j extrinsics
+                if cam_j in cam_to_ext_idx:
+                    ext_start = cam_to_ext_idx[cam_j] * 6
+                    row[ext_start : ext_start + 6] = 1
+
+                # Interface distances for both cameras
+                row[n_extrinsic_params + cam_to_dist_idx[cam_i]] = 1
+                row[n_extrinsic_params + cam_to_dist_idx[cam_j]] = 1
+
+                residual_rows.append(row)
 
     return np.array(residual_rows, dtype=np.int8)
 
@@ -368,7 +382,6 @@ def compute_residuals(
     frame_order: list[int],
     min_corners: int,
     refine_intrinsics: bool = False,
-    use_fast_projection: bool = True,
     water_z_weight: float = 0.0,
 ) -> NDArray[np.float64]:
     """
@@ -395,7 +408,6 @@ def compute_residuals(
         frame_order: Ordered list of frame indices
         min_corners: Minimum corners per detection
         refine_intrinsics: Whether intrinsics are being refined
-        use_fast_projection: If True, use fast Newton-based projection
         water_z_weight: Weight for water surface consistency regularization.
             0.0 disables regularization (default).
 
@@ -444,10 +456,7 @@ def compute_residuals(
                 point_3d = corners_3d[corner_id]
                 detected_px = detection.corners_2d[i]
 
-                if use_fast_projection:
-                    projected = refractive_project_fast(camera, interface, point_3d)
-                else:
-                    projected = refractive_project(camera, interface, point_3d)
+                projected = refractive_project(camera, interface, point_3d)
 
                 if projected is None:
                     residuals.extend([100.0, 100.0])
@@ -461,14 +470,22 @@ def compute_residuals(
 
     # Append water surface consistency regularization residuals
     if water_z_weight > 0.0:
-        water_zs = []
+        # Compute water surface Z for each camera
+        water_zs = {}
         for cam_name in camera_order:
             C = extrinsics[cam_name].C
-            water_zs.append(C[2] + interface_distances[cam_name])
-        water_zs = np.array(water_zs)
-        water_z_mean = np.mean(water_zs)
-        for wz in water_zs:
-            residuals.append(water_z_weight * (wz - water_z_mean))
+            water_zs[cam_name] = C[2] + interface_distances[cam_name]
+
+        # Pairwise consistency: penalize differences between all camera pairs.
+        # Scale weight by 1/sqrt(N-1) so total regularization force per camera
+        # is comparable regardless of camera count.
+        n_cams = len(camera_order)
+        pair_weight = water_z_weight / np.sqrt(max(n_cams - 1, 1))
+        for i in range(n_cams):
+            for j in range(i + 1, n_cams):
+                cam_i = camera_order[i]
+                cam_j = camera_order[j]
+                residuals.append(pair_weight * (water_zs[cam_i] - water_zs[cam_j]))
 
     return np.array(residuals, dtype=np.float64)
 

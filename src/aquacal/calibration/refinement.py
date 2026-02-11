@@ -45,7 +45,6 @@ def joint_refinement(
     loss: str = "huber",
     loss_scale: float = 1.0,
     min_corners: int = 4,
-    use_fast_projection: bool = True,
     use_sparse_jacobian: bool = True,
     verbose: int = 0,
     water_z_weight: float = 0.0,
@@ -77,8 +76,6 @@ def joint_refinement(
         loss: Robust loss function ("linear", "huber", "soft_l1", "cauchy")
         loss_scale: Scale parameter for robust loss in pixels
         min_corners: Minimum corners per detection to include
-        use_fast_projection: Use fast Newton-based projection (default True).
-            Only works with horizontal interface (normal = [0, 0, -1]).
         use_sparse_jacobian: Use sparse Jacobian structure (default True).
             Dramatically improves performance for large parameter counts.
         verbose: Verbosity level for scipy.optimize.least_squares (default 0).
@@ -164,7 +161,6 @@ def joint_refinement(
         frame_order,
         min_corners,
         refine_intrinsics,
-        use_fast_projection,
         water_z_weight,
     )
 

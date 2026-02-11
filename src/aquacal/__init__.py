@@ -2,16 +2,31 @@
 
 __version__ = "0.1.0"
 
+# Load/save calibration results
+from aquacal.io.serialization import load_calibration, save_calibration
+
+# Core types
+from aquacal.config.schema import (
+    CalibrationResult,
+    CameraCalibration,
+    CameraIntrinsics,
+    CameraExtrinsics,
+)
+
+# Run calibration
+from aquacal.calibration.pipeline import run_calibration, load_config
+
 __all__ = [
     "__version__",
-    # Key types (re-exported for convenience once implemented):
-    # "CalibrationResult",
-    # "CalibrationConfig",
-    # "Camera",
-    # "Interface",
+    # Load/save
+    "load_calibration",
+    "save_calibration",
+    # Core types
+    "CalibrationResult",
+    "CameraCalibration",
+    "CameraIntrinsics",
+    "CameraExtrinsics",
+    # Run calibration
+    "run_calibration",
+    "load_config",
 ]
-
-# Convenience re-exports (uncomment as modules are implemented):
-# from aquacal.config.schema import CalibrationResult, CalibrationConfig
-# from aquacal.core.camera import Camera
-# from aquacal.core.interface_model import Interface
