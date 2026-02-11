@@ -317,6 +317,16 @@ def _generate_config_yaml(
 
     lines.extend([
         "",
+        "# Optional: cameras needing 8-coefficient rational distortion model",
+        "# Use for wide-angle lenses where the standard 5-coefficient model is insufficient",
+        "# rational_model_cameras:",
+    ])
+
+    for cam in camera_names:
+        lines.append(f"  # - {cam}")
+
+    lines.extend([
+        "",
         "paths:",
         "  intrinsic_videos:",
     ])

@@ -165,6 +165,9 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     min_cameras = det.get("min_cameras", 2)
     frame_step = det.get("frame_step", 1)
 
+    # Camera model settings
+    rational_model_cameras = data.get("rational_model_cameras", [])
+
     # Validation settings
     val = data.get("validation", {})
     holdout_fraction = val.get("holdout_fraction", 0.2)
@@ -188,6 +191,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         holdout_fraction=holdout_fraction,
         save_detailed_residuals=save_detailed,
         initial_interface_distances=initial_interface_distances,
+        rational_model_cameras=rational_model_cameras,
     )
 
 
@@ -335,10 +339,13 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         board=intrinsic_board,
         min_corners=config.min_corners_per_frame,
         frame_step=config.frame_step,
+        rational_model_cameras=config.rational_model_cameras or None,
         progress_callback=lambda name, cur, total: print(f"  Calibrating {name} ({cur}/{total})..."),
     )
     # Extract just intrinsics from (intrinsics, error) tuples
     intrinsics = {name: result[0] for name, result in intrinsics_results.items()}
+    for name, (_, rms) in intrinsics_results.items():
+        print(f"  {name}: RMS {rms:.3f} px")
     print(f"  Calibrated {len(intrinsics)} cameras")
 
     # --- Detect in underwater videos ---
@@ -374,12 +381,44 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
     print("\n[Stage 2] Extrinsic initialization...")
     pose_graph = build_pose_graph(cal_detections, config.min_cameras_per_frame)
     reference_camera = config.camera_names[0]
-    extrinsics = estimate_extrinsics(pose_graph, intrinsics, board, reference_camera)
+    interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
+    extrinsics = estimate_extrinsics(
+        pose_graph, intrinsics, board, reference_camera,
+        interface_distances=config.initial_interface_distances,
+        interface_normal=interface_normal,
+        n_air=config.n_air,
+        n_water=config.n_water,
+    )
     print(f"  Initialized {len(extrinsics)} camera poses")
+
+    # Save initial camera rig visualization (pre-optimization)
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 — registers '3d' projection
+
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection="3d")
+        for cam_name, ext in extrinsics.items():
+            C = ext.C
+            ax.scatter(C[0], C[1], C[2], s=50)
+            ax.text(C[0], C[1], C[2], f"  {cam_name}", fontsize=7)
+        ax.set_xlabel("X (m)")
+        ax.set_ylabel("Y (m)")
+        ax.set_zlabel("Z (m)")
+        ax.set_title("Stage 2: Initial Camera Positions (pre-optimization)")
+        fig.savefig(
+            str(config.output_dir / "camera_rig_initial.png"),
+            dpi=150, bbox_inches="tight",
+        )
+        plt.close(fig)
+        print(f"  Saved camera_rig_initial.png")
+    except Exception as e:
+        print(f"  Warning: Could not save camera_rig_initial.png: {e}")
 
     # --- Stage 3: Interface Optimization ---
     print("\n[Stage 3] Interface and pose optimization...")
-    interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
 
     t0 = time.perf_counter()
     stage3_extrinsics, stage3_distances, stage3_poses, stage3_rms = optimize_interface(
@@ -399,6 +438,20 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
     )
     elapsed = time.perf_counter() - t0
     print(f"  Stage 3 RMS: {stage3_rms:.3f} pixels ({elapsed:.1f}s)")
+
+    # Water surface consistency check
+    print("  Water surface Z per camera:")
+    water_zs = {}
+    for cam_name in sorted(stage3_extrinsics.keys()):
+        C = stage3_extrinsics[cam_name].C
+        cam_z = C[2]
+        d = stage3_distances[cam_name]
+        water_z = cam_z + d
+        water_zs[cam_name] = water_z
+        print(f"    {cam_name}: cam_z={cam_z:.4f}  d={d:.4f}  water_z={water_z:.4f}")
+
+    zs = np.array(list(water_zs.values()))
+    print(f"  Water surface Z: mean={np.mean(zs):.4f}  std={np.std(zs):.4f}  spread={np.ptp(zs):.4f}")
 
     # --- Stage 4: Optional Joint Refinement ---
     # Check if config has refine_intrinsics attribute (may not exist in base schema)
@@ -430,6 +483,20 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
         )
         elapsed = time.perf_counter() - t0
         print(f"  Stage 4 RMS: {final_rms:.3f} pixels ({elapsed:.1f}s)")
+
+        # Water surface consistency check after refinement
+        print("  Water surface Z per camera (after refinement):")
+        water_zs_final = {}
+        for cam_name in sorted(final_extrinsics.keys()):
+            C = final_extrinsics[cam_name].C
+            cam_z = C[2]
+            d = final_distances[cam_name]
+            water_z = cam_z + d
+            water_zs_final[cam_name] = water_z
+            print(f"    {cam_name}: cam_z={cam_z:.4f}  d={d:.4f}  water_z={water_z:.4f}")
+
+        zs_final = np.array(list(water_zs_final.values()))
+        print(f"  Water surface Z: mean={np.mean(zs_final):.4f}  std={np.std(zs_final):.4f}  spread={np.ptp(zs_final):.4f}")
     else:
         print("\n[Stage 4] Skipped (refine_intrinsics=False)")
         final_extrinsics = stage3_extrinsics
@@ -671,6 +738,9 @@ def _estimate_validation_poses(
                     if projected is not None:
                         residuals.append(det.corners_2d[i, 0] - projected[0])
                         residuals.append(det.corners_2d[i, 1] - projected[1])
+                    else:
+                        residuals.append(100.0)
+                        residuals.append(100.0)
 
             return residuals if residuals else [0.0, 0.0]
 

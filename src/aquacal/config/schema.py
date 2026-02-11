@@ -195,6 +195,9 @@ class CalibrationConfig:
             camera-to-water-surface distances in meters. When None, all cameras default
             to 0.15m. Doesn't need to be exact — within 2-3x of the true value is
             sufficient for good initialization in Stage 3.
+        rational_model_cameras: List of camera names that should use the 8-coefficient
+            rational distortion model instead of the standard 5-coefficient model.
+            Use for wide-angle lenses where 5 coefficients are insufficient.
     """
     board: BoardConfig
     camera_names: list[str]
@@ -213,6 +216,7 @@ class CalibrationConfig:
     holdout_fraction: float = 0.2  # Random selection; frames are held out entirely (not per-detection)
     save_detailed_residuals: bool = True
     initial_interface_distances: dict[str, float] | None = None
+    rational_model_cameras: list[str] = field(default_factory=list)
 
 
 @dataclass

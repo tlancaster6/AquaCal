@@ -5,6 +5,7 @@ import numpy as np
 
 from aquacal.config.schema import (
     BoardConfig,
+    CameraExtrinsics,
     CameraIntrinsics,
     Detection,
     FrameDetections,
@@ -12,13 +13,18 @@ from aquacal.config.schema import (
     ConnectivityError,
 )
 from aquacal.core.board import BoardGeometry
+from aquacal.core.camera import Camera
+from aquacal.core.interface_model import Interface
+from aquacal.core.refractive_geometry import refractive_project_fast
 from aquacal.calibration.extrinsics import (
     Observation,
     PoseGraph,
     estimate_board_pose,
+    refractive_solve_pnp,
     build_pose_graph,
     estimate_extrinsics,
 )
+from aquacal.utils.transforms import rvec_to_matrix
 
 
 @pytest.fixture
@@ -376,3 +382,241 @@ class TestEstimateExtrinsics:
             np.testing.assert_allclose(ext.R @ ext.R.T, np.eye(3), atol=1e-6)
             # Check determinant is +1 (proper rotation)
             np.testing.assert_allclose(np.linalg.det(ext.R), 1.0, atol=1e-6)
+
+
+def _generate_refractive_detections(
+    intrinsics_single: CameraIntrinsics,
+    camera_ext: CameraExtrinsics,
+    cam_name: str,
+    board: BoardGeometry,
+    board_rvec: np.ndarray,
+    board_tvec: np.ndarray,
+    interface_distance: float,
+    n_air: float = 1.0,
+    n_water: float = 1.333,
+) -> Detection | None:
+    """
+    Generate synthetic refractive detections by projecting board corners
+    through a refractive interface.
+
+    Returns Detection or None if any corner fails to project.
+    """
+    camera = Camera(cam_name, intrinsics_single, camera_ext)
+    interface = Interface(
+        normal=np.array([0.0, 0.0, -1.0]),
+        base_height=0.0,
+        camera_offsets={cam_name: interface_distance},
+        n_air=n_air,
+        n_water=n_water,
+    )
+
+    # Board corners in world frame
+    R_board = rvec_to_matrix(board_rvec)
+    all_ids = np.arange(board.num_corners, dtype=np.int32)
+    object_points = board.get_corner_array(all_ids)
+    world_pts = (R_board @ object_points.T).T + board_tvec
+
+    # Project through refractive interface
+    pixels = []
+    for pt in world_pts:
+        px = refractive_project_fast(camera, interface, pt)
+        if px is None:
+            return None
+        pixels.append(px)
+
+    corners_2d = np.array(pixels, dtype=np.float64)
+    return Detection(corner_ids=all_ids, corners_2d=corners_2d)
+
+
+class TestRefractiveSolvePnp:
+    """Tests for refractive_solve_pnp() function."""
+
+    def test_recovers_ground_truth_pose(self, board, intrinsics):
+        """Recovers board pose from synthetic refractive detections (rot < 1deg, trans < 5mm)."""
+        # Ground truth board pose in camera frame
+        rvec_true = np.array([0.1, -0.05, 0.02])
+        tvec_true = np.array([0.01, -0.02, 0.50])
+
+        interface_distance = 0.15
+
+        # Generate synthetic detections using identity camera
+        identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
+        det = _generate_refractive_detections(
+            intrinsics["cam0"], identity_ext, "_test", board,
+            rvec_true, tvec_true, interface_distance,
+        )
+        assert det is not None
+
+        result = refractive_solve_pnp(
+            intrinsics["cam0"], det.corners_2d, det.corner_ids, board,
+            interface_distance,
+        )
+        assert result is not None
+        rvec_est, tvec_est = result
+
+        # Check rotation error < 1 degree
+        R_true = rvec_to_matrix(rvec_true)
+        R_est = rvec_to_matrix(rvec_est)
+        R_err = R_true.T @ R_est
+        angle_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
+        assert np.degrees(angle_err) < 1.0, f"Rotation error {np.degrees(angle_err):.3f} deg"
+
+        # Check translation error < 5mm
+        trans_err = np.linalg.norm(tvec_est - tvec_true)
+        assert trans_err < 0.005, f"Translation error {trans_err*1000:.1f} mm"
+
+    def test_more_accurate_than_standard_pnp(self, board, intrinsics):
+        """Refractive PnP is at least 5x more accurate than standard PnP on refractive data."""
+        rvec_true = np.array([0.08, -0.03, 0.01])
+        tvec_true = np.array([0.02, -0.01, 0.45])
+        interface_distance = 0.15
+
+        # Generate refractive detections
+        identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
+        det = _generate_refractive_detections(
+            intrinsics["cam0"], identity_ext, "_test", board,
+            rvec_true, tvec_true, interface_distance,
+        )
+        assert det is not None
+
+        # Standard PnP
+        result_std = estimate_board_pose(
+            intrinsics["cam0"], det.corners_2d, det.corner_ids, board,
+        )
+        assert result_std is not None
+        _, tvec_std = result_std
+        err_std = np.linalg.norm(tvec_std - tvec_true)
+
+        # Refractive PnP
+        result_ref = refractive_solve_pnp(
+            intrinsics["cam0"], det.corners_2d, det.corner_ids, board,
+            interface_distance,
+        )
+        assert result_ref is not None
+        _, tvec_ref = result_ref
+        err_ref = np.linalg.norm(tvec_ref - tvec_true)
+
+        assert err_ref * 5 < err_std, (
+            f"Refractive PnP ({err_ref*1000:.1f}mm) not 5x better than "
+            f"standard PnP ({err_std*1000:.1f}mm)"
+        )
+
+    def test_returns_none_for_few_points(self, board, intrinsics):
+        """Returns None if fewer than 4 corners."""
+        result = refractive_solve_pnp(
+            intrinsics["cam0"],
+            np.array([[100, 100], [200, 100], [150, 200]], dtype=np.float64),
+            np.array([0, 1, 2], dtype=np.int32),
+            board, 0.15,
+        )
+        assert result is None
+
+    def test_returns_float64_arrays(self, board, intrinsics):
+        """Returns arrays with float64 dtype."""
+        rvec_true = np.array([0.05, -0.02, 0.01])
+        tvec_true = np.array([0.0, 0.0, 0.40])
+        interface_distance = 0.15
+
+        identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
+        det = _generate_refractive_detections(
+            intrinsics["cam0"], identity_ext, "_test", board,
+            rvec_true, tvec_true, interface_distance,
+        )
+        assert det is not None
+
+        result = refractive_solve_pnp(
+            intrinsics["cam0"], det.corners_2d, det.corner_ids, board,
+            interface_distance,
+        )
+        assert result is not None
+        rvec, tvec = result
+        assert rvec.dtype == np.float64
+        assert tvec.dtype == np.float64
+        assert rvec.shape == (3,)
+        assert tvec.shape == (3,)
+
+    def test_default_interface_normal(self, board, intrinsics):
+        """Works without explicitly passing interface_normal."""
+        rvec_true = np.array([0.05, -0.02, 0.01])
+        tvec_true = np.array([0.0, 0.0, 0.40])
+
+        identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
+        det = _generate_refractive_detections(
+            intrinsics["cam0"], identity_ext, "_test", board,
+            rvec_true, tvec_true, 0.15,
+        )
+        assert det is not None
+
+        # Call without interface_normal (should default to [0,0,-1])
+        result = refractive_solve_pnp(
+            intrinsics["cam0"], det.corners_2d, det.corner_ids, board, 0.15,
+        )
+        assert result is not None
+
+
+class TestEstimateExtrinsicsRefractive:
+    """Tests for estimate_extrinsics with refractive PnP."""
+
+    def test_coplanar_cameras_with_interface(self, board, intrinsics):
+        """Coplanar cameras produce Z spread < 0.05m with refractive PnP."""
+        # Two cameras at same Z height, separated in X
+        ext0 = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))  # C0 = [0,0,0]
+        # C1 = [0.3, 0, 0]: t = -R @ C = [-0.3, 0, 0]
+        ext1 = CameraExtrinsics(R=np.eye(3), t=np.array([-0.3, 0.0, 0.0]))
+
+        interface_distance = 0.15
+
+        # Board in world frame, below interface
+        board_rvec = np.array([0.1, -0.05, 0.02])
+        board_tvec = np.array([0.15, 0.0, 0.50])
+
+        # Generate refractive detections for each camera
+        det0 = _generate_refractive_detections(
+            intrinsics["cam0"], ext0, "cam0", board,
+            board_rvec, board_tvec, interface_distance,
+        )
+        det1 = _generate_refractive_detections(
+            intrinsics["cam1"], ext1, "cam1", board,
+            board_rvec, board_tvec, interface_distance,
+        )
+        assert det0 is not None and det1 is not None
+
+        # Build DetectionResult and PoseGraph
+        frames = {
+            0: FrameDetections(
+                frame_idx=0,
+                detections={"cam0": det0, "cam1": det1},
+            ),
+        }
+        detection_result = DetectionResult(
+            frames=frames, camera_names=["cam0", "cam1"], total_frames=1,
+        )
+        graph = build_pose_graph(detection_result)
+
+        # Estimate with refractive PnP
+        interface_distances = {"cam0": interface_distance, "cam1": interface_distance}
+        extrinsics_result = estimate_extrinsics(
+            graph, intrinsics, board, reference_camera="cam0",
+            interface_distances=interface_distances,
+        )
+
+        # Both cameras should be near Z=0 (coplanar)
+        # Reference camera is at origin
+        cam1_C = extrinsics_result["cam1"].C
+        z_spread = abs(cam1_C[2] - 0.0)
+        assert z_spread < 0.05, f"Z spread {z_spread:.3f}m exceeds 0.05m"
+
+    def test_backward_compatible_without_interface(self, board, intrinsics):
+        """Without interface params, behaves identically to standard PnP."""
+        detections = make_connected_detections(["cam0", "cam1", "cam2"])
+        graph = build_pose_graph(detections)
+
+        # Call without interface params
+        result_no_iface = estimate_extrinsics(graph, intrinsics, board)
+
+        # Reference camera at origin
+        np.testing.assert_allclose(result_no_iface["cam0"].R, np.eye(3), atol=1e-10)
+        np.testing.assert_allclose(result_no_iface["cam0"].t, np.zeros(3), atol=1e-10)
+
+        # All cameras get poses
+        assert set(result_no_iface.keys()) == {"cam0", "cam1", "cam2"}

@@ -8,6 +8,18 @@ Format: Agents append entries at the top (below this header) with the date, file
 
 <!-- Agents: add new entries below this line, above previous entries -->
 
+## 2026-02-10 (Task P.15)
+### [src/aquacal/calibration/extrinsics.py]
+- Added `refractive_solve_pnp()`: refractive-corrected PnP using identity-camera trick and LM refinement
+- Extended `estimate_extrinsics()` with optional interface parameters for refractive PnP in BFS traversal
+
+### [src/aquacal/calibration/interface_estimation.py]
+- Replaced `tvec[2] *= n_water` hack in `_compute_initial_board_poses()` with `refractive_solve_pnp()` call
+- Added `interface_distances`, `interface_normal`, `n_air` parameters to `_compute_initial_board_poses()`
+
+### [src/aquacal/calibration/pipeline.py]
+- Wired Stage 2 `estimate_extrinsics()` call to pass interface parameters from config
+
 ## 2026-02-10 (Task P.14)
 ### [src/aquacal/io/detection.py]
 - Fixed progress callback to report processed frame count instead of raw video frame indices

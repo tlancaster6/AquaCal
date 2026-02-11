@@ -8,6 +8,7 @@ from aquacal.calibration.extrinsics import (
     Observation,
     PoseGraph,
     estimate_board_pose,
+    refractive_solve_pnp,
     build_pose_graph,
     estimate_extrinsics,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "Observation",
     "PoseGraph",
     "estimate_board_pose",
+    "refractive_solve_pnp",
     "build_pose_graph",
     "estimate_extrinsics",
     # interface_estimation

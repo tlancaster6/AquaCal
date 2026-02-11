@@ -86,8 +86,15 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.13** Fix validation metrics reporting zero
 
-- [x] **P.14** Fix progress feedback gaps: Fix detection callback passing raw frame indices instead of processed count, add `verbose` parameter to `optimize_interface()` and `joint_refinement()`, and pass `verbose=1` from pipeline for Stage 3/4 optimizer progress.: Estimate board poses for held-out validation frames via per-frame refractive optimization (6 params, camera params fixed), and change silent 0.0 fallbacks in validation modules to warn and return NaN.
+- [x] **P.14** Fix progress feedback gaps: Fix detection callback passing raw frame indices instead of processed count, add `verbose` parameter to `optimize_interface()` and `joint_refinement()`, wire CLI `-v` flag to enable scipy `verbose=2` for per-iteration optimizer progress.
 
+- [x] **P.15** Refractive PnP initialization: Replace standard `cv2.solvePnP` with refractive-corrected PnP (6-param least_squares refinement) for Stage 2 extrinsic initialization and Stage 3 initial board poses. Standard PnP ignores refraction, causing ~2m Z spread in cameras that should be coplanar and preventing Stage 3 convergence.
+
+- [ ] **P.16** Expose Stage 4 joint refinement in config: Add `refine_intrinsics: bool` to `CalibrationConfig`, parse from `optimization.refine_intrinsics` in YAML, and wire through to pipeline. Currently hardcoded to False via `getattr` fallback. Stage 4 jointly refines extrinsics, interface distances, board poses, and per-camera `fx, fy, cx, cy`. Should only be enabled after Stage 3 converges reliably.
+
+- [ ] **P.17** Wire up `normal_fixed` config and add normal optimization: `interface_normal_fixed` is parsed from YAML and stored in config but never passed to the optimizers — the normal is always hardcoded to `[0, 0, -1]`. Add `refractive_project_general()` (Newton-Raphson for arbitrary normals), add 2 tilt-angle parameters to the Stage 3/4 optimization vector when `normal_fixed: false`, and wire through pipeline. Needed when camera rig is tilted relative to water surface.
+
+- [ ] **P.18** Water surface Z consistency diagnostic: After Stage 3, compute `water_z = camera_z + interface_distance` per camera and report the spread. Tests the physical constraint that the water surface is a single plane. Add to pipeline printout and `diagnostics.json`.
 
 ---
 

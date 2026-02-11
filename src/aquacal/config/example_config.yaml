@@ -26,6 +26,11 @@ cameras:
   - cam3
   # Camera names are flexible — use any string that matches your video filenames
 
+# Optional: cameras needing 8-coefficient rational distortion model
+# Use for wide-angle lenses where the standard 5-coefficient model is insufficient
+# rational_model_cameras:
+#   - cam2
+
 paths:
   intrinsic_videos:
     cam0: "/path/to/intrinsic/cam0.mp4"

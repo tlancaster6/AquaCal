@@ -21,6 +21,7 @@ def calibrate_intrinsics_single(
     max_frames: int = 100,
     min_corners: int = 8,
     frame_step: int = 1,
+    rational_model: bool = False,
 ) -> tuple[CameraIntrinsics, float]:
     """
     Calibrate intrinsics for a single camera from in-air video.
@@ -34,10 +35,12 @@ def calibrate_intrinsics_single(
         max_frames: Maximum number of frames to use for calibration (default 100)
         min_corners: Minimum corners required per frame (default 8)
         frame_step: Process every Nth frame from video (default 1)
+        rational_model: If True, use 8-coefficient rational distortion model
+            instead of the standard 5-coefficient model. Use for wide-angle lenses.
 
     Returns:
         Tuple of (CameraIntrinsics, reprojection_error_rms):
-        - CameraIntrinsics with K, dist_coeffs (5 coefficients), and image_size
+        - CameraIntrinsics with K and dist_coeffs (5 or 8 coefficients), and image_size
         - RMS reprojection error in pixels
 
     Raises:
@@ -102,7 +105,7 @@ def calibrate_intrinsics_single(
         image_points.append(corners_2d.astype(np.float32))
 
     # Run OpenCV calibration
-    flags = 0  # Use defaults (5 distortion coefficients)
+    flags = cv2.CALIB_RATIONAL_MODEL if rational_model else 0
     ret, K, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(  # type: ignore[call-overload]
         object_points,
         image_points,
@@ -176,6 +179,7 @@ def calibrate_intrinsics_all(
     max_frames: int = 100,
     min_corners: int = 8,
     frame_step: int = 1,
+    rational_model_cameras: list[str] | None = None,
     progress_callback: Callable[[str, int, int], None] | None = None,
 ) -> dict[str, tuple[CameraIntrinsics, float]]:
     """
@@ -187,6 +191,8 @@ def calibrate_intrinsics_all(
         max_frames: Maximum frames per camera (default 100)
         min_corners: Minimum corners per frame (default 8)
         frame_step: Process every Nth frame (default 1)
+        rational_model_cameras: List of camera names that should use the
+            8-coefficient rational distortion model (default None = all use 5-coeff)
         progress_callback: Optional callback(camera_name, current_cam, total_cams)
 
     Returns:
@@ -210,12 +216,14 @@ def calibrate_intrinsics_all(
         if progress_callback is not None:
             progress_callback(name, idx + 1, total)
 
+        rational = rational_model_cameras is not None and name in rational_model_cameras
         intrinsics, error = calibrate_intrinsics_single(
             video_paths[name],
             board,
             max_frames=max_frames,
             min_corners=min_corners,
             frame_step=frame_step,
+            rational_model=rational,
         )
         results[name] = (intrinsics, error)
 

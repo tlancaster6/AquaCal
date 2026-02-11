@@ -4,7 +4,6 @@ This module implements joint optimization of camera extrinsics, per-camera
 interface distances, and board poses using underwater ChArUco detections.
 """
 
-import cv2
 import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import least_squares
@@ -27,6 +26,7 @@ from aquacal.calibration._optim_common import (
     compute_residuals,
     make_sparse_jacobian_func,
 )
+from aquacal.calibration.extrinsics import refractive_solve_pnp
 from aquacal.utils.transforms import (
     rvec_to_matrix,
     matrix_to_rvec,
@@ -41,19 +41,17 @@ def _compute_initial_board_poses(
     extrinsics: dict[str, CameraExtrinsics],
     board: BoardGeometry,
     min_corners: int = 4,
+    interface_distances: dict[str, float] | None = None,
+    interface_normal: NDArray[np.float64] | None = None,
+    n_air: float = 1.0,
     n_water: float = 1.333,
 ) -> dict[int, BoardPose]:
     """
-    Compute initial board poses via solvePnP for each frame.
+    Compute initial board poses via refractive PnP for each frame.
 
     For each frame, uses the camera with the most detected corners to estimate
-    the board pose via cv2.solvePnP. The pose is transformed to world frame
-    using that camera's extrinsics.
-
-    Note: solvePnP assumes pinhole projection, but the detected corners were
-    projected through a refractive interface. This causes an "apparent depth"
-    effect where objects appear closer. We apply an approximate correction
-    by scaling the Z component of the translation by n_water.
+    the board pose using refractive_solve_pnp, which accounts for refraction
+    at the air-water interface.
 
     Args:
         detections: Detection results
@@ -61,11 +59,18 @@ def _compute_initial_board_poses(
         extrinsics: Per-camera extrinsics (for transforming to world frame)
         board: Board geometry
         min_corners: Minimum corners required for PnP
-        n_water: Refractive index of water (for depth correction)
+        interface_distances: Per-camera interface distances. If None,
+            defaults to 0.15m for all cameras.
+        interface_normal: Interface normal vector. If None, uses [0, 0, -1].
+        n_air: Refractive index of air (default 1.0)
+        n_water: Refractive index of water (default 1.333)
 
     Returns:
         Dict mapping frame_idx to BoardPose (in world frame)
     """
+    if interface_distances is None:
+        interface_distances = {cam: 0.15 for cam in intrinsics.keys()}
+
     board_poses = {}
 
     for frame_idx, frame_det in detections.frames.items():
@@ -82,29 +87,15 @@ def _compute_initial_board_poses(
 
         det = frame_det.detections[best_cam]
 
-        # Get 3D object points
-        object_points = board.get_corner_array(det.corner_ids).astype(np.float32)
-        image_points = det.corners_2d.astype(np.float32)
-
-        intr = intrinsics[best_cam]
-        success, rvec_bc, tvec_bc = cv2.solvePnP(
-            object_points,
-            image_points,
-            intr.K.astype(np.float64),
-            intr.dist_coeffs.astype(np.float64),
-            flags=cv2.SOLVEPNP_ITERATIVE,
+        result = refractive_solve_pnp(
+            intrinsics[best_cam], det.corners_2d, det.corner_ids, board,
+            interface_distances.get(best_cam, 0.15),
+            interface_normal, n_air, n_water,
         )
-
-        if not success:
+        if result is None:
             continue
 
-        rvec_bc = rvec_bc.flatten()
-        tvec_bc = tvec_bc.flatten()
-
-        # Apply approximate depth correction for refraction
-        # solvePnP gives "apparent" depth; real depth is approximately n_water times larger
-        # This is a rough approximation but provides better initialization
-        tvec_bc[2] *= n_water
+        rvec_bc, tvec_bc = result
 
         # Transform board pose from camera frame to world frame
         # board_in_world = camera_in_world @ board_in_camera
@@ -204,7 +195,10 @@ def optimize_interface(
 
     # Compute initial board poses
     initial_board_poses = _compute_initial_board_poses(
-        detections, intrinsics, initial_extrinsics, board, min_corners, n_water
+        detections, intrinsics, initial_extrinsics, board, min_corners,
+        interface_distances=initial_interface_distances,
+        interface_normal=interface_normal,
+        n_air=n_air, n_water=n_water,
     )
 
     # Filter to frames with valid board poses

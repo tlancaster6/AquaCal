@@ -202,10 +202,44 @@ def compute_depth_stratified_errors(
     return pd.DataFrame(rows)
 
 
+def compute_water_surface_consistency(
+    calibration: CalibrationResult,
+) -> dict[str, float]:
+    """
+    Compute water surface Z consistency across cameras.
+
+    For each camera, computes water_z = camera_center_z + interface_distance.
+    If calibration is consistent, all cameras should agree on the same Z.
+
+    Args:
+        calibration: Complete calibration result
+
+    Returns:
+        Dict with keys:
+        - "mean": Mean water surface Z across cameras
+        - "std": Standard deviation of water surface Z
+        - "spread": Max - min water surface Z
+        - "per_camera": Dict mapping camera name to water surface Z
+    """
+    water_zs = {}
+    for cam_name, cam_calib in calibration.cameras.items():
+        C = cam_calib.extrinsics.C
+        water_zs[cam_name] = C[2] + cam_calib.interface_distance
+
+    zs = np.array(list(water_zs.values()))
+    return {
+        "mean": float(np.mean(zs)),
+        "std": float(np.std(zs)),
+        "spread": float(np.ptp(zs)),
+        "per_camera": water_zs,
+    }
+
+
 def generate_recommendations(
     reprojection: ReprojectionErrors,
     reconstruction: DistanceErrors,
     depth_errors: pd.DataFrame,
+    water_surface: dict | None = None,
 ) -> list[str]:
     """
     Generate human-readable recommendations based on diagnostic results.
@@ -214,6 +248,7 @@ def generate_recommendations(
         reprojection: Reprojection error statistics
         reconstruction: 3D reconstruction error statistics
         depth_errors: Depth-stratified error table
+        water_surface: Optional water surface consistency data from compute_water_surface_consistency()
 
     Returns:
         List of recommendation strings.
@@ -272,6 +307,34 @@ def generate_recommendations(
                     "Error increases with depth - consider re-estimating interface parameters"
                 )
 
+    # Water surface consistency
+    if water_surface is not None:
+        spread = water_surface["spread"]
+        if spread < 0.02:
+            recs.append(
+                f"Water surface Z spread ({spread*1000:.1f} mm) is excellent — flat water assumption holds"
+            )
+        elif spread < 0.05:
+            recs.append(f"Water surface Z spread ({spread*1000:.1f} mm) is acceptable")
+        elif spread < 0.10:
+            recs.append(
+                f"Water surface Z spread ({spread*1000:.1f} mm) is elevated — consider enabling normal_fixed: false"
+            )
+        else:
+            recs.append(
+                f"Water surface Z spread ({spread*1000:.1f} mm) is large — check extrinsics and interface distances"
+            )
+
+        # Flag outlier cameras (>2 std from mean)
+        mean_z = water_surface["mean"]
+        std_z = water_surface["std"]
+        if std_z > 0:
+            for cam, z in water_surface["per_camera"].items():
+                if abs(z - mean_z) > 2 * std_z:
+                    recs.append(
+                        f"Camera '{cam}' water surface Z is an outlier ({z:.4f} vs mean {mean_z:.4f})"
+                    )
+
     return recs
 
 
@@ -311,9 +374,12 @@ def generate_diagnostic_report(
         calibration, detections, board_poses, reprojection_errors, board
     )
 
+    # Compute water surface consistency
+    water_surface = compute_water_surface_consistency(calibration)
+
     # Generate recommendations
     recommendations = generate_recommendations(
-        reprojection_errors, reconstruction_errors, depth_errors
+        reprojection_errors, reconstruction_errors, depth_errors, water_surface
     )
 
     # Build summary statistics
@@ -324,6 +390,9 @@ def generate_diagnostic_report(
         "reconstruction_std": reconstruction_errors.std,
         "reconstruction_max": reconstruction_errors.max_error,
         "reconstruction_num_comparisons": float(reconstruction_errors.num_comparisons),
+        "water_surface_z_mean": water_surface["mean"],
+        "water_surface_z_std": water_surface["std"],
+        "water_surface_z_spread": water_surface["spread"],
     }
 
     return DiagnosticReport(
@@ -600,6 +669,10 @@ def save_diagnostic_report(
 
     # Save JSON summary
     json_path = output_dir / "diagnostics.json"
+
+    # Compute water surface consistency
+    water_surface = compute_water_surface_consistency(calibration)
+
     json_data = {
         "summary": report.summary,
         "recommendations": report.recommendations,
@@ -613,6 +686,12 @@ def save_diagnostic_report(
             "std": report.reconstruction.std,
             "max_error": report.reconstruction.max_error,
             "num_comparisons": report.reconstruction.num_comparisons,
+        },
+        "water_surface": {
+            "mean": water_surface["mean"],
+            "std": water_surface["std"],
+            "spread": water_surface["spread"],
+            "per_camera": water_surface["per_camera"],
         },
     }
     with open(json_path, "w") as f:

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 from numpy.typing import NDArray
+from scipy.optimize import least_squares
 
 from aquacal.config.schema import (
     CameraExtrinsics,
@@ -16,7 +17,10 @@ from aquacal.config.schema import (
     DetectionResult,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.utils.transforms import compose_poses, invert_pose
+from aquacal.core.camera import Camera
+from aquacal.core.interface_model import Interface
+from aquacal.core.refractive_geometry import refractive_project_fast
+from aquacal.utils.transforms import compose_poses, invert_pose, rvec_to_matrix
 
 
 @dataclass
@@ -97,6 +101,95 @@ def estimate_board_pose(
         return None
 
     return rvec.flatten().astype(np.float64), tvec.flatten().astype(np.float64)
+
+
+def refractive_solve_pnp(
+    intrinsics: CameraIntrinsics,
+    corners_2d: NDArray[np.float64],
+    corner_ids: NDArray[np.int32],
+    board: BoardGeometry,
+    interface_distance: float,
+    interface_normal: NDArray[np.float64] | None = None,
+    n_air: float = 1.0,
+    n_water: float = 1.333,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]] | None:
+    """
+    Estimate board pose with refractive correction using LM refinement.
+
+    Uses standard solvePnP as initial guess, applies rough depth correction,
+    then refines by minimizing refractive reprojection error.
+
+    The key trick: use an identity-extrinsics camera so camera frame = world
+    frame. Board corners transformed by the candidate pose become "world points"
+    that get projected through the refractive interface.
+
+    Args:
+        intrinsics: Camera intrinsic parameters
+        corners_2d: Detected corner positions, shape (N, 2)
+        corner_ids: Corner IDs corresponding to corners_2d, shape (N,)
+        board: Board geometry for 3D corner positions
+        interface_distance: Distance from camera to water surface in meters
+        interface_normal: Interface normal vector. If None, uses [0, 0, -1].
+        n_air: Refractive index of air (default 1.0)
+        n_water: Refractive index of water (default 1.333)
+
+    Returns:
+        Tuple of (rvec, tvec) representing board pose in camera frame,
+        or None if PnP fails.
+    """
+    # Get initial guess from standard PnP
+    result = estimate_board_pose(intrinsics, corners_2d, corner_ids, board)
+    if result is None:
+        return None
+
+    rvec_init, tvec_init = result
+
+    # Apply rough depth correction for refraction
+    tvec_init[2] *= n_water
+
+    if interface_normal is None:
+        interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
+
+    # Set up identity-extrinsics camera (camera frame = world frame)
+    identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
+    camera = Camera("_pnp", intrinsics, identity_ext)
+    interface = Interface(
+        normal=interface_normal,
+        base_height=0.0,
+        camera_offsets={"_pnp": interface_distance},
+        n_air=n_air,
+        n_water=n_water,
+    )
+
+    # Get 3D object points in board frame
+    object_points = board.get_corner_array(corner_ids).astype(np.float64)
+    image_points = corners_2d.astype(np.float64)
+    n_pts = len(object_points)
+
+    def residuals(x: NDArray[np.float64]) -> NDArray[np.float64]:
+        rvec = x[:3]
+        tvec = x[3:]
+        R = rvec_to_matrix(rvec)
+        # Board corners in camera frame (= world frame for identity camera)
+        pts_cam = (R @ object_points.T).T + tvec
+        resid = np.empty(n_pts * 2, dtype=np.float64)
+        for i, pt in enumerate(pts_cam):
+            projected = refractive_project_fast(camera, interface, pt)
+            if projected is None:
+                resid[2 * i] = 100.0
+                resid[2 * i + 1] = 100.0
+            else:
+                resid[2 * i] = projected[0] - image_points[i, 0]
+                resid[2 * i + 1] = projected[1] - image_points[i, 1]
+        return resid
+
+    x0 = np.concatenate([rvec_init, tvec_init])
+
+    result_opt = least_squares(residuals, x0, method="lm", max_nfev=200)
+
+    rvec_out = result_opt.x[:3].astype(np.float64)
+    tvec_out = result_opt.x[3:].astype(np.float64)
+    return rvec_out, tvec_out
 
 
 def _find_connected_components(
@@ -225,6 +318,10 @@ def estimate_extrinsics(
     intrinsics: dict[str, CameraIntrinsics],
     board: BoardGeometry,
     reference_camera: str | None = None,
+    interface_distances: dict[str, float] | None = None,
+    interface_normal: NDArray[np.float64] | None = None,
+    n_air: float = 1.0,
+    n_water: float = 1.333,
 ) -> dict[str, CameraExtrinsics]:
     """
     Estimate camera extrinsics by chaining poses through the graph.
@@ -246,6 +343,12 @@ def estimate_extrinsics(
         board: Board geometry
         reference_camera: Camera to place at world origin.
             If None, uses first camera name (sorted).
+        interface_distances: Optional dict mapping camera names to interface
+            distances in meters. When provided, uses refractive PnP for
+            cameras with known distances.
+        interface_normal: Interface normal vector. If None, uses [0, 0, -1].
+        n_air: Refractive index of air (default 1.0)
+        n_water: Refractive index of water (default 1.333)
 
     Returns:
         Dict mapping camera names to CameraExtrinsics.
@@ -312,9 +415,16 @@ def estimate_extrinsics(
                     continue
                 obs = obs_maybe
 
-                result = estimate_board_pose(
-                    intrinsics[cam_name], obs.corners_2d, obs.corner_ids, board
-                )
+                if interface_distances is not None and cam_name in interface_distances:
+                    result = refractive_solve_pnp(
+                        intrinsics[cam_name], obs.corners_2d, obs.corner_ids,
+                        board, interface_distances[cam_name],
+                        interface_normal, n_air, n_water,
+                    )
+                else:
+                    result = estimate_board_pose(
+                        intrinsics[cam_name], obs.corners_2d, obs.corner_ids, board
+                    )
                 if result is None:
                     continue
 
@@ -349,9 +459,16 @@ def estimate_extrinsics(
                     continue
                 obs = obs_maybe
 
-                result = estimate_board_pose(
-                    intrinsics[cam_name], obs.corners_2d, obs.corner_ids, board
-                )
+                if interface_distances is not None and cam_name in interface_distances:
+                    result = refractive_solve_pnp(
+                        intrinsics[cam_name], obs.corners_2d, obs.corner_ids,
+                        board, interface_distances[cam_name],
+                        interface_normal, n_air, n_water,
+                    )
+                else:
+                    result = estimate_board_pose(
+                        intrinsics[cam_name], obs.corners_2d, obs.corner_ids, board
+                    )
                 if result is None:
                     continue
 
