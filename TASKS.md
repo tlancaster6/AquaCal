@@ -102,6 +102,8 @@ Status key: `[ ]` not started | `[~]` in progress | `[x]` complete
 
 - [x] **P.21** Three-panel camera rig visualization: Refactor `plot_camera_rig()` to produce a 1×3 figure with perspective, top-down, and side-on views. Replace inline scatter plot in pipeline.py with a call to the shared function.
 
+- [ ] **P.22** Test and document sparse Jacobian OOM fix: Add unit tests for `dense_threshold` behavior in `make_sparse_jacobian_func()` and update changelog. The function was modified to return sparse matrices for large problems to avoid OOM, but was not tested or documented.
+
 ---
 
 ## Future: Advanced Optimization

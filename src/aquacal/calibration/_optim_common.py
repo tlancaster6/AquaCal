@@ -446,24 +446,29 @@ def make_sparse_jacobian_func(
     cost_args: tuple,
     jac_sparsity: NDArray[np.int8],
     bounds: tuple[NDArray[np.float64], NDArray[np.float64]],
+    dense_threshold: int = 500_000_000,
 ):
     """
     Create a Jacobian callable that uses sparse finite differences.
 
-    Uses sparse column grouping for efficient FD computation but returns
-    a dense matrix, allowing the 'exact' trust-region solver (LSMR can
-    diverge on ill-conditioned problems).
+    Uses sparse column grouping for efficient FD computation. Returns a
+    dense matrix for small problems (enabling the exact trust-region solver)
+    or a sparse matrix for large problems (using LSMR solver to avoid OOM).
 
     Args:
         cost_func: The cost function
         cost_args: Arguments to pass to cost_func after params
         jac_sparsity: Sparsity pattern matrix (n_residuals, n_params)
         bounds: Tuple of (lower, upper) bound arrays
+        dense_threshold: Maximum number of elements (rows*cols) before
+            returning sparse instead of dense. Default 500M (~4 GiB).
 
     Returns:
-        Callable that takes (params, *args) and returns dense Jacobian
+        Callable that takes (params, *args) and returns Jacobian matrix
     """
     groups = group_columns(jac_sparsity)
+    n_elements = jac_sparsity.shape[0] * jac_sparsity.shape[1]
+    use_dense = n_elements <= dense_threshold
 
     def jac_func(params, *args):
         J_sparse = approx_derivative(
@@ -473,6 +478,8 @@ def make_sparse_jacobian_func(
             sparsity=(jac_sparsity, groups),
             bounds=bounds,
         )
-        return J_sparse.toarray() if hasattr(J_sparse, "toarray") else np.asarray(J_sparse)
+        if use_dense:
+            return J_sparse.toarray() if hasattr(J_sparse, "toarray") else np.asarray(J_sparse)
+        return J_sparse
 
     return jac_func

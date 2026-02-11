@@ -9,6 +9,17 @@ Format: Agents append entries at the top (below this header) with the date, file
 <!-- Agents: add new entries below this line, above previous entries -->
 
 ## 2026-02-11
+### [src/aquacal/calibration/_optim_common.py]
+- Added `dense_threshold` parameter to `make_sparse_jacobian_func()` to prevent OOM on large problems
+- Problems exceeding threshold (default 500M elements / ~4 GiB) return sparse Jacobian (LSMR solver) instead of dense (exact solver)
+- Fixes crash on 12-camera, 629-frame calibration (469K×3852 Jacobian = 13.5 GiB)
+
+### [tests/unit/test_optim_common.py] (new file)
+- Added 4 tests for `make_sparse_jacobian_func()` dense_threshold behavior
+- Tests verify small problems return dense array, large problems return sparse matrix
+- Tests verify threshold boundary behavior and numerical correctness of both paths
+
+## 2026-02-11
 ### [src/aquacal/validation/diagnostics.py]
 - Modified `plot_camera_rig()` to produce three-panel figure (perspective, top-down, side view)
 - Removed `ax` parameter; function now creates 1×3 subplot layout internally
