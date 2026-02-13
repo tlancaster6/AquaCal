@@ -37,6 +37,12 @@ cameras:
 # auxiliary_cameras:
 #   - center_cam
 
+# Optional: cameras using equidistant fisheye projection model
+# Must be a subset of auxiliary_cameras. Must not overlap with rational_model_cameras.
+# Use for wide-angle lenses (e.g. 2.8mm) where pinhole+polynomial distortion fails.
+# fisheye_cameras:
+#   - overview_cam  # Must also be in auxiliary_cameras. Uses equidistant fisheye model.
+
 paths:
   intrinsic_videos:
     cam0: "/path/to/intrinsic/cam0.mp4"
@@ -53,7 +59,7 @@ paths:
 interface:
   n_air: 1.0             # Refractive index of air
   n_water: 1.333         # Refractive index of water (fresh water at 20C)
-  normal_fixed: true     # If false, estimate interface tilt
+  normal_fixed: false    # If true, assume reference camera is perpendicular to water surface
 
   # Optional: approximate camera-to-water-surface distances (meters)
   # Improves Stage 3 initialization. Doesn't need to be exact (within 2-3x is fine)
@@ -68,13 +74,11 @@ optimization:
   loss_scale: 1.0        # Residual scale for robust loss (pixels)
   # max_calibration_frames: 150  # Max frames for Stage 3/4 optimization (null = no limit)
                                   # Stages 1-2 still use all frames. Reduces memory and runtime.
-  # water_z_weight: 10.0  # Regularization for water surface consistency (0 = disabled)
-                           # Penalizes disagreement in inferred water surface Z across cameras.
-                           # Breaks the camera-height / interface-distance degeneracy. Increase for
-                           # stronger regularization
-  # auxiliary_water_z_weight: 100.0  # Water-Z regularization for auxiliary cameras (0 = disabled)
-                                      # Higher than water_z_weight because auxiliary registration has
-                                      # far fewer regularization residuals vs reprojection residuals
+  # refine_intrinsics: false  # Stage 4: also optimize focal lengths and principal points
+                                # Only enable after Stage 3 converges reliably
+  # refine_auxiliary_intrinsics: false  # Stage 4b: also optimize auxiliary camera
+                                         # focal lengths and principal points.
+                                         # Requires auxiliary_cameras to be set.
 
 detection:
   min_corners: 8         # Minimum corners per frame to use detection

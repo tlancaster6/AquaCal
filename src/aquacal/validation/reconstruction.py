@@ -183,7 +183,7 @@ def compute_3d_distance_errors(
             num_frames_with_measurements += 1
 
     if not all_signed_errors:
-        warnings.warn("No valid 3D distance comparisons — returning NaN")
+        warnings.warn("No valid 3D distance comparisons - returning NaN")
         return DistanceErrors(
             mean=float("nan"),
             std=float("nan"),

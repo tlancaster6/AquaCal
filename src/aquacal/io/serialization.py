@@ -36,11 +36,14 @@ def _list_to_ndarray(lst: list, dtype: type = np.float64) -> NDArray:
 
 def _serialize_camera_intrinsics(intrinsics: CameraIntrinsics) -> dict[str, Any]:
     """Serialize CameraIntrinsics to dict."""
-    return {
+    result = {
         "K": _ndarray_to_list(intrinsics.K),
         "dist_coeffs": _ndarray_to_list(intrinsics.dist_coeffs),
         "image_size": list(intrinsics.image_size),
     }
+    if intrinsics.is_fisheye:
+        result["is_fisheye"] = True
+    return result
 
 
 def _deserialize_camera_intrinsics(data: dict[str, Any]) -> CameraIntrinsics:
@@ -49,6 +52,7 @@ def _deserialize_camera_intrinsics(data: dict[str, Any]) -> CameraIntrinsics:
         K=_list_to_ndarray(data["K"]),
         dist_coeffs=_list_to_ndarray(data["dist_coeffs"]),
         image_size=tuple(data["image_size"]),
+        is_fisheye=data.get("is_fisheye", False),
     )
 
 

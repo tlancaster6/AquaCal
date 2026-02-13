@@ -2,8 +2,6 @@
 
 import pytest
 import numpy as np
-from scipy.optimize._numdiff import group_columns
-
 from aquacal.config.schema import (
     BoardConfig,
     CameraIntrinsics,
@@ -17,12 +15,17 @@ from aquacal.core.board import BoardGeometry
 from aquacal.calibration.interface_estimation import (
     optimize_interface,
     _compute_initial_board_poses,
+    register_auxiliary_camera,
+    _multi_frame_pnp_init,
 )
 from aquacal.calibration._optim_common import (
     pack_params,
     unpack_params,
     build_jacobian_sparsity,
+    build_bounds,
+    compute_residuals,
 )
+from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
 
 import sys
 sys.path.insert(0, ".")
@@ -83,8 +86,12 @@ def ground_truth_extrinsics() -> dict[str, CameraExtrinsics]:
 
 @pytest.fixture
 def ground_truth_distances() -> dict[str, float]:
-    """Ground truth interface distances."""
-    return {"cam0": 0.15, "cam1": 0.16, "cam2": 0.14}
+    """Ground truth interface distances.
+
+    All cameras have C_z=0 (identity R, t with no Z component), so with a
+    single water surface plane, all interface distances must be identical.
+    """
+    return {"cam0": 0.15, "cam1": 0.15, "cam2": 0.15}
 
 
 @pytest.fixture
@@ -176,9 +183,12 @@ class TestPackUnpackParams:
         frame_order = [bp.frame_idx for bp in synthetic_board_poses[:3]]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
 
+        # With all cameras at C_z=0, water_z equals the interface distance
+        water_z = 0.15
+
         packed = pack_params(
             ground_truth_extrinsics,
-            ground_truth_distances,
+            water_z,
             board_poses_dict,
             reference_camera="cam0",
             camera_order=camera_order,
@@ -223,18 +233,19 @@ class TestPackUnpackParams:
         frame_order = [bp.frame_idx for bp in synthetic_board_poses]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses}
         n_frames = len(synthetic_board_poses)
+        water_z = 0.15
 
         packed = pack_params(
             ground_truth_extrinsics,
-            ground_truth_distances,
+            water_z,
             board_poses_dict,
             reference_camera="cam0",
             camera_order=camera_order,
             frame_order=frame_order,
         )
 
-        # 2 non-reference cameras * 6 params + 3 cameras * 1 distance + N frames * 6 params
-        expected = 6 * 2 + 3 + 6 * n_frames
+        # 2 non-reference cameras * 6 params + 1 water_z + N frames * 6 params
+        expected = 6 * 2 + 1 + 6 * n_frames
         assert len(packed) == expected
 
     def test_reference_camera_extrinsics_preserved(
@@ -251,9 +262,11 @@ class TestPackUnpackParams:
             t=np.array([1, 2, 3], dtype=np.float64),
         )
 
+        water_z = 0.15
+
         packed = pack_params(
             ground_truth_extrinsics,
-            ground_truth_distances,
+            water_z,
             board_poses_dict,
             reference_camera="cam0",
             camera_order=camera_order,
@@ -272,6 +285,54 @@ class TestPackUnpackParams:
         # Reference should match modified_ref, not original
         np.testing.assert_allclose(ext_out["cam0"].R, modified_ref.R, atol=1e-10)
         np.testing.assert_allclose(ext_out["cam0"].t, modified_ref.t, atol=1e-10)
+
+    def test_unpack_with_nonzero_Cz(self, synthetic_board_poses):
+        """unpack_params returns water_z for all cameras regardless of their C_z."""
+        # Create cameras with varying C_z (including negative values)
+        extrinsics_nonzero_cz = {
+            "cam0": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.0, 0.0, -0.05], dtype=np.float64),  # C_z = 0.05
+            ),
+            "cam1": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.1, 0.0, 0.03], dtype=np.float64),  # C_z = -0.03
+            ),
+            "cam2": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.0, 0.1, -0.02], dtype=np.float64),  # C_z = 0.02
+            ),
+        }
+
+        camera_order = ["cam0", "cam1", "cam2"]
+        frame_order = [bp.frame_idx for bp in synthetic_board_poses[:3]]
+        board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
+
+        water_z = 0.15
+
+        packed = pack_params(
+            extrinsics_nonzero_cz,
+            water_z,
+            board_poses_dict,
+            reference_camera="cam0",
+            camera_order=camera_order,
+            frame_order=frame_order,
+        )
+
+        ext_out, dist_out, _, _ = unpack_params(
+            packed,
+            reference_camera="cam0",
+            reference_extrinsics=extrinsics_nonzero_cz["cam0"],
+            camera_order=camera_order,
+            frame_order=frame_order,
+        )
+
+        # All cameras should have interface_distance = water_z, regardless of C_z
+        for cam in camera_order:
+            assert abs(dist_out[cam] - water_z) < 1e-10, (
+                f"Camera {cam} with C_z={extrinsics_nonzero_cz[cam].C[2]:.4f} "
+                f"should have interface_distance={water_z}, got {dist_out[cam]}"
+            )
 
 
 class TestOptimizeInterface:
@@ -617,6 +678,115 @@ class TestOptimizeInterface:
 
         assert rms < 2.0
 
+    def test_nonzero_cz_cameras_no_scale_bias(
+        self,
+        board,
+        intrinsics,
+        synthetic_board_poses,
+    ):
+        """Full optimization with non-zero C_z cameras produces correct reconstruction.
+
+        This test verifies that the fix for B.6 (C_z double-counting) is correct.
+        With cameras at different Z heights, the water surface Z should still be
+        recovered correctly and reconstruction should not have systematic scale bias.
+        """
+        np.random.seed(43)
+
+        # Create ground truth with cameras at varying Z heights
+        ground_truth_extrinsics_nonzero = {
+            "cam0": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.0, 0.0, -0.05], dtype=np.float64),  # C_z = 0.05
+            ),
+            "cam1": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.1, 0.0, 0.03], dtype=np.float64),  # C_z = -0.03
+            ),
+            "cam2": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.0, 0.1, -0.02], dtype=np.float64),  # C_z = 0.02
+            ),
+        }
+
+        # Ground truth water surface Z (should be same for all cameras)
+        ground_truth_water_z = 0.15
+        ground_truth_distances_nonzero = {
+            "cam0": ground_truth_water_z,
+            "cam1": ground_truth_water_z,
+            "cam2": ground_truth_water_z,
+        }
+
+        # Generate synthetic detections
+        detections = generate_synthetic_detections(
+            intrinsics,
+            ground_truth_extrinsics_nonzero,
+            ground_truth_distances_nonzero,
+            board,
+            synthetic_board_poses,
+            noise_std=0.5,
+            min_corners=4,
+        )
+
+        # Perturb initial guess
+        initial_extrinsics = {}
+        for cam, ext in ground_truth_extrinsics_nonzero.items():
+            if cam == "cam0":
+                initial_extrinsics[cam] = ext
+            else:
+                noise = np.random.randn(3) * 0.01
+                initial_extrinsics[cam] = CameraExtrinsics(
+                    R=ext.R.copy(),
+                    t=ext.t + noise,
+                )
+
+        initial_water_z_perturbed = ground_truth_water_z + 0.02
+        initial_interface_distances = {
+            cam: initial_water_z_perturbed for cam in intrinsics.keys()
+        }
+
+        # Run optimization
+        opt_extrinsics, opt_distances, opt_board_poses, rms_error = optimize_interface(
+            detections=detections,
+            intrinsics=intrinsics,
+            initial_extrinsics=initial_extrinsics,
+            initial_interface_distances=initial_interface_distances,
+            board=board,
+            reference_camera="cam0",
+            verbose=0,
+        )
+
+        # After the fix, all interface_distances should be identical (= water_z)
+        interface_distances = list(opt_distances.values())
+        recovered_water_z = interface_distances[0]
+
+        # Verify water_z is recovered
+        assert abs(recovered_water_z - ground_truth_water_z) < 0.01, (
+            f"Water Z not recovered: expected {ground_truth_water_z}, "
+            f"got {recovered_water_z}"
+        )
+
+        # Verify all cameras have same interface_distance (= water_z)
+        assert np.std(interface_distances) < 1e-6, (
+            f"Interface distances should be identical (all equal to water_z), "
+            f"got std={np.std(interface_distances)}"
+        )
+
+        # Verify reprojection error is low
+        assert rms_error < 2.0, f"RMS error too high: {rms_error}"
+
+        # Verify extrinsics are recovered reasonably
+        for cam_name in ["cam0", "cam1", "cam2"]:
+            gt_ext = ground_truth_extrinsics_nonzero[cam_name]
+            opt_ext = opt_extrinsics[cam_name]
+
+            # Check C_z is close to ground truth (most important for this test)
+            gt_C_z = gt_ext.C[2]
+            opt_C_z = opt_ext.C[2]
+            assert abs(opt_C_z - gt_C_z) < 0.02, (
+                f"Camera {cam_name} C_z not recovered: "
+                f"expected {gt_C_z:.4f}, got {opt_C_z:.4f}"
+            )
+
 
 class TestBuildJacobianSparsity:
     """Tests for sparse Jacobian structure builder."""
@@ -661,10 +831,10 @@ class TestBuildJacobianSparsity:
                 if det.num_corners >= min_corners:
                     n_residuals += det.num_corners * 2
 
-        # Expected params
+        # Expected params: extrinsics(6*(N-1)) + water_z(1) + board_poses(6*M)
         n_cams = len(camera_order)
         n_frames = len(frame_order)
-        n_params = 6 * (n_cams - 1) + n_cams + 6 * n_frames
+        n_params = 6 * (n_cams - 1) + 1 + 6 * n_frames
 
         assert sparsity.shape == (n_residuals, n_params)
 
@@ -697,14 +867,14 @@ class TestBuildJacobianSparsity:
 
         # Parameter layout:
         # cam1_rvec(0-2), cam1_tvec(3-5), cam2_rvec(6-8), cam2_tvec(9-11) = 12 extrinsic
-        # dist_cam0(12), dist_cam1(13), dist_cam2(14) = 3 distance
-        # frame0_pose(15-20), frame1_pose(21-26), frame2_pose(27-32) = 18 pose
-        # Total = 33 params
+        # water_z(12) = 1 water surface Z
+        # frame0_pose(13-18), frame1_pose(19-24), frame2_pose(25-30) = 18 pose
+        # Total = 31 params
 
         n_cams = len(camera_order)
         n_frames = len(frame_order)
         n_ext = 6 * (n_cams - 1)  # 12
-        n_dist = n_cams  # 3
+        water_z_col = n_ext  # 12
 
         # Check that reference camera has no extrinsic dependencies
         # Find residuals from cam0 (reference)
@@ -721,8 +891,6 @@ class TestBuildJacobianSparsity:
                 det = frame_det.detections[cam_name]
                 if det.num_corners < min_corners:
                     continue
-
-                cam_idx = camera_order.index(cam_name)
 
                 for _ in range(det.num_corners):
                     row_x = sparsity[residual_idx]
@@ -741,14 +909,11 @@ class TestBuildJacobianSparsity:
                         assert np.sum(row_x[:n_ext]) == 6
                         assert np.sum(row_x[ext_idx : ext_idx + 6]) == 6
 
-                    # Check distance dependency: exactly 1 distance param
-                    dist_start = n_ext
-                    dist_end = n_ext + n_dist
-                    assert np.sum(row_x[dist_start:dist_end]) == 1
-                    assert row_x[n_ext + cam_idx] == 1
+                    # Check water_z dependency: single column, always 1
+                    assert row_x[water_z_col] == 1
 
                     # Check pose dependency: exactly 6 pose params
-                    pose_start = n_ext + n_dist + pose_idx * 6
+                    pose_start = water_z_col + 1 + pose_idx * 6
                     assert row_x[pose_start : pose_start + 6].sum() == 6
 
                     residual_idx += 2
@@ -840,10 +1005,86 @@ class TestOptimizeInterfaceWithSparseJacobian:
             assert abs(dist_sparse[cam] - dist_dense[cam]) < 0.005
 
 
-class TestWaterZRegularizationSparsity:
-    """Verify water_z regularization doesn't destroy Jacobian sparsity."""
 
-    def test_group_count_with_regularization(
+class TestTiltEstimation:
+    """Tests for normal_fixed=False (reference camera tilt estimation)."""
+
+    def test_pack_unpack_roundtrip_with_tilt(
+        self, ground_truth_extrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Pack and unpack with normal_fixed=False roundtrips correctly."""
+        camera_order = ["cam0", "cam1", "cam2"]
+        frame_order = [bp.frame_idx for bp in synthetic_board_poses[:3]]
+        board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
+
+        # Give reference camera a non-identity rotation (small tilt)
+        tilt_rvec = np.array([0.05, -0.03, 0.0])
+        R_tilt = rvec_to_matrix(tilt_rvec)
+        tilted_extrinsics = dict(ground_truth_extrinsics)
+        tilted_extrinsics["cam0"] = CameraExtrinsics(
+            R=R_tilt, t=np.zeros(3, dtype=np.float64)
+        )
+
+        water_z = 0.15
+
+        packed = pack_params(
+            tilted_extrinsics,
+            water_z,
+            board_poses_dict,
+            reference_camera="cam0",
+            camera_order=camera_order,
+            frame_order=frame_order,
+            normal_fixed=False,
+        )
+
+        # Should have 2 extra params compared to normal_fixed=True
+        packed_fixed = pack_params(
+            tilted_extrinsics,
+            water_z,
+            board_poses_dict,
+            reference_camera="cam0",
+            camera_order=camera_order,
+            frame_order=frame_order,
+            normal_fixed=True,
+        )
+        assert len(packed) == len(packed_fixed) + 2
+
+        # First 2 params should be the tilt rx, ry
+        np.testing.assert_allclose(packed[0], tilt_rvec[0], atol=1e-10)
+        np.testing.assert_allclose(packed[1], tilt_rvec[1], atol=1e-10)
+
+        # Roundtrip unpack
+        ext_out, dist_out, poses_out, _ = unpack_params(
+            packed,
+            reference_camera="cam0",
+            reference_extrinsics=ground_truth_extrinsics["cam0"],  # ignored
+            camera_order=camera_order,
+            frame_order=frame_order,
+            normal_fixed=False,
+        )
+
+        # Reference camera should have the tilt rotation (rz forced to 0)
+        ref_rvec_out = matrix_to_rvec(ext_out["cam0"].R)
+        np.testing.assert_allclose(ref_rvec_out[0], tilt_rvec[0], atol=1e-6)
+        np.testing.assert_allclose(ref_rvec_out[1], tilt_rvec[1], atol=1e-6)
+
+        # Reference camera t should be zeros
+        np.testing.assert_allclose(ext_out["cam0"].t, np.zeros(3), atol=1e-10)
+
+        # Non-reference cameras should roundtrip exactly
+        for cam in ["cam1", "cam2"]:
+            np.testing.assert_allclose(
+                ext_out[cam].R, tilted_extrinsics[cam].R, atol=1e-10
+            )
+            np.testing.assert_allclose(
+                ext_out[cam].t, tilted_extrinsics[cam].t, atol=1e-10
+            )
+
+        # Distances should roundtrip
+        for cam in camera_order:
+            assert abs(dist_out[cam] - ground_truth_distances[cam]) < 1e-10
+
+    def test_sparsity_pattern_with_tilt(
         self,
         board,
         intrinsics,
@@ -851,7 +1092,7 @@ class TestWaterZRegularizationSparsity:
         ground_truth_distances,
         synthetic_board_poses,
     ):
-        """Column groups should not increase dramatically with water_z_weight."""
+        """Sparsity with normal_fixed=False has 2 extra columns, correctly marked."""
         detections = generate_synthetic_detections(
             intrinsics,
             ground_truth_extrinsics,
@@ -864,48 +1105,149 @@ class TestWaterZRegularizationSparsity:
 
         camera_order = sorted(intrinsics.keys())
         frame_order = [bp.frame_idx for bp in synthetic_board_poses]
+        min_corners = 4
 
-        # Build sparsity pattern without regularization
-        sparsity_off = build_jacobian_sparsity(
-            detections,
-            reference_camera="cam0",
-            camera_order=camera_order,
-            frame_order=frame_order,
+        sparsity_fixed = build_jacobian_sparsity(
+            detections, "cam0", camera_order, frame_order, min_corners,
+            normal_fixed=True,
+        )
+        sparsity_tilt = build_jacobian_sparsity(
+            detections, "cam0", camera_order, frame_order, min_corners,
+            normal_fixed=False,
+        )
+
+        # Same number of residual rows, 2 extra columns
+        assert sparsity_tilt.shape[0] == sparsity_fixed.shape[0]
+        assert sparsity_tilt.shape[1] == sparsity_fixed.shape[1] + 2
+
+        # Check that reference camera residuals depend on tilt params
+        # and non-reference residuals don't
+        n_tilt = 2
+        n_ext = 6 * (len(camera_order) - 1)
+        residual_idx = 0
+        for frame_idx in frame_order:
+            if frame_idx not in detections.frames:
+                continue
+            frame_det = detections.frames[frame_idx]
+            for cam_name in camera_order:
+                if cam_name not in frame_det.detections:
+                    continue
+                det = frame_det.detections[cam_name]
+                if det.num_corners < min_corners:
+                    continue
+                for _ in range(det.num_corners):
+                    row = sparsity_tilt[residual_idx]
+                    if cam_name == "cam0":
+                        # Reference camera: tilt cols should be 1
+                        assert row[0] == 1 and row[1] == 1
+                        # No extrinsic params for reference
+                        assert np.sum(row[n_tilt : n_tilt + n_ext]) == 0
+                    else:
+                        # Non-reference: tilt cols should be 0
+                        assert row[0] == 0 and row[1] == 0
+                    residual_idx += 2
+
+    def test_bounds_with_tilt(self, synthetic_board_poses):
+        """Bounds with normal_fixed=False have 2 extra elements with tilt bounds."""
+        camera_order = ["cam0", "cam1", "cam2"]
+        frame_order = [bp.frame_idx for bp in synthetic_board_poses]
+
+        lower_fixed, upper_fixed = build_bounds(
+            camera_order, frame_order, "cam0", normal_fixed=True,
+        )
+        lower_tilt, upper_tilt = build_bounds(
+            camera_order, frame_order, "cam0", normal_fixed=False,
+        )
+
+        # 2 extra elements
+        assert len(lower_tilt) == len(lower_fixed) + 2
+        assert len(upper_tilt) == len(upper_fixed) + 2
+
+        # First 2 bounds are tilt bounds [-0.2, 0.2]
+        np.testing.assert_allclose(lower_tilt[0:2], -0.2)
+        np.testing.assert_allclose(upper_tilt[0:2], 0.2)
+
+        # Remaining bounds should match (shifted by 2)
+        np.testing.assert_allclose(lower_tilt[2:], lower_fixed)
+        np.testing.assert_allclose(upper_tilt[2:], upper_fixed)
+
+    def test_optimize_interface_with_tilt(
+        self,
+        board,
+        intrinsics,
+        ground_truth_distances,
+        synthetic_board_poses,
+    ):
+        """Optimizer recovers a known small tilt when normal_fixed=False."""
+        np.random.seed(42)
+
+        # Create ground truth with a tilted reference camera (~3 degrees)
+        tilt_rvec = np.array([0.03, -0.02, 0.0])  # ~3 deg combined tilt
+        R_tilt = rvec_to_matrix(tilt_rvec)
+        gt_extrinsics = {
+            "cam0": CameraExtrinsics(
+                R=R_tilt, t=np.zeros(3, dtype=np.float64),
+            ),
+            "cam1": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.1, 0.0, 0.0], dtype=np.float64),
+            ),
+            "cam2": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.0, 0.1, 0.0], dtype=np.float64),
+            ),
+        }
+
+        detections = generate_synthetic_detections(
+            intrinsics,
+            gt_extrinsics,
+            ground_truth_distances,
+            board,
+            synthetic_board_poses,
+            noise_std=0.3,
             min_corners=4,
-            water_z_weight=0.0,
         )
-        groups_off = group_columns(sparsity_off)
-        n_groups_off = int(groups_off.max()) + 1
 
-        # Build sparsity pattern with regularization
-        sparsity_on = build_jacobian_sparsity(
-            detections,
+        # Initialize without tilt (as Stage 2 would)
+        initial_extrinsics = {
+            "cam0": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.zeros(3, dtype=np.float64),
+            ),
+            "cam1": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.1, 0.0, 0.0], dtype=np.float64)
+                + np.random.normal(0, 0.01, 3),
+            ),
+            "cam2": CameraExtrinsics(
+                R=np.eye(3, dtype=np.float64),
+                t=np.array([0.0, 0.1, 0.0], dtype=np.float64)
+                + np.random.normal(0, 0.01, 3),
+            ),
+        }
+
+        ext_opt, dist_opt, poses_opt, rms = optimize_interface(
+            detections=detections,
+            intrinsics=intrinsics,
+            initial_extrinsics=initial_extrinsics,
+            board=board,
             reference_camera="cam0",
-            camera_order=camera_order,
-            frame_order=frame_order,
-            min_corners=4,
-            water_z_weight=10.0,
-        )
-        groups_on = group_columns(sparsity_on)
-        n_groups_on = int(groups_on.max()) + 1
-
-        # Regularization should add at most a modest number of groups.
-        # The old bug caused n_groups to go from ~50 to ~80+ (60%+ increase)
-        # with EVERY regularization residual depending on ALL cameras.
-        # Pairwise regularization is much sparser (each residual depends on only 2 cameras).
-        # For small test cases (3 cameras), the pairwise residuals may introduce new
-        # column co-occurrences that increase groups proportionally. The threshold should
-        # catch cases where the sparsity pattern couples too many parameters.
-        # With 3 cameras: 13->21 groups (62% increase) is expected due to 3 new pairwise
-        # residuals in a small parameter space. Allow up to 2x increase to catch truly
-        # pathological cases while passing this expected behavior.
-        assert n_groups_on <= n_groups_off * 2.0, (
-            f"Regularization increased groups from {n_groups_off} to {n_groups_on} "
-            f"({(n_groups_on / n_groups_off - 1) * 100:.0f}% increase). "
-            f"Sparsity pattern may be coupling too many parameters."
+            initial_interface_distances=ground_truth_distances,
+            normal_fixed=False,
         )
 
-    def test_residual_count_with_regularization(
+        # Should converge
+        assert rms < 2.0, f"RMS too high: {rms}"
+
+        # Recovered tilt should be close to ground truth
+        recovered_rvec = matrix_to_rvec(ext_opt["cam0"].R)
+        np.testing.assert_allclose(recovered_rvec[:2], tilt_rvec[:2], atol=0.02)
+
+        # Distances should be reasonable
+        for cam in intrinsics:
+            assert abs(dist_opt[cam] - ground_truth_distances[cam]) < 0.05
+
+    def test_normal_fixed_true_unchanged(
         self,
         board,
         intrinsics,
@@ -913,8 +1255,8 @@ class TestWaterZRegularizationSparsity:
         ground_truth_distances,
         synthetic_board_poses,
     ):
-        """Pairwise regularization should add N*(N-1)/2 residuals."""
-        from aquacal.calibration._optim_common import compute_residuals, pack_params
+        """normal_fixed=True produces identical results to omitting the parameter."""
+        np.random.seed(42)
 
         detections = generate_synthetic_detections(
             intrinsics,
@@ -922,7 +1264,7 @@ class TestWaterZRegularizationSparsity:
             ground_truth_distances,
             board,
             synthetic_board_poses,
-            noise_std=0.0,
+            noise_std=0.5,
             min_corners=4,
         )
 
@@ -930,61 +1272,636 @@ class TestWaterZRegularizationSparsity:
         frame_order = [bp.frame_idx for bp in synthetic_board_poses]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses}
 
-        # Pack parameters
-        params = pack_params(
+        water_z = 0.15
+
+        # Pack params: explicit normal_fixed=True should give same as default
+        packed_default = pack_params(
             ground_truth_extrinsics,
-            ground_truth_distances,
+            water_z,
             board_poses_dict,
             reference_camera="cam0",
             camera_order=camera_order,
             frame_order=frame_order,
         )
+        packed_explicit = pack_params(
+            ground_truth_extrinsics,
+            water_z,
+            board_poses_dict,
+            reference_camera="cam0",
+            camera_order=camera_order,
+            frame_order=frame_order,
+            normal_fixed=True,
+        )
+        np.testing.assert_array_equal(packed_default, packed_explicit)
 
-        # Build cost args
+        # Sparsity: same shape and values
+        sparsity_default = build_jacobian_sparsity(
+            detections, "cam0", camera_order, frame_order, 4,
+        )
+        sparsity_explicit = build_jacobian_sparsity(
+            detections, "cam0", camera_order, frame_order, 4,
+            normal_fixed=True,
+        )
+        np.testing.assert_array_equal(sparsity_default, sparsity_explicit)
+
+        # Bounds: same length and values
+        lo_default, hi_default = build_bounds(
+            camera_order, frame_order, "cam0",
+        )
+        lo_explicit, hi_explicit = build_bounds(
+            camera_order, frame_order, "cam0", normal_fixed=True,
+        )
+        np.testing.assert_array_equal(lo_default, lo_explicit)
+        np.testing.assert_array_equal(hi_default, hi_explicit)
+
+        # Optimize: same result
+        np.random.seed(42)
+        _, dist_default, _, rms_default = optimize_interface(
+            detections=detections,
+            intrinsics=intrinsics,
+            initial_extrinsics=ground_truth_extrinsics,
+            board=board,
+            reference_camera="cam0",
+        )
+        np.random.seed(42)
+        _, dist_explicit, _, rms_explicit = optimize_interface(
+            detections=detections,
+            intrinsics=intrinsics,
+            initial_extrinsics=ground_truth_extrinsics,
+            board=board,
+            reference_camera="cam0",
+            normal_fixed=True,
+        )
+        assert abs(rms_default - rms_explicit) < 1e-10
+        for cam in camera_order:
+            assert abs(dist_default[cam] - dist_explicit[cam]) < 1e-10
+
+
+class TestRegisterAuxiliaryCamera:
+    """Tests for auxiliary camera registration with multi-frame PnP initialization."""
+
+    def test_multi_frame_init_robust_to_outlier(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Multi-frame PnP initialization filters out outlier frames."""
+        np.random.seed(42)
+
+        # Create a near-overhead auxiliary camera (small tilt)
+        aux_extrinsics = CameraExtrinsics(
+            R=rvec_to_matrix(np.array([0.05, 0.03, 0.0])),  # ~3 deg tilt
+            t=np.array([0.2, 0.0, 0.0], dtype=np.float64),  # C_z = 0
+        )
+        aux_intrinsics = intrinsics["cam0"]
+        aux_name = "aux_cam"
+
+        # Generate detections for this aux camera
+        # Use more frames to test multi-frame averaging (10 frames)
+        multi_frame_poses = []
+        for i in range(10):
+            x_offset = 0.05 * (i % 3 - 1)
+            y_offset = 0.02 * (i % 2)
+            multi_frame_poses.append(
+                BoardPose(
+                    frame_idx=i,
+                    rvec=np.array([0.1 * (i % 3), 0.1 * (i % 2), 0.0], dtype=np.float64),
+                    tvec=np.array([x_offset, y_offset, 0.4], dtype=np.float64),
+                )
+            )
+
+        # Generate clean detections for most frames
+        # Use min_corners=6 since cv2.solvePnP ITERATIVE requires at least 6 points
+        detections = generate_synthetic_detections(
+            {aux_name: aux_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
+            board,
+            multi_frame_poses,
+            noise_std=0.3,
+            min_corners=6,
+        )
+
+        # Manually corrupt one frame with large noise to simulate PnP failure
+        # We'll add extra noise to one frame's corners
+        frame_to_corrupt = 3
+        if frame_to_corrupt in detections.frames:
+            corrupted_corners = (
+                detections.frames[frame_to_corrupt].detections[aux_name].corners_2d
+                + np.random.randn(
+                    detections.frames[frame_to_corrupt].detections[aux_name].num_corners, 2
+                ) * 10.0
+            )
+            detections.frames[frame_to_corrupt].detections[aux_name].corners_2d = corrupted_corners
+
+        # Create board_poses dict from list
+        board_poses_dict = {bp.frame_idx: bp for bp in multi_frame_poses}
+
+        # Run register_auxiliary_camera
+        water_z = ground_truth_distances["cam0"]
+        opt_extrinsics, opt_iface_dist, rms_error = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=aux_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            verbose=0,
+        )
+
+        # Should achieve reasonable RMS despite the outlier
+        # The outlier frame still participates in optimization after init, so RMS may be higher
+        assert rms_error < 5.0, f"RMS error too high: {rms_error}"
+
+        # C_z should be close to ground truth (0.0)
+        recovered_C_z = opt_extrinsics.C[2]
+        assert abs(recovered_C_z) < 0.1, (
+            f"C_z should be near 0, got {recovered_C_z:.4f}. "
+            "Multi-frame PnP should filter outlier frames."
+        )
+
+        # Interface distance should equal water_z
+        assert abs(opt_iface_dist - water_z) < 1e-6
+
+    def test_single_frame_fallback(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Falls back gracefully when only one frame is available."""
+        np.random.seed(42)
+
+        # Create auxiliary camera
+        aux_extrinsics = CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.15, 0.0, 0.0], dtype=np.float64),
+        )
+        aux_intrinsics = intrinsics["cam0"]
+        aux_name = "aux_cam"
+
+        # Generate detections for only one frame
+        single_frame_pose = [synthetic_board_poses[0]]
+
+        detections = generate_synthetic_detections(
+            {aux_name: aux_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
+            board,
+            single_frame_pose,
+            noise_std=0.3,
+            min_corners=6,
+        )
+
+        board_poses_dict = {single_frame_pose[0].frame_idx: single_frame_pose[0]}
+        water_z = ground_truth_distances["cam0"]
+
+        # Should not raise, even with single frame
+        opt_extrinsics, opt_iface_dist, rms_error = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=aux_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            verbose=0,
+        )
+
+        # Should produce reasonable result
+        assert isinstance(opt_extrinsics, CameraExtrinsics)
+        assert isinstance(rms_error, float)
+        assert rms_error < 5.0
+
+    def test_produces_correct_C_z(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Recovered C_z is within tolerance of ground truth."""
+        np.random.seed(42)
+
+        # Create auxiliary camera at known position
+        ground_truth_C_z = 0.02  # 2cm above reference (smaller offset for better visibility)
+        aux_extrinsics = CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.15, 0.0, -ground_truth_C_z], dtype=np.float64),  # Closer in X too
+        )
+        aux_intrinsics = intrinsics["cam0"]
+        aux_name = "aux_cam"
+
+        # Use existing synthetic board poses which are known to work
+        # Just use the first 3 frames from fixture
+        multi_frame_poses = synthetic_board_poses
+
+        detections = generate_synthetic_detections(
+            {aux_name: aux_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
+            board,
+            multi_frame_poses,
+            noise_std=0.3,
+            min_corners=6,
+        )
+
+        board_poses_dict = {bp.frame_idx: bp for bp in multi_frame_poses}
+        water_z = ground_truth_distances["cam0"]
+
+        opt_extrinsics, opt_iface_dist, rms_error = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=aux_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            verbose=0,
+        )
+
+        # Check C_z is close to ground truth
+        recovered_C_z = opt_extrinsics.C[2]
+        assert abs(recovered_C_z - ground_truth_C_z) < 0.05, (
+            f"C_z should be near {ground_truth_C_z:.4f}, got {recovered_C_z:.4f}"
+        )
+
+        # Check interface distance equals water_z
+        assert abs(opt_iface_dist - water_z) < 1e-6
+
+        # Check RMS is reasonable
+        assert rms_error < 2.0
+
+    def test_raises_for_no_frames(self, board, intrinsics):
+        """Raises InsufficientDataError when no usable frames."""
+        aux_intrinsics = intrinsics["cam0"]
+        aux_name = "aux_cam"
+
+        # Empty detections
+        detections = DetectionResult(
+            frames={},
+            camera_names=[aux_name],
+            total_frames=0,
+        )
+
+        board_poses_dict = {}
+        water_z = 0.15
+
+        with pytest.raises(InsufficientDataError, match="No usable frames"):
+            register_auxiliary_camera(
+                camera_name=aux_name,
+                intrinsics=aux_intrinsics,
+                detections=detections,
+                board_poses=board_poses_dict,
+                board=board,
+                water_z=water_z,
+            )
+
+    def test_multi_frame_pnp_init_averages_multiple_frames(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """_multi_frame_pnp_init averages multiple frames correctly."""
+        np.random.seed(42)
+
+        # Create auxiliary camera
+        aux_extrinsics = CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.15, 0.0, 0.0], dtype=np.float64),
+        )
+        aux_intrinsics = intrinsics["cam0"]
+        aux_name = "aux_cam"
+
+        # Generate detections with 5 frames
+        multi_frame_poses = synthetic_board_poses[:5]
+
+        detections = generate_synthetic_detections(
+            {aux_name: aux_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
+            board,
+            multi_frame_poses,
+            noise_std=0.5,
+            min_corners=6,
+        )
+
+        # Collect obs_frames in the same format as register_auxiliary_camera
+        obs_frames = []
+        for frame_idx, frame_det in detections.frames.items():
+            if aux_name in frame_det.detections:
+                det = frame_det.detections[aux_name]
+                obs_frames.append((frame_idx, det.corner_ids, det.corners_2d))
+
+        board_poses_dict = {bp.frame_idx: bp for bp in multi_frame_poses}
+        water_z = ground_truth_distances["cam0"]
         interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
-        reference_extrinsics = ground_truth_extrinsics["cam0"]
 
-        # Compute residuals without regularization
-        residuals_off = compute_residuals(
-            params,
-            detections,
-            intrinsics,
+        # Call the helper directly
+        result = _multi_frame_pnp_init(
+            obs_frames=obs_frames,
+            board_poses=board_poses_dict,
+            intrinsics=aux_intrinsics,
+            board=board,
+            water_z=water_z,
+            interface_normal=interface_normal,
+            n_air=1.0,
+            n_water=1.333,
+        )
+
+        assert result is not None
+        rvec, tvec = result
+
+        # Result should be reasonable
+        assert rvec.shape == (3,)
+        assert tvec.shape == (3,)
+
+        # C_z should be near ground truth (0 in this case)
+        R = rvec_to_matrix(rvec)
+        C = -R.T @ tvec
+        C_z = C[2]
+        assert abs(C_z) < 0.1, f"C_z should be near 0, got {C_z:.4f}"
+
+    def test_register_auxiliary_refine_intrinsics_improves_rms(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Refining intrinsics improves RMS when initial intrinsics are perturbed."""
+        np.random.seed(42)
+
+        # Create auxiliary camera
+        ground_truth_C_z = 0.02
+        aux_extrinsics = CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.15, 0.0, -ground_truth_C_z], dtype=np.float64),
+        )
+
+        # Use perturbed intrinsics (fx off by 5%)
+        true_intrinsics = intrinsics["cam0"]
+        perturbed_K = true_intrinsics.K.copy()
+        perturbed_K[0, 0] *= 1.05  # fx 5% too high
+        perturbed_intrinsics = CameraIntrinsics(
+            K=perturbed_K,
+            dist_coeffs=true_intrinsics.dist_coeffs,
+            image_size=true_intrinsics.image_size,
+            is_fisheye=true_intrinsics.is_fisheye,
+        )
+
+        aux_name = "aux_cam"
+        multi_frame_poses = synthetic_board_poses
+
+        # Generate detections with true intrinsics but optimize with perturbed
+        detections = generate_synthetic_detections(
+            {aux_name: true_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
             board,
-            "cam0",
-            reference_extrinsics,
-            interface_normal,
-            1.0,  # n_air
-            1.333,  # n_water
-            camera_order,
-            frame_order,
-            4,  # min_corners
-            False,  # refine_intrinsics
-            0.0,  # water_z_weight
+            multi_frame_poses,
+            noise_std=0.3,
+            min_corners=6,
         )
 
-        # Compute residuals with regularization
-        residuals_on = compute_residuals(
-            params,
-            detections,
-            intrinsics,
+        board_poses_dict = {bp.frame_idx: bp for bp in multi_frame_poses}
+        water_z = ground_truth_distances["cam0"]
+
+        # Run without intrinsic refinement (should have higher RMS)
+        _, _, rms_no_refine = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=perturbed_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            refine_intrinsics=False,
+            verbose=0,
+        )
+
+        # Run with intrinsic refinement (should improve RMS and fx)
+        _, _, rms_with_refine, refined_intr = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=perturbed_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            refine_intrinsics=True,
+            verbose=0,
+        )
+
+        # RMS should improve
+        assert rms_with_refine < rms_no_refine, (
+            f"Refinement should improve RMS: {rms_with_refine:.2f} vs {rms_no_refine:.2f}"
+        )
+
+        # Refined fx should be closer to true value
+        refined_fx = refined_intr.K[0, 0]
+        true_fx = true_intrinsics.K[0, 0]
+        perturbed_fx = perturbed_intrinsics.K[0, 0]
+
+        error_before = abs(perturbed_fx - true_fx)
+        error_after = abs(refined_fx - true_fx)
+
+        assert error_after < error_before, (
+            f"Refinement should move fx closer to true value. "
+            f"Before: {perturbed_fx:.1f}, After: {refined_fx:.1f}, True: {true_fx:.1f}"
+        )
+
+    def test_register_auxiliary_refine_intrinsics_returns_4_tuple(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Returns 4-tuple with CameraIntrinsics when refine_intrinsics=True."""
+        np.random.seed(42)
+
+        aux_extrinsics = CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.15, 0.0, 0.0], dtype=np.float64),
+        )
+        aux_intrinsics = intrinsics["cam0"]
+        aux_name = "aux_cam"
+
+        detections = generate_synthetic_detections(
+            {aux_name: aux_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
             board,
-            "cam0",
-            reference_extrinsics,
-            interface_normal,
-            1.0,  # n_air
-            1.333,  # n_water
-            camera_order,
-            frame_order,
-            4,  # min_corners
-            False,  # refine_intrinsics
-            10.0,  # water_z_weight
+            synthetic_board_poses,
+            noise_std=0.3,
+            min_corners=6,
         )
 
-        n_cams = len(camera_order)
-        expected_extra = n_cams * (n_cams - 1) // 2
+        board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses}
+        water_z = ground_truth_distances["cam0"]
 
-        assert len(residuals_on) == len(residuals_off) + expected_extra, (
-            f"Expected {len(residuals_off) + expected_extra} residuals with regularization, "
-            f"but got {len(residuals_on)}. Expected {expected_extra} additional pairwise residuals "
-            f"for {n_cams} cameras."
+        result = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=aux_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            refine_intrinsics=True,
+            verbose=0,
         )
+
+        # Should return 4-tuple
+        assert len(result) == 4
+        ext, dist, rms, refined_intr = result
+
+        # Check types
+        assert isinstance(ext, CameraExtrinsics)
+        assert isinstance(dist, float)
+        assert isinstance(rms, float)
+        assert isinstance(refined_intr, CameraIntrinsics)
+
+    def test_register_auxiliary_refine_intrinsics_preserves_distortion(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Refined intrinsics preserve distortion coefficients and is_fisheye flag."""
+        np.random.seed(42)
+
+        aux_extrinsics = CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.15, 0.0, 0.0], dtype=np.float64),
+        )
+
+        # Create intrinsics with non-zero distortion and fisheye flag set
+        # Fisheye cameras need exactly 4 distortion coefficients
+        K = intrinsics["cam0"].K.copy()
+        dist = np.array([0.1, -0.05, 0.001, 0.002], dtype=np.float64)
+        aux_intrinsics = CameraIntrinsics(
+            K=K,
+            dist_coeffs=dist,
+            image_size=(640, 480),
+            is_fisheye=True,
+        )
+        aux_name = "aux_cam"
+
+        detections = generate_synthetic_detections(
+            {aux_name: aux_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
+            board,
+            synthetic_board_poses,
+            noise_std=0.3,
+            min_corners=6,
+        )
+
+        board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses}
+        water_z = ground_truth_distances["cam0"]
+
+        _, _, _, refined_intr = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=aux_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            refine_intrinsics=True,
+            verbose=0,
+        )
+
+        # Distortion coefficients should be unchanged
+        np.testing.assert_array_equal(
+            refined_intr.dist_coeffs,
+            aux_intrinsics.dist_coeffs,
+            err_msg="Distortion coefficients should not be modified",
+        )
+
+        # is_fisheye flag should be preserved
+        assert refined_intr.is_fisheye == aux_intrinsics.is_fisheye
+
+        # image_size should be preserved
+        assert refined_intr.image_size == aux_intrinsics.image_size
+
+    def test_register_auxiliary_no_refine_returns_3_tuple(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Returns 3-tuple when refine_intrinsics=False (backward compatibility)."""
+        np.random.seed(42)
+
+        aux_extrinsics = CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.15, 0.0, 0.0], dtype=np.float64),
+        )
+        aux_intrinsics = intrinsics["cam0"]
+        aux_name = "aux_cam"
+
+        detections = generate_synthetic_detections(
+            {aux_name: aux_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
+            board,
+            synthetic_board_poses,
+            noise_std=0.3,
+            min_corners=6,
+        )
+
+        board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses}
+        water_z = ground_truth_distances["cam0"]
+
+        result = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=aux_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            refine_intrinsics=False,
+            verbose=0,
+        )
+
+        # Should return 3-tuple
+        assert len(result) == 3
+        ext, dist, rms = result
+
+        # Check types
+        assert isinstance(ext, CameraExtrinsics)
+        assert isinstance(dist, float)
+        assert isinstance(rms, float)
+
+    def test_register_auxiliary_refine_intrinsics_bounds(
+        self, board, intrinsics, ground_truth_distances, synthetic_board_poses
+    ):
+        """Intrinsic bounds are enforced: fx/fy in [0.5x, 2.0x], cx/cy in [0, w/h]."""
+        np.random.seed(42)
+
+        aux_extrinsics = CameraExtrinsics(
+            R=np.eye(3, dtype=np.float64),
+            t=np.array([0.15, 0.0, 0.0], dtype=np.float64),
+        )
+
+        # Create intrinsics with extreme initial fx (to test bounds)
+        K = intrinsics["cam0"].K.copy()
+        initial_fx = 100.0  # Very low fx
+        K[0, 0] = initial_fx
+        aux_intrinsics = CameraIntrinsics(
+            K=K,
+            dist_coeffs=np.zeros(5, dtype=np.float64),
+            image_size=(640, 480),
+            is_fisheye=False,
+        )
+        aux_name = "aux_cam"
+
+        detections = generate_synthetic_detections(
+            {aux_name: aux_intrinsics},
+            {aux_name: aux_extrinsics},
+            {aux_name: ground_truth_distances["cam0"]},
+            board,
+            synthetic_board_poses,
+            noise_std=0.3,
+            min_corners=6,
+        )
+
+        board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses}
+        water_z = ground_truth_distances["cam0"]
+
+        _, _, _, refined_intr = register_auxiliary_camera(
+            camera_name=aux_name,
+            intrinsics=aux_intrinsics,
+            detections=detections,
+            board_poses=board_poses_dict,
+            board=board,
+            water_z=water_z,
+            refine_intrinsics=True,
+            verbose=0,
+        )
+
+        # Check fx is within bounds [0.5*initial_fx, 2.0*initial_fx]
+        refined_fx = refined_intr.K[0, 0]
+        assert 0.5 * initial_fx <= refined_fx <= 2.0 * initial_fx, (
+            f"fx should be in [0.5*{initial_fx}, 2.0*{initial_fx}], got {refined_fx}"
+        )
+
+        # Check cx, cy are within image bounds
+        refined_cx = refined_intr.K[0, 2]
+        refined_cy = refined_intr.K[1, 2]
+        w, h = aux_intrinsics.image_size
+
+        assert 0.0 <= refined_cx <= float(w), f"cx should be in [0, {w}], got {refined_cx}"
+        assert 0.0 <= refined_cy <= float(h), f"cy should be in [0, {h}], got {refined_cy}"

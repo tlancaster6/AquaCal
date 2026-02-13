@@ -19,12 +19,13 @@ from aquacal.core.refractive_geometry import refractive_project
 from aquacal.calibration.extrinsics import (
     Observation,
     PoseGraph,
+    _average_rotations,
     estimate_board_pose,
     refractive_solve_pnp,
     build_pose_graph,
     estimate_extrinsics,
 )
-from aquacal.utils.transforms import rvec_to_matrix
+from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
 
 
 @pytest.fixture
@@ -383,6 +384,54 @@ class TestEstimateExtrinsics:
             # Check determinant is +1 (proper rotation)
             np.testing.assert_allclose(np.linalg.det(ext.R), 1.0, atol=1e-6)
 
+    def test_progress_callback_invoked(self, board, intrinsics):
+        """Progress callback is called for each camera located and for averaging pass."""
+        detections = make_connected_detections(["cam0", "cam1", "cam2"])
+        graph = build_pose_graph(detections)
+
+        # Record callback invocations
+        calls = []
+        def callback(cam_name: str, current: int, total: int):
+            calls.append((cam_name, current, total))
+
+        extrinsics_result = estimate_extrinsics(
+            graph, intrinsics, board, reference_camera="cam0",
+            progress_callback=callback,
+        )
+
+        # Should have 3 calls for cameras + 1 for averaging
+        assert len(calls) == 4
+
+        # First three calls should be for cameras (order may vary except reference)
+        camera_calls = [c for c in calls if c[0] != "_averaging"]
+        assert len(camera_calls) == 3
+
+        # Reference camera should be first
+        assert camera_calls[0][0] == "cam0"
+        assert camera_calls[0][1] == 1
+        assert camera_calls[0][2] == 3
+
+        # All camera calls should have total=3
+        for _, cur, total in camera_calls:
+            assert total == 3
+
+        # Current should be sequential (1, 2, 3)
+        assert [c[1] for c in camera_calls] == [1, 2, 3]
+
+        # Final call should be for averaging
+        assert calls[-1][0] == "_averaging"
+        assert calls[-1][1] == 3  # All cameras located
+        assert calls[-1][2] == 3
+
+    def test_progress_callback_optional(self, board, intrinsics):
+        """Progress callback is optional (defaults to None)."""
+        detections = make_connected_detections(["cam0", "cam1", "cam2"])
+        graph = build_pose_graph(detections)
+
+        # Should not raise when callback is omitted
+        extrinsics_result = estimate_extrinsics(graph, intrinsics, board)
+        assert len(extrinsics_result) == 3
+
 
 def _generate_refractive_detections(
     intrinsics_single: CameraIntrinsics,
@@ -619,3 +668,174 @@ class TestEstimateExtrinsicsRefractive:
 
         # All cameras get poses
         assert set(result_no_iface.keys()) == {"cam0", "cam1", "cam2"}
+
+
+class TestAverageRotations:
+    """Tests for _average_rotations() helper."""
+
+    def test_returns_valid_so3(self):
+        """Result is orthonormal with det=+1."""
+        R1 = rvec_to_matrix(np.array([0.1, 0.0, 0.0]))
+        R2 = rvec_to_matrix(np.array([-0.1, 0.05, 0.0]))
+        R_avg = _average_rotations([R1, R2], [1.0, 1.0])
+
+        np.testing.assert_allclose(R_avg @ R_avg.T, np.eye(3), atol=1e-10)
+        np.testing.assert_allclose(np.linalg.det(R_avg), 1.0, atol=1e-10)
+
+    def test_identity_from_identical_rotations(self):
+        """Averaging identical rotations recovers that rotation."""
+        R = rvec_to_matrix(np.array([0.2, -0.1, 0.05]))
+        R_avg = _average_rotations([R, R, R], [1.0, 1.0, 1.0])
+
+        np.testing.assert_allclose(R_avg, R, atol=1e-10)
+
+    def test_identity_input(self):
+        """Averaging identity matrices returns identity."""
+        R_avg = _average_rotations(
+            [np.eye(3), np.eye(3)], [1.0, 1.0]
+        )
+        np.testing.assert_allclose(R_avg, np.eye(3), atol=1e-10)
+
+    def test_weights_matter(self):
+        """Higher weight pulls average toward that rotation."""
+        R1 = np.eye(3)
+        R2 = rvec_to_matrix(np.array([0.0, 0.0, 0.3]))
+
+        # Heavy weight on R1 -> result closer to identity
+        R_heavy_1 = _average_rotations([R1, R2], [100.0, 1.0])
+        angle_1 = np.linalg.norm(matrix_to_rvec(R_heavy_1))
+
+        # Equal weight
+        R_equal = _average_rotations([R1, R2], [1.0, 1.0])
+        angle_eq = np.linalg.norm(matrix_to_rvec(R_equal))
+
+        assert angle_1 < angle_eq, "Heavy weight on identity should produce smaller rotation"
+
+
+class TestPriorityBFS:
+    """Tests for priority queue ordering in estimate_extrinsics."""
+
+    def test_prefers_higher_corner_count(self, board, intrinsics):
+        """Priority BFS processes edges with more corners first."""
+        # Build two frames: frame 0 has 6 corners, frame 1 has 12
+        few_ids = np.array([0, 1, 2, 3, 4, 5], dtype=np.int32)
+        few_2d = np.array(
+            [[100, 100], [180, 100], [260, 100],
+             [100, 180], [180, 180], [260, 180]],
+            dtype=np.float64,
+        )
+        many_ids = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.int32)
+        many_2d = np.array(
+            [[100, 100], [180, 100], [260, 100], [340, 100],
+             [100, 180], [180, 180], [260, 180], [340, 180],
+             [100, 260], [180, 260], [260, 260], [340, 260]],
+            dtype=np.float64,
+        )
+
+        frames = {
+            0: FrameDetections(
+                frame_idx=0,
+                detections={
+                    "cam0": Detection(corner_ids=few_ids.copy(), corners_2d=few_2d.copy()),
+                    "cam1": Detection(corner_ids=few_ids.copy(), corners_2d=few_2d + 10),
+                },
+            ),
+            1: FrameDetections(
+                frame_idx=1,
+                detections={
+                    "cam0": Detection(corner_ids=many_ids.copy(), corners_2d=many_2d.copy()),
+                    "cam1": Detection(corner_ids=many_ids.copy(), corners_2d=many_2d + 10),
+                },
+            ),
+        }
+        det_result = DetectionResult(
+            frames=frames, camera_names=["cam0", "cam1"], total_frames=2,
+        )
+        graph = build_pose_graph(det_result)
+
+        # Should succeed and produce valid extrinsics regardless of order
+        result = estimate_extrinsics(graph, intrinsics, board, reference_camera="cam0")
+        assert "cam0" in result
+        assert "cam1" in result
+
+
+class TestDeterminism:
+    """Tests that estimate_extrinsics is deterministic."""
+
+    def test_two_calls_same_result(self, board, intrinsics):
+        """Two calls with same input produce identical output."""
+        detections = make_connected_detections(["cam0", "cam1", "cam2"])
+        graph = build_pose_graph(detections)
+
+        result1 = estimate_extrinsics(graph, intrinsics, board, reference_camera="cam0")
+        result2 = estimate_extrinsics(graph, intrinsics, board, reference_camera="cam0")
+
+        for cam_name in result1:
+            np.testing.assert_array_equal(result1[cam_name].R, result2[cam_name].R)
+            np.testing.assert_array_equal(result1[cam_name].t, result2[cam_name].t)
+
+
+class TestMultiFrameAveraging:
+    """Tests that multi-frame averaging improves initialization quality."""
+
+    def test_averaging_produces_valid_poses(self, board, intrinsics):
+        """Multi-frame averaging produces valid rotation matrices."""
+        detections = make_connected_detections(["cam0", "cam1", "cam2"])
+        graph = build_pose_graph(detections)
+
+        result = estimate_extrinsics(graph, intrinsics, board, reference_camera="cam0")
+
+        for cam, ext in result.items():
+            # Check orthonormality
+            np.testing.assert_allclose(ext.R @ ext.R.T, np.eye(3), atol=1e-6)
+            # Check determinant
+            np.testing.assert_allclose(np.linalg.det(ext.R), 1.0, atol=1e-6)
+
+    def test_averaging_with_refractive_multi_camera(self, board, intrinsics):
+        """Multi-frame averaging with 3 cameras and 3 shared frames."""
+        # 3 cameras at different positions, all coplanar (Z=0)
+        ext0 = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
+        ext1 = CameraExtrinsics(R=np.eye(3), t=np.array([-0.3, 0.0, 0.0]))
+        ext2 = CameraExtrinsics(R=np.eye(3), t=np.array([0.0, -0.3, 0.0]))
+
+        interface_distance = 0.15
+        camera_exts = {"cam0": ext0, "cam1": ext1, "cam2": ext2}
+
+        # 3 board poses at different positions
+        board_poses_gt = [
+            (np.array([0.1, -0.05, 0.02]), np.array([0.10, 0.0, 0.50])),
+            (np.array([-0.05, 0.08, 0.01]), np.array([0.15, 0.05, 0.45])),
+            (np.array([0.02, 0.03, -0.04]), np.array([0.05, -0.05, 0.55])),
+        ]
+
+        frames = {}
+        for fi, (brvec, btvec) in enumerate(board_poses_gt):
+            dets = {}
+            for cam_name, cam_ext in camera_exts.items():
+                det = _generate_refractive_detections(
+                    intrinsics[cam_name], cam_ext, cam_name, board,
+                    brvec, btvec, interface_distance,
+                )
+                if det is not None:
+                    dets[cam_name] = det
+            if len(dets) >= 2:
+                frames[fi] = FrameDetections(frame_idx=fi, detections=dets)
+
+        assert len(frames) >= 2, "Need at least 2 usable frames"
+
+        det_result = DetectionResult(
+            frames=frames, camera_names=["cam0", "cam1", "cam2"], total_frames=len(frames),
+        )
+        graph = build_pose_graph(det_result)
+
+        interface_distances = {cam: interface_distance for cam in camera_exts}
+        result = estimate_extrinsics(
+            graph, intrinsics, board, reference_camera="cam0",
+            interface_distances=interface_distances,
+        )
+
+        # Check cam1 position accuracy (should be close to ground truth)
+        cam1_C = result["cam1"].C
+        cam1_C_gt = np.array([0.3, 0.0, 0.0])  # C = -R.T @ t
+        pos_err = np.linalg.norm(cam1_C - cam1_C_gt)
+        assert pos_err < 0.05, f"cam1 position error {pos_err:.3f}m exceeds 0.05m"

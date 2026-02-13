@@ -10,12 +10,14 @@ class Interface:
     """
     Planar refractive interface (air-water boundary).
 
-    The interface is a horizontal plane at a specific Z-coordinate in the world frame.
-    Each camera has an associated interface distance (distance from camera to water surface).
+    The interface is a horizontal plane at a fixed Z-coordinate in the world frame.
 
     Attributes:
         normal: Unit normal vector pointing from water toward air [0, 0, -1]
-        camera_distances: Per-camera interface distances (distance from camera to water surface)
+        camera_distances: Per-camera Z-coordinate of the water surface in world frame.
+            After optimization this is the same value (water_z) for all cameras.
+            The physical camera-to-water gap is computed internally by projection
+            functions as ``water_z - C_z``.
         n_air: Refractive index of air (default 1.0)
         n_water: Refractive index of water (default 1.333)
     """
@@ -32,8 +34,8 @@ class Interface:
 
         Args:
             normal: Unit normal vector pointing from water to air (typically [0,0,-1])
-            camera_distances: Per-camera interface distance (distance from camera to water surface).
-                            For a camera at world Z=0, this is the Z-coordinate of the water surface.
+            camera_distances: Per-camera Z-coordinate of the water surface in world frame.
+                            Typically the same value (water_z) for all cameras.
             n_air: Refractive index of air
             n_water: Refractive index of water
         """
@@ -44,15 +46,17 @@ class Interface:
 
     def get_interface_distance(self, camera_name: str) -> float:
         """
-        Get the interface distance for a specific camera.
+        Get the water surface Z-coordinate for a specific camera.
 
-        This equals the distance from camera to interface IF the camera is at Z=0.
+        This is the Z-coordinate of the interface plane in world frame.
+        The physical camera-to-water gap is ``z_interface - C_z``, computed
+        internally by the projection functions.
 
         Args:
             camera_name: Name of camera
 
         Returns:
-            Interface distance for the specified camera
+            Water surface Z-coordinate for the specified camera
 
         Raises:
             KeyError: If camera_name not in camera_distances

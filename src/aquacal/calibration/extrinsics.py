@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import heapq
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import cv2
@@ -214,7 +216,7 @@ def _find_connected_components(
             visited.add(node)
             component.add(node)
 
-            for neighbor in adjacency.get(node, []):
+            for neighbor in sorted(adjacency.get(node, [])):
                 if neighbor not in visited:
                     queue.append(neighbor)
 
@@ -312,6 +314,178 @@ def build_pose_graph(
     )
 
 
+def _average_rotations(
+    rotations: list[NDArray[np.float64]],
+    weights: list[float],
+) -> NDArray[np.float64]:
+    """Compute weighted chordal L2 mean of rotation matrices.
+
+    Projects the weighted sum of rotation matrices back to SO(3) via SVD.
+
+    Args:
+        rotations: List of 3x3 rotation matrices
+        weights: List of non-negative weights (one per rotation)
+
+    Returns:
+        3x3 rotation matrix representing the weighted average
+    """
+    M = np.zeros((3, 3), dtype=np.float64)
+    for R, w in zip(rotations, weights):
+        M += w * R
+
+    U, _, Vt = np.linalg.svd(M)
+    R_avg = U @ Vt
+
+    # Ensure proper rotation (det = +1)
+    if np.linalg.det(R_avg) < 0:
+        U[:, -1] *= -1
+        R_avg = U @ Vt
+
+    return R_avg
+
+
+def _refine_poses_multi_frame(
+    camera_poses: dict[str, tuple[NDArray, NDArray]],
+    board_poses: dict[int, tuple[NDArray, NDArray]],
+    obs_index: dict[tuple[str, int], Observation],
+    pose_graph: PoseGraph,
+    intrinsics: dict[str, CameraIntrinsics],
+    board: BoardGeometry,
+    reference_camera: str,
+    interface_distances: dict[str, float] | None = None,
+    interface_normal: NDArray[np.float64] | None = None,
+    n_air: float = 1.0,
+    n_water: float = 1.333,
+) -> tuple[dict[str, tuple[NDArray, NDArray]], dict[int, tuple[NDArray, NDArray]]]:
+    """Refine poses via one pass of multi-frame averaging.
+
+    Step A: For each frame, re-estimate board pose from all cameras that see it,
+    then average. Step B: For each non-reference camera, re-estimate camera pose
+    from all frames it sees, then average.
+
+    Args:
+        camera_poses: Dict of camera_name -> (R, t) world->camera
+        board_poses: Dict of frame_idx -> (R, t) board->world
+        obs_index: Dict of (camera_name, frame_idx) -> Observation
+        pose_graph: The pose graph
+        intrinsics: Per-camera intrinsics
+        board: Board geometry
+        reference_camera: Camera fixed at world origin
+        interface_distances: Optional per-camera interface distances
+        interface_normal: Interface normal vector
+        n_air: Refractive index of air
+        n_water: Refractive index of water
+
+    Returns:
+        Tuple of (refined_camera_poses, refined_board_poses)
+    """
+    refined_board_poses = dict(board_poses)
+    refined_camera_poses = dict(camera_poses)
+
+    # Step A: Refine board poses
+    for frame_idx in sorted(board_poses.keys()):
+        frame_node = f"f{frame_idx}"
+        cam_neighbors = sorted(pose_graph.adjacency.get(frame_node, []))
+
+        rotations = []
+        translations = []
+        weights = []
+
+        for cam_name in cam_neighbors:
+            if cam_name not in camera_poses:
+                continue
+            obs_maybe = obs_index.get((cam_name, frame_idx))
+            if obs_maybe is None:
+                continue
+            obs = obs_maybe
+
+            # PnP: board in camera frame
+            if interface_distances is not None and cam_name in interface_distances:
+                result = refractive_solve_pnp(
+                    intrinsics[cam_name], obs.corners_2d, obs.corner_ids,
+                    board, interface_distances[cam_name],
+                    interface_normal, n_air, n_water,
+                )
+            else:
+                result = estimate_board_pose(
+                    intrinsics[cam_name], obs.corners_2d, obs.corner_ids, board
+                )
+            if result is None:
+                continue
+
+            rvec_bc, tvec_bc = result
+            R_bc = cv2.Rodrigues(rvec_bc)[0].astype(np.float64)
+
+            # board_in_world = cam_in_world @ board_in_cam
+            cam_R, cam_t = camera_poses[cam_name]
+            R_cw, t_cw = invert_pose(cam_R, cam_t)
+            R_bw, t_bw = compose_poses(R_cw, t_cw, R_bc, tvec_bc)
+
+            rotations.append(R_bw)
+            translations.append(t_bw)
+            weights.append(float(len(obs.corner_ids)))
+
+        if len(rotations) >= 1:
+            R_avg = _average_rotations(rotations, weights)
+            w_total = sum(weights)
+            t_avg = sum(w * t for w, t in zip(weights, translations)) / w_total
+            refined_board_poses[frame_idx] = (R_avg, t_avg)
+
+    # Step B: Refine camera poses
+    for cam_name in sorted(camera_poses.keys()):
+        if cam_name == reference_camera:
+            continue
+
+        cam_neighbors = sorted(pose_graph.adjacency.get(cam_name, []))
+
+        rotations = []
+        translations = []
+        weights = []
+
+        for frame_node in cam_neighbors:
+            frame_idx = int(frame_node[1:])
+            if frame_idx not in refined_board_poses:
+                continue
+            obs_maybe = obs_index.get((cam_name, frame_idx))
+            if obs_maybe is None:
+                continue
+            obs = obs_maybe
+
+            # PnP: board in camera frame
+            if interface_distances is not None and cam_name in interface_distances:
+                result = refractive_solve_pnp(
+                    intrinsics[cam_name], obs.corners_2d, obs.corner_ids,
+                    board, interface_distances[cam_name],
+                    interface_normal, n_air, n_water,
+                )
+            else:
+                result = estimate_board_pose(
+                    intrinsics[cam_name], obs.corners_2d, obs.corner_ids, board
+                )
+            if result is None:
+                continue
+
+            rvec_bc, tvec_bc = result
+            R_bc = cv2.Rodrigues(rvec_bc)[0].astype(np.float64)
+
+            # world_in_cam = board_in_cam @ world_in_board
+            R_bw, t_bw = refined_board_poses[frame_idx]
+            R_wb, t_wb = invert_pose(R_bw, t_bw)
+            R_wc, t_wc = compose_poses(R_bc, tvec_bc, R_wb, t_wb)
+
+            rotations.append(R_wc)
+            translations.append(t_wc)
+            weights.append(float(len(obs.corner_ids)))
+
+        if len(rotations) >= 1:
+            R_avg = _average_rotations(rotations, weights)
+            w_total = sum(weights)
+            t_avg = sum(w * t for w, t in zip(weights, translations)) / w_total
+            refined_camera_poses[cam_name] = (R_avg, t_avg)
+
+    return refined_camera_poses, refined_board_poses
+
+
 def estimate_extrinsics(
     pose_graph: PoseGraph,
     intrinsics: dict[str, CameraIntrinsics],
@@ -321,6 +495,7 @@ def estimate_extrinsics(
     interface_normal: NDArray[np.float64] | None = None,
     n_air: float = 1.0,
     n_water: float = 1.333,
+    progress_callback: Callable[[str, int, int], None] | None = None,
 ) -> dict[str, CameraExtrinsics]:
     """
     Estimate camera extrinsics by chaining poses through the graph.
@@ -348,6 +523,8 @@ def estimate_extrinsics(
         interface_normal: Interface normal vector. If None, uses [0, 0, -1].
         n_air: Refractive index of air (default 1.0)
         n_water: Refractive index of water (default 1.333)
+        progress_callback: Optional callback(camera_name, cameras_located, total_cameras)
+            called after each camera is located during BFS traversal
 
     Returns:
         Dict mapping camera names to CameraExtrinsics.
@@ -390,29 +567,43 @@ def estimate_extrinsics(
         np.zeros(3, dtype=np.float64),
     )
 
-    # BFS to propagate poses
+    # Report progress for reference camera
+    total_cameras = len(pose_graph.camera_names)
+    if progress_callback is not None:
+        progress_callback(reference_camera, 1, total_cameras)
+
+    # Priority BFS to propagate poses, ordered by corner count (highest first)
+    # Heap entries: (-num_corners, node_name) — negative for max-heap behavior
     visited_cameras: set[str] = {reference_camera}
     visited_frames: set[int] = set()
-    queue = deque([reference_camera])
 
-    while queue:
-        node = queue.popleft()
+    # Seed heap with reference camera (max priority)
+    heap: list[tuple[int, str]] = [(0, reference_camera)]
 
-        if isinstance(node, str) and not node.startswith("f"):
+    while heap:
+        _priority, node = heapq.heappop(heap)
+
+        if not node.startswith("f"):
             # Camera node - propagate to connected frames
             cam_name = node
+            if cam_name not in camera_poses:
+                continue
             cam_R, cam_t = camera_poses[cam_name]
 
+            # Score each neighboring frame by corner count, pick best first
+            frame_neighbors = []
             for neighbor in pose_graph.adjacency.get(cam_name, []):
                 frame_idx = int(neighbor[1:])  # "f42" -> 42
                 if frame_idx in visited_frames:
                     continue
-
-                # Compute board pose in world frame via this camera
                 obs_maybe = obs_index.get((cam_name, frame_idx))
                 if obs_maybe is None:
                     continue
-                obs = obs_maybe
+                frame_neighbors.append((frame_idx, obs_maybe))
+
+            for frame_idx, obs in frame_neighbors:
+                if frame_idx in visited_frames:
+                    continue
 
                 if interface_distances is not None and cam_name in interface_distances:
                     result = refractive_solve_pnp(
@@ -431,15 +622,15 @@ def estimate_extrinsics(
                 R_bc: NDArray[np.float64] = cv2.Rodrigues(rvec_bc)[0].astype(np.float64)
 
                 # board_in_world = cam_in_world @ board_in_cam
-                # cam_in_world = invert(world_in_cam) = invert(cam_R, cam_t)
                 R_cw, t_cw = invert_pose(cam_R, cam_t)  # camera in world
                 R_bw, t_bw = compose_poses(R_cw, t_cw, R_bc, tvec_bc)  # board in world
 
                 board_poses[frame_idx] = (R_bw, t_bw)
                 visited_frames.add(frame_idx)
-                queue.append(f"f{frame_idx}")
+                # Priority: negative corner count for max-heap; tie-break by name
+                heapq.heappush(heap, (-len(obs.corner_ids), f"f{frame_idx}"))
 
-        elif isinstance(node, str) and node.startswith("f"):
+        else:
             # Frame node - propagate to connected cameras
             frame_idx = int(node[1:])
             if frame_idx not in board_poses:
@@ -447,16 +638,20 @@ def estimate_extrinsics(
 
             R_bw, t_bw = board_poses[frame_idx]
 
-            for neighbor in pose_graph.adjacency.get(node, []):
+            # Score each neighboring camera by corner count
+            cam_neighbors = []
+            for neighbor in sorted(pose_graph.adjacency.get(node, [])):
                 cam_name = neighbor
                 if cam_name in visited_cameras:
                     continue
-
-                # Compute camera pose from board pose
                 obs_maybe = obs_index.get((cam_name, frame_idx))
                 if obs_maybe is None:
                     continue
-                obs = obs_maybe
+                cam_neighbors.append((cam_name, obs_maybe))
+
+            for cam_name, obs in cam_neighbors:
+                if cam_name in visited_cameras:
+                    continue
 
                 if interface_distances is not None and cam_name in interface_distances:
                     result = refractive_solve_pnp(
@@ -475,13 +670,23 @@ def estimate_extrinsics(
                 R_bc = cv2.Rodrigues(rvec_bc)[0].astype(np.float64)
 
                 # world_in_cam = board_in_cam @ world_in_board
-                # world_in_board = invert(board_in_world)
                 R_wb, t_wb = invert_pose(R_bw, t_bw)
                 R_wc, t_wc = compose_poses(R_bc, tvec_bc, R_wb, t_wb)
 
                 camera_poses[cam_name] = (R_wc, t_wc)
                 visited_cameras.add(cam_name)
-                queue.append(cam_name)
+                if progress_callback is not None:
+                    progress_callback(cam_name, len(visited_cameras), total_cameras)
+                heapq.heappush(heap, (-len(obs.corner_ids), cam_name))
+
+    # Multi-frame averaging refinement pass
+    if progress_callback is not None:
+        progress_callback("_averaging", len(visited_cameras), total_cameras)
+    camera_poses, board_poses = _refine_poses_multi_frame(
+        camera_poses, board_poses, obs_index, pose_graph,
+        intrinsics, board, reference_camera,
+        interface_distances, interface_normal, n_air, n_water,
+    )
 
     # Convert to CameraExtrinsics
     extrinsics_result: dict[str, CameraExtrinsics] = {}

@@ -50,12 +50,15 @@ class CameraIntrinsics:
 
     Attributes:
         K: 3x3 intrinsic matrix
-        dist_coeffs: Distortion coefficients, length 5 or 8: [k1, k2, p1, p2, k3, ...]
+        dist_coeffs: Distortion coefficients. For pinhole: length 5 or 8
+            [k1, k2, p1, p2, k3, ...]. For fisheye: length 4 [k1, k2, k3, k4].
         image_size: Image dimensions as (width, height) in pixels
+        is_fisheye: If True, uses equidistant fisheye projection model
     """
     K: Mat3  # 3x3 intrinsic matrix
-    dist_coeffs: NDArray[np.float64]  # length 5 or 8: [k1, k2, p1, p2, k3, ...]
+    dist_coeffs: NDArray[np.float64]  # pinhole: length 5 or 8; fisheye: length 4
     image_size: tuple[int, int]  # (width, height)
+    is_fisheye: bool = False
 
 
 @dataclass
@@ -89,14 +92,16 @@ class CameraCalibration:
         name: Camera identifier (e.g., "cam0", "cam1")
         intrinsics: Intrinsic camera parameters
         extrinsics: Extrinsic camera parameters (pose in world frame)
-        interface_distance: Distance in meters from camera center to water surface
+        interface_distance: Z-coordinate of the water surface in world frame (meters).
+            Same for all cameras after optimization. Despite the name, this is a
+            coordinate, not a per-camera distance.
         is_auxiliary: If True, this camera was registered post-hoc against
             fixed board poses (excluded from joint Stage 3/4 optimization).
     """
     name: str
     intrinsics: CameraIntrinsics
     extrinsics: CameraExtrinsics
-    interface_distance: float  # meters from camera center to water surface
+    interface_distance: float
     is_auxiliary: bool = False
 
 
@@ -140,17 +145,17 @@ class DiagnosticsData:
     """Calibration quality metrics.
 
     Attributes:
-        reprojection_error_rms: Overall RMS reprojection error in pixels
-        reprojection_error_per_camera: Per-camera RMS reprojection errors
-        validation_3d_error_mean: Mean 3D reconstruction error in meters (holdout set)
-        validation_3d_error_std: Standard deviation of 3D errors in meters
+        reprojection_error_rms: Overall RMS reprojection error in pixels (primary cameras only)
+        reprojection_error_per_camera: Per-camera RMS reprojection errors (primary cameras only)
+        validation_3d_error_mean: Mean 3D reconstruction error in meters (holdout set, primary cameras only)
+        validation_3d_error_std: Standard deviation of 3D errors in meters (primary cameras only)
         per_corner_residuals: Optional (N, 2) array of pixel errors for each corner
         per_frame_errors: Optional dict mapping frame index to error value
     """
-    reprojection_error_rms: float  # pixels
-    reprojection_error_per_camera: dict[str, float]
-    validation_3d_error_mean: float  # meters
-    validation_3d_error_std: float  # meters
+    reprojection_error_rms: float  # pixels (primary cameras only)
+    reprojection_error_per_camera: dict[str, float]  # primary cameras only
+    validation_3d_error_mean: float  # meters (primary cameras only)
+    validation_3d_error_std: float  # meters (primary cameras only)
     per_corner_residuals: Optional[NDArray[np.float64]] = None  # (N, 2) pixel errors
     per_frame_errors: Optional[dict[int, float]] = None
 
@@ -196,6 +201,10 @@ class CalibrationConfig:
         max_calibration_frames: Maximum number of frames for Stages 3-4 optimization.
             None (default) = use all calibration frames. When set, calibration frames
             are uniformly subsampled to this limit before optimization.
+        refine_intrinsics: If True, Stage 4 jointly refines per-camera focal lengths
+            (fx, fy) and principal points (cx, cy) alongside extrinsics and interface
+            distances. Distortion coefficients are NOT refined. Only enable after
+            Stage 3 converges reliably. Default False (Stage 4 skipped).
         save_detailed_residuals: Whether to save per-corner residuals
         initial_interface_distances: Optional dict mapping camera names to approximate
             camera-to-water-surface distances in meters. When None, all cameras default
@@ -208,10 +217,14 @@ class CalibrationConfig:
             fixed board poses. These cameras are calibrated for intrinsics and
             detected, but excluded from joint Stage 3/4 optimization. Must not
             overlap with camera_names.
-        auxiliary_water_z_weight: Water-Z regularization weight for auxiliary cameras.
-            Higher than water_z_weight because auxiliary registration has only 1
-            regularization residual vs thousands of reprojection residuals.
-            0.0 disables (default). Recommended value ~100.
+        fisheye_cameras: List of camera names that should use the equidistant
+            fisheye projection model. Must be a subset of auxiliary_cameras
+            and must not overlap with rational_model_cameras.
+        refine_auxiliary_intrinsics: If True, Stage 4b refines auxiliary camera
+            intrinsics (fx, fy, cx, cy) alongside extrinsics. Requires
+            auxiliary_cameras to be set. Independent of refine_intrinsics (which
+            controls primary camera refinement in Stage 4). Distortion coefficients
+            are NOT refined.
     """
     board: BoardConfig
     camera_names: list[str]
@@ -221,7 +234,7 @@ class CalibrationConfig:
     intrinsic_board: BoardConfig | None = None
     n_air: float = 1.0
     n_water: float = 1.333
-    interface_normal_fixed: bool = True
+    interface_normal_fixed: bool = False
     robust_loss: str = "huber"  # "huber", "soft_l1", "linear"
     loss_scale: float = 1.0  # pixels
     min_corners_per_frame: int = 8
@@ -229,12 +242,13 @@ class CalibrationConfig:
     frame_step: int = 1  # Process every Nth frame (1 = all frames)
     holdout_fraction: float = 0.2  # Random selection; frames are held out entirely (not per-detection)
     max_calibration_frames: int | None = None  # None = no limit, use all frames
+    refine_intrinsics: bool = False
+    refine_auxiliary_intrinsics: bool = False  # If True, Stage 4b refines auxiliary camera intrinsics (fx, fy, cx, cy) alongside extrinsics. Requires auxiliary_cameras to be set. Independent of refine_intrinsics (which controls primary camera refinement in Stage 4). Distortion coefficients are NOT refined.
     save_detailed_residuals: bool = True
     initial_interface_distances: dict[str, float] | None = None
     rational_model_cameras: list[str] = field(default_factory=list)
     auxiliary_cameras: list[str] = field(default_factory=list)
-    water_z_weight: float = 0.0  # 0.0 = disabled
-    auxiliary_water_z_weight: float = 0.0  # water-Z regularization for auxiliary cameras (0 = disabled)
+    fisheye_cameras: list[str] = field(default_factory=list)
 
 
 @dataclass

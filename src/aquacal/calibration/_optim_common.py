@@ -25,22 +25,23 @@ from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
 
 def pack_params(
     extrinsics: dict[str, CameraExtrinsics],
-    interface_distances: dict[str, float],
+    water_z: float,
     board_poses: dict[int, BoardPose],
     reference_camera: str,
     camera_order: list[str],
     frame_order: list[int],
     intrinsics: dict[str, CameraIntrinsics] | None = None,
     refine_intrinsics: bool = False,
+    normal_fixed: bool = True,
 ) -> NDArray[np.float64]:
     """
     Pack optimization parameters into a 1D array.
 
-    Parameter layout:
+    Parameter layout (when normal_fixed=False, tilt params are prepended):
+    - If not normal_fixed: reference camera tilt rx, ry (2)
     - For each non-reference camera (in camera_order, skipping reference):
         cam_rvec (3), cam_tvec (3)
-    - For each camera (in camera_order, including reference):
-        interface_distance (1)
+    - water_z (1): global water surface Z coordinate
     - For each frame (in frame_order):
         board_rvec (3), board_tvec (3)
     - If refine_intrinsics, for each camera (in camera_order):
@@ -48,18 +49,25 @@ def pack_params(
 
     Args:
         extrinsics: Camera extrinsics dict
-        interface_distances: Per-camera interface distances
+        water_z: Global water surface Z coordinate. This is stored as the
+            interface_distance for all cameras (a Z-coordinate, not a distance).
         board_poses: Board poses dict (frame_idx -> BoardPose)
         reference_camera: Name of reference camera (skipped in extrinsics packing)
         camera_order: Ordered list of camera names
         frame_order: Ordered list of frame indices
         intrinsics: Per-camera intrinsics (required if refine_intrinsics=True)
         refine_intrinsics: Whether to include intrinsics in parameter vector
+        normal_fixed: If False, prepend 2 tilt params (rx, ry) for reference camera
 
     Returns:
         1D parameter vector
     """
     params = []
+
+    # Pack reference camera tilt (if estimating)
+    if not normal_fixed:
+        rvec = matrix_to_rvec(extrinsics[reference_camera].R)
+        params.extend(rvec[:2].tolist())
 
     # Pack camera extrinsics (skip reference camera)
     for cam_name in camera_order:
@@ -70,9 +78,8 @@ def pack_params(
         params.extend(rvec.tolist())
         params.extend(ext.t.tolist())
 
-    # Pack interface distances (all cameras, including reference)
-    for cam_name in camera_order:
-        params.append(interface_distances[cam_name])
+    # Pack water surface Z (single parameter replacing N distances)
+    params.append(water_z)
 
     # Pack board poses
     for frame_idx in frame_order:
@@ -97,6 +104,7 @@ def unpack_params(
     frame_order: list[int],
     base_intrinsics: dict[str, CameraIntrinsics] | None = None,
     refine_intrinsics: bool = False,
+    normal_fixed: bool = True,
 ) -> tuple[
     dict[str, CameraExtrinsics],
     dict[str, float],
@@ -109,24 +117,36 @@ def unpack_params(
     Args:
         params: 1D parameter vector
         reference_camera: Name of reference camera
-        reference_extrinsics: Fixed extrinsics for reference camera
+        reference_extrinsics: Fixed extrinsics for reference camera (used when
+            normal_fixed=True; ignored when normal_fixed=False since reference
+            extrinsics come from the parameter vector)
         camera_order: Ordered list of camera names
         frame_order: Ordered list of frame indices
         base_intrinsics: Base intrinsics (for distortion coeffs and image_size).
             Required if refine_intrinsics=True. When False, copies are returned
             if provided, otherwise an empty dict.
         refine_intrinsics: Whether intrinsics are included in params
+        normal_fixed: If False, first 2 params are tilt (rx, ry) for reference camera
 
     Returns:
         Tuple of (extrinsics_dict, distances_dict, board_poses_dict, intrinsics_dict)
     """
     idx = 0
 
+    # Unpack reference camera tilt (if estimating)
+    if not normal_fixed:
+        rx, ry = params[0], params[1]
+        idx = 2
+        R_ref = rvec_to_matrix(np.array([rx, ry, 0.0]))
+        ref_ext = CameraExtrinsics(R=R_ref, t=np.zeros(3, dtype=np.float64))
+    else:
+        ref_ext = reference_extrinsics
+
     # Unpack camera extrinsics (skip reference camera)
     extrinsics_out = {}
     for cam_name in camera_order:
         if cam_name == reference_camera:
-            extrinsics_out[cam_name] = reference_extrinsics
+            extrinsics_out[cam_name] = ref_ext
         else:
             rvec = params[idx : idx + 3]
             tvec = params[idx + 3 : idx + 6]
@@ -134,11 +154,15 @@ def unpack_params(
             R = rvec_to_matrix(rvec)
             extrinsics_out[cam_name] = CameraExtrinsics(R=R, t=tvec.copy())
 
-    # Unpack interface distances (all cameras)
+    # Unpack water surface Z (single parameter)
+    water_z = float(params[idx])
+    idx += 1
+
+    # Derive per-camera interface distances from water_z
+    # interface_distance is the Z-coordinate of the water surface for all cameras
     distances_out = {}
     for cam_name in camera_order:
-        distances_out[cam_name] = params[idx]
-        idx += 1
+        distances_out[cam_name] = water_z
 
     # Unpack board poses
     board_poses_out = {}
@@ -187,19 +211,17 @@ def build_jacobian_sparsity(
     frame_order: list[int],
     min_corners: int,
     refine_intrinsics: bool = False,
-    water_z_weight: float = 0.0,
+    normal_fixed: bool = True,
 ) -> NDArray[np.int8]:
     """
     Build sparse Jacobian structure matrix.
 
     Each residual (x and y error for one corner observation) depends only on:
+    - Tilt params: 2 params (only if normal_fixed=False AND camera is reference)
     - Camera extrinsics: 6 params (or 0 if reference camera)
-    - Interface distance for that camera: 1 param
+    - water_z: 1 param (dense — ALL cameras depend on it)
     - Board pose for that frame: 6 params
     - Camera intrinsics for that camera: 4 params (if refine_intrinsics)
-
-    When water_z_weight > 0, appends N_cameras rows for regularization
-    residuals that depend on all extrinsic and interface distance params.
 
     Args:
         detections: Detection results
@@ -208,7 +230,7 @@ def build_jacobian_sparsity(
         frame_order: Ordered list of frame indices
         min_corners: Minimum corners per detection
         refine_intrinsics: Whether intrinsics are in the parameter vector
-        water_z_weight: Weight for water surface regularization (0.0 = disabled)
+        normal_fixed: If False, 2 tilt params are prepended to the parameter vector
 
     Returns:
         Sparse matrix of shape (n_residuals, n_params) with 1s where
@@ -217,11 +239,18 @@ def build_jacobian_sparsity(
     n_cams = len(camera_order)
     n_frames = len(frame_order)
 
+    n_tilt_params = 0 if normal_fixed else 2
     n_extrinsic_params = 6 * (n_cams - 1)
-    n_distance_params = n_cams
+    n_water_z_params = 1
     n_pose_params = 6 * n_frames
     n_intrinsic_params = 4 * n_cams if refine_intrinsics else 0
-    n_params = n_extrinsic_params + n_distance_params + n_pose_params + n_intrinsic_params
+    n_params = (
+        n_tilt_params
+        + n_extrinsic_params
+        + n_water_z_params
+        + n_pose_params
+        + n_intrinsic_params
+    )
 
     # Build camera index mappings
     cam_to_ext_idx = {}
@@ -231,8 +260,10 @@ def build_jacobian_sparsity(
             cam_to_ext_idx[cam_name] = ext_idx
             ext_idx += 1
 
-    cam_to_dist_idx = {cam: i for i, cam in enumerate(camera_order)}
+    cam_to_cam_idx = {cam: i for i, cam in enumerate(camera_order)}
     frame_to_pose_idx = {frame: i for i, frame in enumerate(frame_order)}
+
+    water_z_col = n_tilt_params + n_extrinsic_params
 
     residual_rows = []
 
@@ -251,29 +282,34 @@ def build_jacobian_sparsity(
             if detection.num_corners < min_corners:
                 continue
 
-            dist_idx = cam_to_dist_idx[cam_name]
-
             for _ in range(detection.num_corners):
                 row = np.zeros(n_params, dtype=np.int8)
 
+                # 0. Tilt params (reference camera residuals only)
+                if not normal_fixed and cam_name == reference_camera:
+                    row[0:2] = 1
+
                 # 1. Camera extrinsics (if not reference)
                 if cam_name in cam_to_ext_idx:
-                    ext_start = cam_to_ext_idx[cam_name] * 6
+                    ext_start = n_tilt_params + cam_to_ext_idx[cam_name] * 6
                     row[ext_start : ext_start + 6] = 1
 
-                # 2. Interface distance for this camera
-                row[n_extrinsic_params + dist_idx] = 1
+                # 2. water_z affects ALL cameras (dense column)
+                row[water_z_col] = 1
 
                 # 3. Board pose for this frame
-                pose_start = n_extrinsic_params + n_distance_params + pose_idx * 6
+                pose_start = (
+                    n_tilt_params + n_extrinsic_params + n_water_z_params + pose_idx * 6
+                )
                 row[pose_start : pose_start + 6] = 1
 
                 # 4. Camera intrinsics (if refining)
                 if refine_intrinsics:
-                    cam_idx = cam_to_dist_idx[cam_name]
+                    cam_idx = cam_to_cam_idx[cam_name]
                     intr_start = (
-                        n_extrinsic_params
-                        + n_distance_params
+                        n_tilt_params
+                        + n_extrinsic_params
+                        + n_water_z_params
                         + n_pose_params
                         + cam_idx * 4
                     )
@@ -282,30 +318,6 @@ def build_jacobian_sparsity(
                 # Two residuals (x and y) with same sparsity pattern
                 residual_rows.append(row)
                 residual_rows.append(row.copy())
-
-    # Append sparsity rows for water surface regularization residuals
-    if water_z_weight > 0.0:
-        for i in range(len(camera_order)):
-            for j in range(i + 1, len(camera_order)):
-                row = np.zeros(n_params, dtype=np.int8)
-                cam_i = camera_order[i]
-                cam_j = camera_order[j]
-
-                # Camera i extrinsics (all 6, since C_z depends on R and t)
-                if cam_i in cam_to_ext_idx:
-                    ext_start = cam_to_ext_idx[cam_i] * 6
-                    row[ext_start : ext_start + 6] = 1
-
-                # Camera j extrinsics
-                if cam_j in cam_to_ext_idx:
-                    ext_start = cam_to_ext_idx[cam_j] * 6
-                    row[ext_start : ext_start + 6] = 1
-
-                # Interface distances for both cameras
-                row[n_extrinsic_params + cam_to_dist_idx[cam_i]] = 1
-                row[n_extrinsic_params + cam_to_dist_idx[cam_j]] = 1
-
-                residual_rows.append(row)
 
     return np.array(residual_rows, dtype=np.int8)
 
@@ -316,6 +328,7 @@ def build_bounds(
     reference_camera: str,
     base_intrinsics: dict[str, CameraIntrinsics] | None = None,
     refine_intrinsics: bool = False,
+    normal_fixed: bool = True,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
     Build lower and upper bounds for optimization.
@@ -326,30 +339,44 @@ def build_bounds(
         reference_camera: Name of reference camera
         base_intrinsics: Base intrinsics (required if refine_intrinsics=True)
         refine_intrinsics: Whether intrinsics are being refined
+        normal_fixed: If False, 2 tilt bounds are prepended
 
     Returns:
         Tuple of (lower_bounds, upper_bounds) arrays
     """
     n_cams = len(camera_order)
     n_frames = len(frame_order)
+    n_tilt_params = 0 if normal_fixed else 2
     n_extrinsic_params = 6 * (n_cams - 1)
-    n_distance_params = n_cams
+    n_water_z_params = 1
     n_pose_params = 6 * n_frames
     n_intrinsic_params = 4 * n_cams if refine_intrinsics else 0
-    total = n_extrinsic_params + n_distance_params + n_pose_params + n_intrinsic_params
+    total = (
+        n_tilt_params
+        + n_extrinsic_params
+        + n_water_z_params
+        + n_pose_params
+        + n_intrinsic_params
+    )
 
     lower = np.full(total, -np.inf)
     upper = np.full(total, np.inf)
 
-    # Interface distances: [0.01, 2.0]
-    dist_start = n_extrinsic_params
-    dist_end = dist_start + n_distance_params
-    lower[dist_start:dist_end] = 0.01
-    upper[dist_start:dist_end] = 2.0
+    # Tilt bounds: [-0.2, 0.2] radians (~11 degrees)
+    if not normal_fixed:
+        lower[0:2] = -0.2
+        upper[0:2] = 0.2
+
+    # Water surface Z bound: [0.01, 2.0] meters
+    water_z_idx = n_tilt_params + n_extrinsic_params
+    lower[water_z_idx] = 0.01
+    upper[water_z_idx] = 2.0
 
     # Intrinsic bounds
     if refine_intrinsics:
-        intr_start = n_extrinsic_params + n_distance_params + n_pose_params
+        intr_start = (
+            n_tilt_params + n_extrinsic_params + n_water_z_params + n_pose_params
+        )
         for i, cam_name in enumerate(camera_order):
             base = base_intrinsics[cam_name]
             fx, fy = base.K[0, 0], base.K[1, 1]
@@ -382,16 +409,13 @@ def compute_residuals(
     frame_order: list[int],
     min_corners: int,
     refine_intrinsics: bool = False,
-    water_z_weight: float = 0.0,
+    normal_fixed: bool = True,
 ) -> NDArray[np.float64]:
     """
     Compute reprojection residuals for all observations.
 
     When refine_intrinsics=False, intrinsics are taken from base_intrinsics.
     When refine_intrinsics=True, intrinsics are unpacked from the parameter vector.
-
-    When water_z_weight > 0, appends N_cameras regularization residuals that
-    penalize inconsistency in the inferred water surface Z across cameras.
 
     Args:
         params: Current parameter vector
@@ -400,7 +424,8 @@ def compute_residuals(
             distortion coeffs and image_size when refining)
         board: Board geometry
         reference_camera: Name of reference camera
-        reference_extrinsics: Extrinsics for reference camera (fixed)
+        reference_extrinsics: Extrinsics for reference camera (fixed when
+            normal_fixed=True; ignored when normal_fixed=False)
         interface_normal: Interface normal vector
         n_air: Refractive index of air
         n_water: Refractive index of water
@@ -408,12 +433,10 @@ def compute_residuals(
         frame_order: Ordered list of frame indices
         min_corners: Minimum corners per detection
         refine_intrinsics: Whether intrinsics are being refined
-        water_z_weight: Weight for water surface consistency regularization.
-            0.0 disables regularization (default).
+        normal_fixed: If False, first 2 params are tilt for reference camera
 
     Returns:
-        1D array of residuals [r0_x, r0_y, r1_x, r1_y, ...] in pixels,
-        optionally followed by N_cameras regularization residuals.
+        1D array of residuals [r0_x, r0_y, r1_x, r1_y, ...] in pixels.
     """
     extrinsics, interface_distances, board_poses, intrinsics = unpack_params(
         params,
@@ -423,6 +446,7 @@ def compute_residuals(
         frame_order,
         base_intrinsics=base_intrinsics,
         refine_intrinsics=refine_intrinsics,
+        normal_fixed=normal_fixed,
     )
 
     residuals = []
@@ -467,25 +491,6 @@ def compute_residuals(
                             projected[1] - detected_px[1],
                         ]
                     )
-
-    # Append water surface consistency regularization residuals
-    if water_z_weight > 0.0:
-        # Compute water surface Z for each camera
-        water_zs = {}
-        for cam_name in camera_order:
-            C = extrinsics[cam_name].C
-            water_zs[cam_name] = C[2] + interface_distances[cam_name]
-
-        # Pairwise consistency: penalize differences between all camera pairs.
-        # Scale weight by 1/sqrt(N-1) so total regularization force per camera
-        # is comparable regardless of camera count.
-        n_cams = len(camera_order)
-        pair_weight = water_z_weight / np.sqrt(max(n_cams - 1, 1))
-        for i in range(n_cams):
-            for j in range(i + 1, n_cams):
-                cam_i = camera_order[i]
-                cam_j = camera_order[j]
-                residuals.append(pair_weight * (water_zs[cam_i] - water_zs[cam_j]))
 
     return np.array(residuals, dtype=np.float64)
 

@@ -53,16 +53,16 @@ def matrix_to_rvec(R: Mat3) -> Vec3:
 
 def compose_poses(R1: Mat3, t1: Vec3, R2: Mat3, t2: Vec3) -> tuple[Mat3, Vec3]:
     """
-    Compose two poses: T_combined = T1 @ T2.
+    Compose two poses: T_combined = T1 @ T2 (T2 applied first, then T1).
 
-    If T1 transforms from frame A to frame B, and T2 transforms from frame B
-    to frame C, then T_combined transforms from frame A to frame C.
+    If T1 transforms from frame B to frame C, and T2 transforms from frame A
+    to frame B, then T_combined transforms from frame A to frame C.
 
     Args:
-        R1: First rotation matrix, shape (3, 3)
-        t1: First translation vector, shape (3,)
-        R2: Second rotation matrix, shape (3, 3)
-        t2: Second translation vector, shape (3,)
+        R1: Outer rotation matrix (applied second), shape (3, 3)
+        t1: Outer translation vector, shape (3,)
+        R2: Inner rotation matrix (applied first), shape (3, 3)
+        t2: Inner translation vector, shape (3,)
 
     Returns:
         R_combined: Combined rotation matrix, shape (3, 3)

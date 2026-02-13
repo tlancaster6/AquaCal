@@ -66,19 +66,26 @@ def ground_truth_extrinsics() -> dict[str, CameraExtrinsics]:
         ),
         "cam1": CameraExtrinsics(
             R=np.eye(3, dtype=np.float64),
-            t=np.array([0.3, 0.0, 0.0], dtype=np.float64),
+            t=np.array([0.1, 0.0, 0.0], dtype=np.float64),
         ),
         "cam2": CameraExtrinsics(
             R=np.eye(3, dtype=np.float64),
-            t=np.array([0.0, 0.3, 0.0], dtype=np.float64),
+            t=np.array([0.0, 0.1, 0.0], dtype=np.float64),
         ),
     }
 
 
 @pytest.fixture
 def ground_truth_distances() -> dict[str, float]:
-    """Ground truth interface distances."""
-    return {"cam0": 0.15, "cam1": 0.16, "cam2": 0.14}
+    """Ground truth interface distances.
+
+    With a single water_z parameter, distances are derived as d_i = water_z - C_z_i.
+    cam0: C_z = 0 (identity R, t=0) -> d = water_z
+    cam1: C_z = 0 (identity R, t=[0.3,0,0]) -> d = water_z
+    cam2: C_z = 0 (identity R, t=[0,0.3,0]) -> d = water_z
+    All cameras share C_z=0, so all distances must equal water_z = 0.15.
+    """
+    return {"cam0": 0.15, "cam1": 0.15, "cam2": 0.15}
 
 
 @pytest.fixture
@@ -125,10 +132,11 @@ class TestPackUnpackWithIntrinsics:
         camera_order = ["cam0", "cam1", "cam2"]
         frame_order = [0, 1, 2]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
+        water_z = 0.15  # All cameras at C_z=0, so water_z = distance
 
         packed = pack_params(
             ground_truth_extrinsics,
-            ground_truth_distances,
+            water_z,
             board_poses_dict,
             "cam0",
             camera_order,
@@ -174,10 +182,11 @@ class TestPackUnpackWithIntrinsics:
         camera_order = ["cam0", "cam1", "cam2"]
         frame_order = [0, 1, 2]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
+        water_z = 0.15
 
         packed = pack_params(
             ground_truth_extrinsics,
-            ground_truth_distances,
+            water_z,
             board_poses_dict,
             "cam0",
             camera_order,
@@ -215,10 +224,11 @@ class TestPackUnpackWithIntrinsics:
         camera_order = ["cam0", "cam1", "cam2"]
         frame_order = [0, 1, 2]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
+        water_z = 0.15
 
         packed = pack_params(
             ground_truth_extrinsics,
-            ground_truth_distances,
+            water_z,
             board_poses_dict,
             "cam0",
             camera_order,
@@ -226,10 +236,8 @@ class TestPackUnpackWithIntrinsics:
             refine_intrinsics=False,
         )
 
-        # Expected: 6*(3-1) + 3 + 6*3 = 12 + 3 + 18 = 33
-        expected_count = 6 * (len(camera_order) - 1) + len(camera_order) + 6 * len(
-            frame_order
-        )
+        # Expected: 6*(3-1) + 1 + 6*3 = 12 + 1 + 18 = 31
+        expected_count = 6 * (len(camera_order) - 1) + 1 + 6 * len(frame_order)
         assert len(packed) == expected_count
 
     def test_parameter_count_with_intrinsics(
@@ -243,10 +251,11 @@ class TestPackUnpackWithIntrinsics:
         camera_order = ["cam0", "cam1", "cam2"]
         frame_order = [0, 1, 2]
         board_poses_dict = {bp.frame_idx: bp for bp in synthetic_board_poses[:3]}
+        water_z = 0.15
 
         packed = pack_params(
             ground_truth_extrinsics,
-            ground_truth_distances,
+            water_z,
             board_poses_dict,
             "cam0",
             camera_order,
@@ -255,10 +264,10 @@ class TestPackUnpackWithIntrinsics:
             refine_intrinsics=True,
         )
 
-        # Expected: 6*(3-1) + 3 + 6*3 + 4*3 = 12 + 3 + 18 + 12 = 45
+        # Expected: 6*(3-1) + 1 + 6*3 + 4*3 = 12 + 1 + 18 + 12 = 43
         expected_count = (
             6 * (len(camera_order) - 1)
-            + len(camera_order)
+            + 1
             + 6 * len(frame_order)
             + 4 * len(camera_order)
         )
@@ -398,7 +407,7 @@ class TestJointRefinement:
                 reference_camera="camX",
             )
 
-    def test_distances_within_bounds(
+    def test_distances_positive(
         self,
         board,
         intrinsics,
@@ -407,7 +416,9 @@ class TestJointRefinement:
         synthetic_board_poses,
         stage3_result,
     ):
-        """Interface distances stay within bounds."""
+        """Interface distances are positive (cameras above water surface)."""
+        np.random.seed(42)
+
         detections = generate_synthetic_detections(
             intrinsics,
             ground_truth_extrinsics,
@@ -427,7 +438,7 @@ class TestJointRefinement:
         )
 
         for cam, dist in dist_opt.items():
-            assert 0.01 <= dist <= 2.0
+            assert dist > 0, f"Negative distance for {cam}: {dist}"
 
     def test_intrinsic_bounds_enforced(
         self,

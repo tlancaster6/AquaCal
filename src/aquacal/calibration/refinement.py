@@ -47,7 +47,7 @@ def joint_refinement(
     min_corners: int = 4,
     use_sparse_jacobian: bool = True,
     verbose: int = 0,
-    water_z_weight: float = 0.0,
+    normal_fixed: bool = True,
 ) -> tuple[
     dict[str, CameraExtrinsics],
     dict[str, float],
@@ -80,13 +80,13 @@ def joint_refinement(
             Dramatically improves performance for large parameter counts.
         verbose: Verbosity level for scipy.optimize.least_squares (default 0).
             0 = silent, 1 = one-line per iteration, 2 = full per-iteration report.
-        water_z_weight: Weight for water surface consistency regularization.
-            0.0 disables regularization (default).
+        normal_fixed: If False, estimate reference camera tilt (2 DOF) to account
+            for non-perpendicular camera-to-water-surface alignment.
 
     Returns:
         Tuple of:
         - dict[str, CameraExtrinsics]: Refined extrinsics for all cameras
-        - dict[str, float]: Refined interface distances per camera
+        - dict[str, float]: Refined interface distances per camera (derived from water_z)
         - list[BoardPose]: Refined board poses
         - dict[str, CameraIntrinsics]: Refined intrinsics (modified if refine_intrinsics=True,
           otherwise copies of input)
@@ -126,16 +126,21 @@ def joint_refinement(
 
     reference_extrinsics = extrinsics_in[reference_camera]
 
+    # Compute water_z from Stage 3 output
+    # C_z_ref = 0 since reference camera is at origin, so water_z = d_ref
+    water_z = extrinsics_in[reference_camera].C[2] + distances_in[reference_camera]
+
     # Pack initial parameters
     initial_params = pack_params(
         extrinsics_in,
-        distances_in,
+        water_z,
         board_poses_dict,
         reference_camera,
         camera_order,
         frame_order,
         intrinsics=intrinsics,
         refine_intrinsics=refine_intrinsics,
+        normal_fixed=normal_fixed,
     )
 
     # Build bounds
@@ -145,6 +150,7 @@ def joint_refinement(
         reference_camera,
         base_intrinsics=intrinsics,
         refine_intrinsics=refine_intrinsics,
+        normal_fixed=normal_fixed,
     )
 
     # Build cost function args
@@ -161,7 +167,7 @@ def joint_refinement(
         frame_order,
         min_corners,
         refine_intrinsics,
-        water_z_weight,
+        normal_fixed,
     )
 
     # Build sparse Jacobian if enabled
@@ -174,7 +180,7 @@ def joint_refinement(
             frame_order,
             min_corners,
             refine_intrinsics=refine_intrinsics,
-            water_z_weight=water_z_weight,
+            normal_fixed=normal_fixed,
         )
         jac = make_sparse_jacobian_func(
             compute_residuals, cost_args, jac_sparsity, (lower, upper),
@@ -205,6 +211,7 @@ def joint_refinement(
         frame_order,
         base_intrinsics=intrinsics,
         refine_intrinsics=refine_intrinsics,
+        normal_fixed=normal_fixed,
     )
 
     # Convert board poses dict to sorted list

@@ -31,7 +31,7 @@ from aquacal.validation.diagnostics import (
     DiagnosticReport,
     compute_spatial_error_map,
     compute_depth_stratified_errors,
-    compute_water_surface_consistency,
+    compute_camera_heights,
     generate_recommendations,
     generate_diagnostic_report,
     save_diagnostic_report,
@@ -372,6 +372,71 @@ class TestGenerateRecommendations:
         # Should mention elevated error
         assert any("elevated" in r.lower() and "review" in r.lower() for r in recs)
 
+    def test_camera_height_small_spread(self):
+        """Test recommendation for small camera height spread (no warning)."""
+        reproj = ReprojectionErrors(
+            rms=0.5,
+            per_camera={"cam0": 0.5, "cam1": 0.5},
+            per_frame={0: 0.5},
+            residuals=np.zeros((10, 2)),
+            num_observations=10,
+        )
+        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
+        depth_errors = pd.DataFrame(
+            {
+                "depth_min": [0.5],
+                "depth_max": [1.0],
+                "mean_error": [0.5],
+                "std_error": [0.1],
+                "num_observations": [10],
+            }
+        )
+        camera_heights = {
+            "water_z": 0.5,
+            "per_camera_height": {"cam0": 0.5, "cam1": 0.48},
+            "mean_height": 0.49,
+            "height_spread": 0.02,  # 20mm - below threshold
+        }
+
+        recs = generate_recommendations(reproj, recon, depth_errors, camera_heights)
+
+        # Should mention camera heights but no warning
+        assert any("camera heights" in r.lower() for r in recs)
+        # Should not mention mounting check (spread < 50mm)
+        assert not any("mounting" in r.lower() for r in recs)
+
+    def test_camera_height_large_spread(self):
+        """Test recommendation for large camera height spread (mounting warning)."""
+        reproj = ReprojectionErrors(
+            rms=0.5,
+            per_camera={"cam0": 0.5, "cam1": 0.5, "cam2": 0.5},
+            per_frame={0: 0.5},
+            residuals=np.zeros((10, 2)),
+            num_observations=10,
+        )
+        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
+        depth_errors = pd.DataFrame(
+            {
+                "depth_min": [0.5],
+                "depth_max": [1.0],
+                "mean_error": [0.5],
+                "std_error": [0.1],
+                "num_observations": [10],
+            }
+        )
+        camera_heights = {
+            "water_z": 0.5,
+            "per_camera_height": {"cam0": 0.4, "cam1": 0.5, "cam2": 0.48},
+            "mean_height": 0.46,
+            "height_spread": 0.1,  # 100mm - above threshold
+        }
+
+        recs = generate_recommendations(reproj, recon, depth_errors, camera_heights)
+
+        # Should mention camera heights and mounting check
+        assert any("camera heights" in r.lower() for r in recs)
+        assert any("mounting" in r.lower() for r in recs)
+
 
 class TestGenerateDiagnosticReport:
     """Tests for generate_diagnostic_report()."""
@@ -671,6 +736,107 @@ class TestPlotCameraRig:
 
         assert fig is not None
 
+    def test_top_down_preserves_ccw_order(self, board_config):
+        """Test that top-down view preserves counter-clockwise ordering of cameras."""
+        from aquacal.validation.diagnostics import plot_camera_rig
+
+        # Create 6 cameras arranged in a known CCW ring (angles 0, 60, 120, 180, 240, 300 degrees)
+        cameras = {}
+        radius = 0.5
+        height = -0.3  # Camera Z (negative in Z-down frame = above origin)
+        expected_order = []
+
+        for i in range(6):
+            angle_rad = 2 * np.pi * i / 6  # CCW from +X axis
+            x = radius * np.cos(angle_rad)
+            y = radius * np.sin(angle_rad)
+
+            K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            R = np.eye(3)
+            # Camera center C = -R^T @ t. With R=I, C = -t
+            t = np.array([-x, -y, -height])  # Note: t = -C when R=I
+            extrinsics = CameraExtrinsics(R=R, t=t)
+
+            cam_name = f"cam{i}"
+            cameras[cam_name] = CameraCalibration(
+                name=cam_name,
+                intrinsics=intrinsics,
+                extrinsics=extrinsics,
+                interface_distance=0.0,  # Water at Z=0
+            )
+            expected_order.append((cam_name, x, y, angle_rad))
+
+        interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
+        diagnostics = DiagnosticsData(
+            reprojection_error_rms=0.5,
+            reprojection_error_per_camera={f"cam{i}": 0.5 for i in range(6)},
+            validation_3d_error_mean=0.001,
+            validation_3d_error_std=0.0005,
+        )
+        metadata = CalibrationMetadata(
+            calibration_date="2026-01-01",
+            software_version="0.1.0",
+            config_hash="abc123",
+            num_frames_used=10,
+            num_frames_holdout=2,
+        )
+        calibration = CalibrationResult(
+            cameras=cameras,
+            interface=interface,
+            board=board_config,
+            diagnostics=diagnostics,
+            metadata=metadata,
+        )
+
+        # Generate the plot
+        fig = plot_camera_rig(calibration)
+
+        # Extract scatter plot data from top-down view (axes[1])
+        top_down_ax = fig.axes[1]
+
+        # Find the scatter collection (PathCollection)
+        scatter_collection = None
+        for collection in top_down_ax.collections:
+            if hasattr(collection, 'get_offsets'):
+                scatter_collection = collection
+                break
+
+        assert scatter_collection is not None, "Could not find scatter plot in top-down axes"
+
+        # Get plotted positions (X, Y in plot coordinates)
+        # Note: Z is negated in the plot, but top-down (elev=90) projects only X and Y
+        offsets = scatter_collection.get_offsets()
+        plotted_x = offsets[:, 0]
+        plotted_y = offsets[:, 1]
+
+        # Compute angular ordering of plotted points
+        plotted_angles = np.arctan2(plotted_y, plotted_x)
+
+        # Sort by angle to get CCW order (from +X axis)
+        plotted_order_indices = np.argsort(plotted_angles)
+
+        # Expected order is cam0, cam1, cam2, cam3, cam4, cam5 (already CCW by construction)
+        expected_angles = np.array([angle for _, _, _, angle in expected_order])
+
+        # Sort expected angles and verify plotted angles match
+        expected_order_indices = np.argsort(expected_angles)
+
+        # The plotted angular ordering should match the expected CCW ordering
+        # We don't need exact angle match, just that the order is preserved
+        # Check that the angular differences between consecutive cameras are all positive (CCW)
+        plotted_sorted_angles = plotted_angles[plotted_order_indices]
+        angle_diffs = np.diff(plotted_sorted_angles)
+
+        # Handle wraparound: if any diff is very negative, it's crossing the -pi/pi boundary
+        angle_diffs = np.where(angle_diffs < -np.pi, angle_diffs + 2*np.pi, angle_diffs)
+
+        # All diffs should be positive (or close to the expected 60 degrees = pi/3)
+        assert np.all(angle_diffs > 0), (
+            f"Top-down view does not preserve CCW order. "
+            f"Angular differences between consecutive cameras: {np.degrees(angle_diffs)}"
+        )
+
 
 class TestPlotReprojectionQuiver:
     """Tests for plot_reprojection_quiver()."""
@@ -932,11 +1098,11 @@ class TestSaveDiagnosticReportWithNewPlots:
                 assert result["quiver"][cam_name].exists()
 
 
-class TestComputeWaterSurfaceConsistency:
-    """Tests for compute_water_surface_consistency()."""
+class TestComputeCameraHeights:
+    """Tests for compute_camera_heights()."""
 
     def test_coplanar_cameras(self, board_config):
-        """Test cameras at same Z with same interface distance -> spread ≈ 0."""
+        """Test cameras at same Z with same interface_distance -> all h_c equal, spread = 0."""
         # Create 3 cameras all at Z=0 with interface_distance=0.5
         cameras = {}
         for i in range(3):
@@ -949,7 +1115,7 @@ class TestComputeWaterSurfaceConsistency:
                 name=f"cam{i}",
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=0.5,  # Same interface distance
+                interface_distance=0.5,  # water_z = 0.5
             )
 
         interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
@@ -974,20 +1140,23 @@ class TestComputeWaterSurfaceConsistency:
             metadata=metadata,
         )
 
-        result = compute_water_surface_consistency(calibration)
+        result = compute_camera_heights(calibration)
 
-        # All cameras at Z=0 with d=0.5 -> water_z = 0.5 for all
-        assert np.isclose(result["mean"], 0.5)
-        assert np.isclose(result["std"], 0.0)
-        assert np.isclose(result["spread"], 0.0)
-        assert len(result["per_camera"]) == 3
-        for cam_name, water_z in result["per_camera"].items():
-            assert np.isclose(water_z, 0.5)
+        # All cameras at Z=0, water_z=0.5 -> h_c = 0.5 for all
+        assert np.isclose(result["water_z"], 0.5)
+        assert np.isclose(result["mean_height"], 0.5)
+        assert np.isclose(result["height_spread"], 0.0)
+        assert len(result["per_camera_height"]) == 3
+        for cam_name, h_c in result["per_camera_height"].items():
+            assert np.isclose(h_c, 0.5)
 
-    def test_different_heights_compensated(self, board_config):
-        """Test cameras at different Z but interface distances compensate -> spread ≈ 0."""
-        # Create 3 cameras at different heights but interface distances adjusted
+    def test_different_heights(self, board_config):
+        """Test cameras at different Z with same interface_distance -> h_c varies, spread > 0."""
+        # Create 3 cameras at different heights, all with same water_z
         cameras = {}
+        water_z = 0.5
+        expected_heights = []
+
         for i in range(3):
             K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
             intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
@@ -997,14 +1166,14 @@ class TestComputeWaterSurfaceConsistency:
             cam_c_z = 0.1 * i  # cam0 at Z=0, cam1 at Z=0.1, cam2 at Z=0.2
             t = np.array([i * 0.1, 0.0, -cam_c_z])  # Note: t_z = -C_z
             extrinsics = CameraExtrinsics(R=R, t=t)
-            # Adjust interface distance so water_z = C_z + d = 0.5 for all
-            interface_distance = 0.5 - cam_c_z  # d = 0.5, 0.4, 0.3
+            # All cameras have same interface_distance (water_z)
             cameras[f"cam{i}"] = CameraCalibration(
                 name=f"cam{i}",
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=interface_distance,
+                interface_distance=water_z,
             )
+            expected_heights.append(water_z - cam_c_z)
 
         interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
         diagnostics = DiagnosticsData(
@@ -1028,39 +1197,40 @@ class TestComputeWaterSurfaceConsistency:
             metadata=metadata,
         )
 
-        result = compute_water_surface_consistency(calibration)
+        result = compute_camera_heights(calibration)
 
-        # All cameras should agree on water_z = 0.5
-        assert np.isclose(result["mean"], 0.5, atol=1e-10)
-        assert np.isclose(result["std"], 0.0, atol=1e-10)
-        assert np.isclose(result["spread"], 0.0, atol=1e-10)
-        assert len(result["per_camera"]) == 3
+        # Water_z is same for all
+        assert np.isclose(result["water_z"], water_z)
+        # Heights vary: cam0=0.5, cam1=0.4, cam2=0.3
+        # mean = 0.4, spread = 0.2
+        assert np.isclose(result["mean_height"], np.mean(expected_heights))
+        assert np.isclose(result["height_spread"], 0.2)
+        assert len(result["per_camera_height"]) == 3
 
-    def test_outlier_camera(self, board_config):
-        """Test one camera with wrong interface distance -> large spread, outlier detected."""
-        # Create 5 cameras: 4 agree, 1 is a clear outlier
-        cameras = {}
-        expected_water_zs = {}
-        for i in range(5):
-            K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
-            R = np.eye(3)
-            t = np.array([i * 0.1, 0.0, 0.0])  # All at C_z=0 (since R=I, t_z=0 -> C_z=0)
-            extrinsics = CameraExtrinsics(R=R, t=t)
-            # cam0-3: d=0.5, cam4: d=1.1 (outlier - 600mm off)
-            interface_distance = 1.1 if i == 4 else 0.5
-            cameras[f"cam{i}"] = CameraCalibration(
-                name=f"cam{i}",
+        # Verify individual heights
+        for i, (cam_name, h_c) in enumerate(sorted(result["per_camera_height"].items())):
+            assert np.isclose(h_c, expected_heights[i])
+
+    def test_single_camera(self, board_config):
+        """Test single camera edge case."""
+        K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
+        intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+        R = np.eye(3)
+        t = np.array([0.0, 0.0, 0.0])
+        extrinsics = CameraExtrinsics(R=R, t=t)
+        cameras = {
+            "cam0": CameraCalibration(
+                name="cam0",
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=interface_distance,
+                interface_distance=0.5,
             )
-            expected_water_zs[f"cam{i}"] = 0.0 + interface_distance
+        }
 
         interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
         diagnostics = DiagnosticsData(
             reprojection_error_rms=0.5,
-            reprojection_error_per_camera={f"cam{i}": 0.5 for i in range(5)},
+            reprojection_error_per_camera={"cam0": 0.5},
             validation_3d_error_mean=0.001,
             validation_3d_error_std=0.0005,
         )
@@ -1079,39 +1249,10 @@ class TestComputeWaterSurfaceConsistency:
             metadata=metadata,
         )
 
-        result = compute_water_surface_consistency(calibration)
+        result = compute_camera_heights(calibration)
 
-        # Mean should be around (0.5*4 + 1.1) / 5 = 0.62
-        assert np.isclose(result["mean"], (0.5 * 4 + 1.1) / 5.0)
-        # Spread should be 1.1 - 0.5 = 0.6
-        assert np.isclose(result["spread"], 0.6)
-        # Std should be non-zero
-        assert result["std"] > 0
-
-        # Test recommendations detect outlier
-        reproj = ReprojectionErrors(
-            rms=0.5,
-            per_camera={f"cam{i}": 0.5 for i in range(5)},
-            per_frame={0: 0.5},
-            residuals=np.zeros((10, 2)),
-            num_observations=10,
-        )
-        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
-        depth_errors = pd.DataFrame(
-            {
-                "depth_min": [0.5],
-                "depth_max": [1.0],
-                "mean_error": [0.5],
-                "std_error": [0.1],
-                "num_observations": [10],
-            }
-        )
-
-        recs = generate_recommendations(reproj, recon, depth_errors, result)
-
-        # Should mention large spread (600mm)
-        assert any("large" in r.lower() and "600" in r for r in recs)
-
-        # Verify that cam4 is far from the mean
-        mean_z = result["mean"]
-        assert abs(expected_water_zs["cam4"] - mean_z) > 0.4  # 400mm difference
+        # Single camera at Z=0 with water_z=0.5 -> h_c=0.5, spread=0
+        assert np.isclose(result["water_z"], 0.5)
+        assert np.isclose(result["mean_height"], 0.5)
+        assert np.isclose(result["height_spread"], 0.0)
+        assert len(result["per_camera_height"]) == 1

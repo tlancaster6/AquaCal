@@ -405,13 +405,17 @@ class TestCmdInit:
         # Check defaults match CalibrationConfig
         assert config["interface"]["n_air"] == 1.0
         assert config["interface"]["n_water"] == 1.333
-        assert config["interface"]["normal_fixed"] is True
+        assert config["interface"]["normal_fixed"] is False
         assert config["optimization"]["robust_loss"] == "huber"
         assert config["optimization"]["loss_scale"] == 1.0
         assert config["detection"]["min_corners"] == 8
         assert config["detection"]["min_cameras"] == 2
         assert config["validation"]["holdout_fraction"] == 0.2
         assert config["validation"]["save_detailed_residuals"] is True
+
+        # Check that commented-out fields are present in raw text
+        raw_text = output_file.read_text()
+        assert "refine_intrinsics" in raw_text
 
 
 class TestMain:

@@ -11,6 +11,7 @@ from aquacal.calibration.intrinsics import (
     calibrate_intrinsics_single,
     calibrate_intrinsics_all,
     _select_calibration_frames,
+    validate_intrinsics,
 )
 
 
@@ -283,3 +284,167 @@ class TestSelectCalibrationFrames:
 
         # Should select the spread one
         np.testing.assert_array_equal(selected[0][1], spread[1])
+
+
+class TestValidateIntrinsics:
+    def test_good_intrinsics_passes(self):
+        """Returns no warnings for well-calibrated intrinsics."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([
+                [800.0, 0, 640],
+                [0, 800.0, 480],
+                [0, 0, 1]
+            ], dtype=np.float64),
+            dist_coeffs=np.array([0.1, -0.05, 0.0, 0.0, 0.02], dtype=np.float64),
+            image_size=(1280, 960),
+        )
+
+        warnings = validate_intrinsics(intrinsics, camera_name="test_cam")
+
+        assert isinstance(warnings, list)
+        assert len(warnings) == 0
+
+    def test_bad_roundtrip_warns(self):
+        """Detects extreme distortion that breaks roundtrip."""
+        # Extreme distortion coefficients that will cause large roundtrip errors
+        intrinsics = CameraIntrinsics(
+            K=np.array([
+                [500.0, 0, 320],
+                [0, 500.0, 240],
+                [0, 0, 1]
+            ], dtype=np.float64),
+            dist_coeffs=np.array([5.0, -10.0, 0.0, 0.0, 20.0], dtype=np.float64),
+            image_size=(640, 480),
+        )
+
+        warnings = validate_intrinsics(intrinsics, camera_name="bad_cam", max_roundtrip_error_px=0.5)
+
+        # Should have at least one warning
+        assert len(warnings) > 0
+        # Should mention roundtrip error
+        assert any("roundtrip" in w.lower() for w in warnings)
+
+    def test_negative_distortion_factor_warns(self):
+        """Detects when distortion polynomial goes negative."""
+        # Large negative k1 will cause distortion factor to go negative
+        intrinsics = CameraIntrinsics(
+            K=np.array([
+                [500.0, 0, 320],
+                [0, 500.0, 240],
+                [0, 0, 1]
+            ], dtype=np.float64),
+            dist_coeffs=np.array([-5.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float64),
+            image_size=(640, 480),
+        )
+
+        warnings = validate_intrinsics(intrinsics, camera_name="negative_cam")
+
+        # Should have at least one warning about distortion model
+        assert len(warnings) > 0
+        assert any("distortion" in w.lower() and ("negative" in w.lower() or "non-monotonic" in w.lower()) for w in warnings)
+
+    def test_fx_check_passes_within_tolerance(self):
+        """Passes fx check when within tolerance."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([
+                [800.0, 0, 320],
+                [0, 800.0, 240],
+                [0, 0, 1]
+            ], dtype=np.float64),
+            dist_coeffs=np.array([0.1, -0.05, 0.0, 0.0, 0.0], dtype=np.float64),
+            image_size=(640, 480),
+        )
+
+        # Expected fx is 820, actual is 800 -> 2.4% difference, within 30% tolerance
+        warnings = validate_intrinsics(
+            intrinsics,
+            camera_name="test_cam",
+            expected_fx=820.0,
+            fx_tolerance_fraction=0.3
+        )
+
+        # Should not warn about fx
+        assert not any("fx=" in w for w in warnings)
+
+    def test_fx_check_warns_outside_tolerance(self):
+        """Warns when fx is outside tolerance."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([
+                [500.0, 0, 320],
+                [0, 500.0, 240],
+                [0, 0, 1]
+            ], dtype=np.float64),
+            dist_coeffs=np.array([0.1, -0.05, 0.0, 0.0, 0.0], dtype=np.float64),
+            image_size=(640, 480),
+        )
+
+        # Expected fx is 1000, actual is 500 -> 50% difference, outside 30% tolerance
+        warnings = validate_intrinsics(
+            intrinsics,
+            camera_name="bad_fx_cam",
+            expected_fx=1000.0,
+            fx_tolerance_fraction=0.3
+        )
+
+        # Should warn about fx
+        assert len(warnings) > 0
+        assert any("fx=" in w for w in warnings)
+
+    def test_fisheye_skips_monotonicity(self):
+        """Fisheye intrinsics skip monotonicity check."""
+        # Create fisheye intrinsics with large coefficients
+        intrinsics = CameraIntrinsics(
+            K=np.array([
+                [400.0, 0, 640],
+                [0, 400.0, 480],
+                [0, 0, 1]
+            ], dtype=np.float64),
+            dist_coeffs=np.array([0.5, -0.3, 0.1, -0.05], dtype=np.float64),
+            image_size=(1280, 960),
+            is_fisheye=True,
+        )
+
+        warnings = validate_intrinsics(intrinsics, camera_name="fisheye_cam")
+
+        # Should only check roundtrip, not monotonicity
+        # No warnings should mention "monotonic" or "negative"
+        for w in warnings:
+            assert "monotonic" not in w.lower()
+            # May have roundtrip warnings, but not distortion model warnings
+
+    def test_returns_empty_list_on_success(self):
+        """Returns empty list for successful validation."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([
+                [800.0, 0, 640],
+                [0, 800.0, 480],
+                [0, 0, 1]
+            ], dtype=np.float64),
+            dist_coeffs=np.array([0.05, -0.02, 0.0, 0.0, 0.01], dtype=np.float64),
+            image_size=(1280, 960),
+        )
+
+        warnings = validate_intrinsics(intrinsics)
+
+        assert isinstance(warnings, list)
+        assert warnings == []
+
+    def test_rational_model_validation(self):
+        """Validates 8-coefficient rational model."""
+        intrinsics = CameraIntrinsics(
+            K=np.array([
+                [800.0, 0, 640],
+                [0, 800.0, 480],
+                [0, 0, 1]
+            ], dtype=np.float64),
+            # 8-coeff rational model with reasonable values
+            dist_coeffs=np.array([0.1, -0.05, 0.0, 0.0, 0.02, 0.01, 0.005, 0.001], dtype=np.float64),
+            image_size=(1280, 960),
+        )
+
+        warnings = validate_intrinsics(intrinsics, camera_name="rational_cam")
+
+        # Should work without crashing and return a list
+        assert isinstance(warnings, list)
+        # Reasonable rational model should pass
+        # (may or may not have warnings depending on coefficients)

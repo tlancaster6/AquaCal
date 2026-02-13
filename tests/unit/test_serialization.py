@@ -311,3 +311,69 @@ class TestPerFrameErrorsIntKeys:
         # Keys should be integers, not strings
         for key in loaded.diagnostics.per_frame_errors.keys():
             assert isinstance(key, int)
+
+
+class TestFisheyeSerialization:
+    def test_fisheye_flag_roundtrip(self, tmp_path, sample_calibration_result, sample_metadata):
+        """is_fisheye=True survives save/load roundtrip."""
+        # Create a fisheye camera
+        fisheye_intrinsics = CameraIntrinsics(
+            K=np.array([[400.0, 0, 320], [0, 400.0, 240], [0, 0, 1]], dtype=np.float64),
+            dist_coeffs=np.array([0.05, -0.01, 0.002, -0.001], dtype=np.float64),
+            image_size=(640, 480),
+            is_fisheye=True,
+        )
+        fisheye_cam = CameraCalibration(
+            name="fisheye_cam",
+            intrinsics=fisheye_intrinsics,
+            extrinsics=CameraExtrinsics(R=np.eye(3), t=np.zeros(3)),
+            interface_distance=0.15,
+            is_auxiliary=True,
+        )
+        result = CalibrationResult(
+            cameras={
+                **sample_calibration_result.cameras,
+                "fisheye_cam": fisheye_cam,
+            },
+            interface=sample_calibration_result.interface,
+            board=sample_calibration_result.board,
+            diagnostics=sample_calibration_result.diagnostics,
+            metadata=sample_metadata,
+        )
+
+        path = tmp_path / "calibration.json"
+        save_calibration(result, path)
+        loaded = load_calibration(path)
+
+        assert loaded.cameras["fisheye_cam"].intrinsics.is_fisheye is True
+        assert loaded.cameras["cam0"].intrinsics.is_fisheye is False
+        assert len(loaded.cameras["fisheye_cam"].intrinsics.dist_coeffs) == 4
+
+    def test_backward_compat_missing_fisheye_field(self, tmp_path, sample_calibration_result):
+        """Loading JSON without is_fisheye field defaults to False."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+
+        # Verify the saved file doesn't contain is_fisheye for pinhole cameras
+        with open(path) as f:
+            data = json.load(f)
+
+        for cam_data in data["cameras"].values():
+            assert "is_fisheye" not in cam_data["intrinsics"]
+
+        # Load and check default
+        loaded = load_calibration(path)
+        for cam in loaded.cameras.values():
+            assert cam.intrinsics.is_fisheye is False
+
+    def test_fisheye_flag_only_written_when_true(self, tmp_path, sample_calibration_result):
+        """is_fisheye is only written to JSON when True (backward compat)."""
+        path = tmp_path / "calibration.json"
+        save_calibration(sample_calibration_result, path)
+
+        with open(path) as f:
+            data = json.load(f)
+
+        # Non-fisheye cameras should not have the field at all
+        for cam_data in data["cameras"].values():
+            assert "is_fisheye" not in cam_data["intrinsics"]

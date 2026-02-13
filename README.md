@@ -1,4 +1,4 @@
-Wwhy# AquaCal
+# AquaCal
 
 Refractive multi-camera calibration library for arrays of cameras in air viewing an underwater volume through the water surface. AquaCal jointly optimizes camera intrinsics, extrinsics, per-camera interface distances, and board poses to achieve accurate 3D reconstruction in refractive multi-camera systems. Designed for researchers and engineers working with multi-camera underwater imaging setups.
 
@@ -24,7 +24,7 @@ pip install .[dev]
    - In-air videos: Move a ChArUco board in front of the cameras above water
    - Underwater videos: Move the same (or different) board underwater
 
-2. **Create a configuration file** (`config.yaml`):
+2. **Create a configuration file** (`config.yaml`). See also aquacal init in the CLI reference section below for semi-automated config file generation:
 
 ```yaml
 board:
@@ -89,6 +89,31 @@ aquacal calibrate config.yaml -o results/experiment1/
 aquacal calibrate config.yaml --dry-run
 ```
 
+#### `aquacal init`
+
+Generate a configuration YAML file by scanning video directories. Extracts camera names from filenames using a regex pattern and writes a starter config with TODO placeholders for board measurements.
+
+**Options:**
+- `--intrinsic-dir <path>`: Directory containing in-air calibration videos (required)
+- `--extrinsic-dir <path>`: Directory containing underwater calibration videos (required)
+- `-o, --output <path>`: Output config file path (default: `config.yaml`)
+- `--pattern <regex>`: Regex with one capture group to extract camera name from filename stem (default: `(.+)` = full filename)
+
+**Examples:**
+
+```bash
+# Basic usage — camera names from full filename stems
+aquacal init --intrinsic-dir videos/intrinsic/ --extrinsic-dir videos/extrinsic/
+
+# Extract camera name from prefix (e.g., "cam0_recording.mp4" → "cam0")
+aquacal init --intrinsic-dir inair/ --extrinsic-dir underwater/ --pattern "([^_]+)"
+
+# Specify output path
+aquacal init --intrinsic-dir inair/ --extrinsic-dir underwater/ -o my_config.yaml
+```
+
+The generated config file includes TODO placeholders for board dimensions that you must fill in before running calibration. Camera names found in one directory but not the other are reported as warnings; only cameras present in both directories are included.
+
 #### `aquacal --version`
 
 Display the installed version of AquaCal.
@@ -105,6 +130,7 @@ board:
   square_size: 0.03            # Size of each square in meters
   marker_size: 0.022           # Size of ArUco markers in meters
   dictionary: DICT_4X4_50      # ArUco dictionary (default: DICT_4X4_50)
+  # legacy_pattern: false      # Set true if board has marker in top-left cell (pre-OpenCV 4.6)
 
 # Optional: separate board for in-air intrinsic calibration
 # If not specified, uses the same board as above
@@ -117,6 +143,12 @@ board:
 
 # List of camera identifiers
 cameras: [cam0, cam1, cam2]
+
+# Optional: cameras needing 8-coefficient rational distortion model
+# rational_model_cameras: [cam2]
+
+# Optional: auxiliary cameras (registered post-hoc, excluded from joint optimization)
+# auxiliary_cameras: [overview_cam]
 
 # Video file paths
 paths:
@@ -134,41 +166,29 @@ paths:
 interface:
   n_air: 1.0                   # Refractive index of air (default: 1.0)
   n_water: 1.333               # Refractive index of water (default: 1.333, fresh water at 20°C)
-  normal_fixed: true           # Fix interface normal to [0, 0, -1] (default: true)
+  normal_fixed: false          # Estimate ref camera tilt (default); true = assume perpendicular
+  # initial_distances:         # Approximate camera-to-water distances (meters, within 2-3x is fine)
+  #   cam0: 0.20
+  #   cam1: 0.20
 
 # Optimization settings
 optimization:
   robust_loss: huber           # Robust loss function: huber | soft_l1 | linear (default: huber)
   loss_scale: 1.0              # Scale parameter for robust loss in pixels (default: 1.0)
+  # max_calibration_frames: 150  # Max frames for Stage 3/4 (null = no limit)
+  # refine_intrinsics: false     # Stage 4: refine focal lengths and principal points (default: false)
 
 # Detection filtering
 detection:
   min_corners: 8               # Minimum corners required to use a detection (default: 8)
   min_cameras: 2               # Minimum cameras required to use a frame (default: 2)
+  frame_step: 1                # Process every Nth frame (1 = all, 5 = every 5th)
 
 # Validation settings
 validation:
   holdout_fraction: 0.2        # Fraction of frames held out for validation (default: 0.2)
   save_detailed_residuals: true  # Save per-corner residuals to output (default: true)
 ```
-
-### Field Descriptions
-
-**board**: Defines the ChArUco calibration board used for underwater calibration. ChArUco boards combine a chessboard pattern with ArUco markers for robust detection.
-
-**intrinsic_board** (optional): Separate board specification for in-air intrinsic calibration. Useful if you have a larger or different board for in-air calibration. If omitted, the `board` configuration is used for both stages.
-
-**cameras**: List of camera names. These names are used as keys in the video path dictionaries and in the output calibration file.
-
-**paths**: File paths for input videos and output directory. Each camera must have both an intrinsic (in-air) and extrinsic (underwater) video.
-
-**interface**: Parameters of the refractive interface (water surface). `n_water` should be adjusted for salt water (≈1.34) if applicable. `normal_fixed` determines whether the interface normal is fixed to vertical or optimized.
-
-**optimization**: Controls the optimization behavior. Robust loss functions reduce the influence of outliers. `huber` is recommended for most cases. `loss_scale` determines the threshold in pixels at which errors are considered outliers.
-
-**detection**: Filtering criteria for detected corners. Frames with fewer than `min_corners` total corners or visible in fewer than `min_cameras` cameras are discarded.
-
-**validation**: Controls held-out validation. A random selection of complete frames (across all cameras) is held out for validation. `save_detailed_residuals` includes per-corner reprojection errors in the output.
 
 ## Technical Methodology
 
@@ -199,13 +219,13 @@ The pipeline estimates camera parameters in four stages, progressing from simple
 - Per-camera interface distances (1 parameter per camera)
 - Board poses (6 DOF per observed frame)
 
-The cost function minimizes reprojection error: for each detected corner, the known 3D board point is projected through the refractive model to a predicted pixel, and the residual against the detected pixel is computed. A Huber robust loss reduces sensitivity to outlier detections. An optional water surface consistency regularization (`water_z_weight`) adds soft residuals that penalize disagreement in the inferred water surface Z-coordinate (camera Z + interface distance) across cameras, breaking the degeneracy between camera height and interface distance that arises with downward-looking geometries.
+The cost function minimizes reprojection error: for each detected corner, the known 3D board point is projected through the refractive model to a predicted pixel, and the residual against the detected pixel is computed. A Huber robust loss reduces sensitivity to outlier detections.
 
-**Stage 4 — Optional Intrinsic Refinement**: Optionally re-refines focal lengths and principal points alongside extrinsics and interface distances, with the same water surface regularization applied. Useful when in-air intrinsics are not fully representative of the underwater imaging condition.
+**Stage 4 — Optional Intrinsic Refinement**: Optionally re-refines focal lengths and principal points alongside extrinsics and interface distances. Useful when in-air intrinsics are not fully representative of the underwater imaging condition.
 
 ### Scalability
 
-For large camera arrays (10+ cameras) and many frames, the Jacobian matrix in Stage 3 can become very large. AquaCal exploits the block-sparse structure of the problem — each residual depends only on one camera's parameters and one board pose — to compute finite-difference Jacobians efficiently via column grouping, reducing the number of function evaluations by 10-15x. A configurable frame budget (`max_calibration_frames`) allows uniform temporal subsampling of frames entering optimization while retaining all frames for the earlier initialization stages.
+AquaCal scales to large camera arrays (10+ cameras) and many frames by exploiting the sparse structure of the optimization problem. A configurable frame budget (`max_calibration_frames`) allows uniform temporal subsampling of frames entering optimization while retaining all frames for the earlier initialization stages.
 
 ### Validation
 
@@ -213,7 +233,7 @@ A random fraction of detected frames (default 20%) is held out from optimization
 - **Reprojection error**: RMS pixel distance between detected and predicted corner positions (per-camera and overall).
 - **3D reconstruction error**: Adjacent ChArUco corners are triangulated from multi-camera observations and compared to the known board geometry (square size), providing a metric in physical units (mm).
 
-For details on coordinate conventions (world frame, camera frame, interface normal direction), see [`docs/COORDINATES.md`](docs/COORDINATES.md).
+For details on coordinate conventions (world frame, camera frame, interface normal direction), see [`docs/COORDINATES.md`](dev/docs/COORDINATES.md).
 
 ## Output
 
@@ -231,3 +251,53 @@ After successful calibration, the output directory contains:
 - **Per-corner residuals** (if `save_detailed_residuals: true`): Detailed reprojection errors for every detected corner, useful for identifying problematic frames or cameras.
 
 The calibration can be loaded and used in downstream applications for 3D reconstruction of underwater scenes.
+
+## Using Results in Python
+
+After calibration, load and use results programmatically:
+
+```python
+import numpy as np
+from aquacal import load_calibration
+
+# Load a completed calibration
+result = load_calibration("output/calibration.json")
+
+# Project a 3D underwater point into a camera's image
+pixel = result.project("cam0", np.array([0.1, 0.05, 0.4]))
+
+# Back-project a pixel to a 3D ray in water
+origin, direction = result.back_project("cam0", np.array([800.0, 600.0]))
+
+# Access raw calibration data
+cam = result.cameras["cam0"]
+print(cam.intrinsics.K)                    # 3x3 intrinsic matrix
+print(cam.extrinsics.R, cam.extrinsics.t)  # Rotation and translation
+print(cam.interface_distance)              # Camera-to-water distance (m)
+print(result.diagnostics.reprojection_error_rms)  # Overall RMS error (px)
+```
+
+### Top-level imports
+
+The essential API is available directly from the top-level package:
+
+```python
+from aquacal import (
+    load_calibration,   # Load calibration from JSON
+    save_calibration,   # Save calibration to JSON
+    CalibrationResult,  # Result type with project/back_project methods
+    CameraCalibration,  # Per-camera calibration data
+    CameraIntrinsics,   # Intrinsic parameters (K, distortion, image size)
+    CameraExtrinsics,   # Extrinsic parameters (R, t)
+    run_calibration,    # Run pipeline from config file path
+    load_config,        # Load and validate YAML config
+)
+```
+
+Internals can also be imported from subpackages:
+
+```python
+from aquacal.core import Camera, Interface, refractive_project
+from aquacal.calibration import optimize_interface
+from aquacal.triangulation import triangulate_point
+```

@@ -191,6 +191,101 @@ class Camera:
         return self.C, ray_world
 
 
+class FisheyeCamera(Camera):
+    """
+    Fisheye (equidistant) camera model.
+
+    Overrides projection and back-projection to use OpenCV's fisheye module.
+    The equidistant model is appropriate for wide-angle lenses where the
+    standard pinhole + polynomial distortion model fails.
+
+    Attributes:
+        name: Camera identifier string
+        intrinsics: CameraIntrinsics dataclass (must have is_fisheye=True, 4 dist coeffs)
+        extrinsics: CameraExtrinsics dataclass
+    """
+
+    def project(
+        self, point_world: Vec3, apply_distortion: bool = True
+    ) -> Vec2 | None:
+        """
+        Project 3D world point to 2D pixel using fisheye model.
+
+        Args:
+            point_world: 3D point in world frame, shape (3,)
+            apply_distortion: If True, apply fisheye distortion. Default True.
+
+        Returns:
+            2D pixel coordinates shape (2,), or None if point is behind camera.
+        """
+        p_cam = self.world_to_camera(point_world)
+
+        if p_cam[2] <= 0:
+            return None
+
+        if apply_distortion:
+            # cv2.fisheye.projectPoints expects D as (4, 1)
+            D = self.dist_coeffs.reshape(4, 1)
+            pts, _ = cv2.fisheye.projectPoints(
+                p_cam.reshape(1, 1, 3),
+                np.zeros(3),  # rvec = identity
+                np.zeros(3),  # tvec = zero
+                self.K,
+                D,
+            )
+            return pts.reshape(2).astype(np.float64)
+        else:
+            # Ideal pinhole projection (no distortion) - same as base class
+            p_normalized = p_cam[:2] / p_cam[2]
+            pixel = self.K[:2, :2] @ p_normalized + self.K[:2, 2]
+            return pixel.astype(np.float64)
+
+    def pixel_to_ray(self, pixel: Vec2, undistort: bool = True) -> Vec3:
+        """
+        Back-project pixel to unit ray in camera frame using fisheye model.
+
+        Args:
+            pixel: 2D pixel coordinates, shape (2,)
+            undistort: If True, undistort pixel first. Default True.
+
+        Returns:
+            Unit direction vector in camera frame (Z forward), shape (3,)
+        """
+        if undistort:
+            pixel_input = np.asarray(pixel, dtype=np.float64).reshape(1, 1, 2)
+            D = self.dist_coeffs.reshape(4, 1)
+            pts_undist = cv2.fisheye.undistortPoints(
+                pixel_input, K=self.K, D=D
+            )
+            x_norm, y_norm = pts_undist.reshape(2)
+        else:
+            pixel_h = np.array([pixel[0], pixel[1], 1.0])
+            K_inv = np.linalg.inv(self.K)
+            p_norm = K_inv @ pixel_h
+            x_norm, y_norm = p_norm[0], p_norm[1]
+
+        direction = np.array([x_norm, y_norm, 1.0])
+        return direction / np.linalg.norm(direction)
+
+
+def create_camera(
+    name: str, intrinsics: CameraIntrinsics, extrinsics: CameraExtrinsics
+) -> Camera:
+    """Create Camera or FisheyeCamera based on intrinsics.is_fisheye.
+
+    Args:
+        name: Camera identifier
+        intrinsics: Intrinsic parameters
+        extrinsics: Extrinsic parameters
+
+    Returns:
+        FisheyeCamera if intrinsics.is_fisheye is True, Camera otherwise.
+    """
+    if intrinsics.is_fisheye:
+        return FisheyeCamera(name, intrinsics, extrinsics)
+    return Camera(name, intrinsics, extrinsics)
+
+
 def undistort_points(
     points: NDArray[np.float64], K: Mat3, dist_coeffs: NDArray[np.float64]
 ) -> NDArray[np.float64]:

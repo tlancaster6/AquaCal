@@ -202,36 +202,46 @@ def compute_depth_stratified_errors(
     return pd.DataFrame(rows)
 
 
-def compute_water_surface_consistency(
+def compute_camera_heights(
     calibration: CalibrationResult,
 ) -> dict[str, float]:
     """
-    Compute water surface Z consistency across cameras.
+    Compute per-camera height above the water surface.
 
-    For each camera, computes water_z = camera_center_z + interface_distance.
-    If calibration is consistent, all cameras should agree on the same Z.
+    For each camera, computes h_c = water_z - camera_z (positive means camera
+    is above water in Z-down frame).
 
     Args:
         calibration: Complete calibration result
 
     Returns:
         Dict with keys:
-        - "mean": Mean water surface Z across cameras
-        - "std": Standard deviation of water surface Z
-        - "spread": Max - min water surface Z
-        - "per_camera": Dict mapping camera name to water surface Z
+        - "water_z": The water surface Z-coordinate (from interface_distance)
+        - "per_camera_height": Dict mapping camera name to height above water
+        - "mean_height": Mean camera height above water
+        - "height_spread": Max - min camera height
     """
-    water_zs = {}
+    # All cameras have the same interface_distance (water surface Z-coordinate)
+    water_z = None
+    camera_heights = {}
+
     for cam_name, cam_calib in calibration.cameras.items():
         C = cam_calib.extrinsics.C
-        water_zs[cam_name] = C[2] + cam_calib.interface_distance
+        camera_z = C[2]
 
-    zs = np.array(list(water_zs.values()))
+        if water_z is None:
+            water_z = cam_calib.interface_distance
+
+        # h_c = water_z - camera_z (positive when camera is above water)
+        h_c = water_z - camera_z
+        camera_heights[cam_name] = h_c
+
+    heights = np.array(list(camera_heights.values()))
     return {
-        "mean": float(np.mean(zs)),
-        "std": float(np.std(zs)),
-        "spread": float(np.ptp(zs)),
-        "per_camera": water_zs,
+        "water_z": float(water_z),
+        "per_camera_height": camera_heights,
+        "mean_height": float(np.mean(heights)),
+        "height_spread": float(np.ptp(heights)),
     }
 
 
@@ -239,16 +249,18 @@ def generate_recommendations(
     reprojection: ReprojectionErrors,
     reconstruction: DistanceErrors,
     depth_errors: pd.DataFrame,
-    water_surface: dict | None = None,
+    camera_heights: dict | None = None,
+    auxiliary_reprojection: ReprojectionErrors | None = None,
 ) -> list[str]:
     """
     Generate human-readable recommendations based on diagnostic results.
 
     Args:
-        reprojection: Reprojection error statistics
-        reconstruction: 3D reconstruction error statistics
+        reprojection: Reprojection error statistics (primary cameras only)
+        reconstruction: 3D reconstruction error statistics (primary cameras only)
         depth_errors: Depth-stratified error table
-        water_surface: Optional water surface consistency data from compute_water_surface_consistency()
+        camera_heights: Optional camera height data from compute_camera_heights()
+        auxiliary_reprojection: Optional reprojection errors for auxiliary cameras
 
     Returns:
         List of recommendation strings.
@@ -260,26 +272,36 @@ def generate_recommendations(
     """
     recs = []
 
-    # Reprojection RMS thresholds
+    # Reprojection RMS thresholds (primary cameras)
     if reprojection.rms < 0.5:
         recs.append(
-            f"Reprojection RMS ({reprojection.rms:.2f} px) is excellent (<0.5 px)"
+            f"Primary reprojection RMS ({reprojection.rms:.2f} px) is excellent (<0.5 px)"
         )
     elif reprojection.rms < 1.0:
-        recs.append(f"Reprojection RMS ({reprojection.rms:.2f} px) is good (<1.0 px)")
+        recs.append(f"Primary reprojection RMS ({reprojection.rms:.2f} px) is good (<1.0 px)")
     else:
         recs.append(
-            f"Reprojection RMS ({reprojection.rms:.2f} px) is elevated - review calibration"
+            f"Primary reprojection RMS ({reprojection.rms:.2f} px) is elevated - review calibration"
         )
 
-    # Per-camera outliers
+    # Per-camera outliers (primary cameras)
     if reprojection.per_camera:
         mean_cam_error = np.mean(list(reprojection.per_camera.values()))
         for cam, err in reprojection.per_camera.items():
             if err > mean_cam_error * 1.5:
                 recs.append(
-                    f"Camera '{cam}' has elevated error ({err:.2f} px) - check lens/mounting"
+                    f"Primary camera '{cam}' has elevated error ({err:.2f} px) - check lens/mounting"
                 )
+
+    # Auxiliary camera check
+    if auxiliary_reprojection and auxiliary_reprojection.per_camera:
+        aux_mean = np.mean(list(auxiliary_reprojection.per_camera.values()))
+        primary_mean = np.mean(list(reprojection.per_camera.values())) if reprojection.per_camera else 0.0
+        if aux_mean > primary_mean * 2.0 and primary_mean > 0:
+            recs.append(
+                f"Auxiliary cameras have higher error (mean {aux_mean:.2f} px vs primary {primary_mean:.2f} px) - "
+                f"expected for post-hoc registered cameras"
+            )
 
     # 3D reconstruction
     if reconstruction.num_comparisons > 0:
@@ -302,12 +324,12 @@ def generate_recommendations(
             sign = "+" if bias_mm > 0 else ""
             if bias_mm > 0:
                 recs.append(
-                    f"Systematic scale bias detected ({sign}{bias_mm:.1f} mm) — "
+                    f"Systematic scale bias detected ({sign}{bias_mm:.1f} mm) - "
                     f"distances overestimated (check n_water or interface distance)"
                 )
             else:
                 recs.append(
-                    f"Systematic scale bias detected ({sign}{bias_mm:.1f} mm) — "
+                    f"Systematic scale bias detected ({sign}{bias_mm:.1f} mm) - "
                     f"distances underestimated"
                 )
 
@@ -322,33 +344,20 @@ def generate_recommendations(
                     "Error increases with depth - consider re-estimating interface parameters"
                 )
 
-    # Water surface consistency
-    if water_surface is not None:
-        spread = water_surface["spread"]
-        if spread < 0.02:
-            recs.append(
-                f"Water surface Z spread ({spread*1000:.1f} mm) is excellent — flat water assumption holds"
-            )
-        elif spread < 0.05:
-            recs.append(f"Water surface Z spread ({spread*1000:.1f} mm) is acceptable")
-        elif spread < 0.10:
-            recs.append(
-                f"Water surface Z spread ({spread*1000:.1f} mm) is elevated — consider enabling normal_fixed: false"
-            )
-        else:
-            recs.append(
-                f"Water surface Z spread ({spread*1000:.1f} mm) is large — check extrinsics and interface distances"
-            )
+    # Camera height spread
+    if camera_heights is not None:
+        mean_height = camera_heights["mean_height"]
+        height_spread = camera_heights["height_spread"]
+        water_z = camera_heights["water_z"]
 
-        # Flag outlier cameras (>2 std from mean)
-        mean_z = water_surface["mean"]
-        std_z = water_surface["std"]
-        if std_z > 0:
-            for cam, z in water_surface["per_camera"].items():
-                if abs(z - mean_z) > 2 * std_z:
-                    recs.append(
-                        f"Camera '{cam}' water surface Z is an outlier ({z:.4f} vs mean {mean_z:.4f})"
-                    )
+        recs.append(
+            f"Camera heights above water: mean {mean_height*1000:.1f} mm, spread {height_spread*1000:.1f} mm"
+        )
+
+        if height_spread > 0.05:
+            recs.append(
+                f"Camera height spread ({height_spread*1000:.1f} mm) is large - check camera mounting"
+            )
 
     return recs
 
@@ -360,22 +369,24 @@ def generate_diagnostic_report(
     reprojection_errors: ReprojectionErrors,
     reconstruction_errors: DistanceErrors,
     board: BoardGeometry,
+    auxiliary_reprojection: ReprojectionErrors | None = None,
 ) -> DiagnosticReport:
     """
     Generate complete diagnostic report.
 
     Args:
-        calibration: Complete calibration result
+        calibration: Complete calibration result (primary cameras only for summary stats)
         detections: Detection result
         board_poses: Dict mapping frame_idx to BoardPose
-        reprojection_errors: Pre-computed from reprojection.py
-        reconstruction_errors: Pre-computed from reconstruction.py
+        reprojection_errors: Pre-computed from reprojection.py (primary cameras only)
+        reconstruction_errors: Pre-computed from reconstruction.py (primary cameras only)
         board: Board geometry
+        auxiliary_reprojection: Optional reprojection errors for auxiliary cameras
 
     Returns:
         DiagnosticReport with all analysis results.
     """
-    # Compute spatial error maps for each camera
+    # Compute spatial error maps for each camera (primary only, since calibration is primary-only)
     spatial_error_maps = {}
     for cam_name, cam_calib in calibration.cameras.items():
         image_size = cam_calib.intrinsics.image_size
@@ -384,17 +395,18 @@ def generate_diagnostic_report(
         )
         spatial_error_maps[cam_name] = error_map
 
-    # Compute depth-stratified errors
+    # Compute depth-stratified errors (primary only)
     depth_errors = compute_depth_stratified_errors(
         calibration, detections, board_poses, reprojection_errors, board
     )
 
-    # Compute water surface consistency
-    water_surface = compute_water_surface_consistency(calibration)
+    # Compute camera heights (primary only)
+    camera_heights = compute_camera_heights(calibration)
 
-    # Generate recommendations
+    # Generate recommendations (includes auxiliary camera check)
     recommendations = generate_recommendations(
-        reprojection_errors, reconstruction_errors, depth_errors, water_surface
+        reprojection_errors, reconstruction_errors, depth_errors, camera_heights,
+        auxiliary_reprojection,
     )
 
     # Build summary statistics
@@ -409,9 +421,9 @@ def generate_diagnostic_report(
         "reconstruction_rmse": reconstruction_errors.rmse,
         "reconstruction_percent_error": reconstruction_errors.percent_error,
         "reconstruction_num_frames": float(reconstruction_errors.num_frames),
-        "water_surface_z_mean": water_surface["mean"],
-        "water_surface_z_std": water_surface["std"],
-        "water_surface_z_spread": water_surface["spread"],
+        "water_z": camera_heights["water_z"],
+        "mean_camera_height": camera_heights["mean_height"],
+        "camera_height_spread": camera_heights["height_spread"],
     }
 
     return DiagnosticReport(
@@ -452,8 +464,8 @@ def plot_camera_rig(
         C = cam_calib.extrinsics.C
         camera_positions.append(C)
         camera_names.append(cam_name)
-        # Interface z = camera z + interface_distance (Z-down frame)
-        interface_z = C[2] + cam_calib.interface_distance
+        # interface_distance is the water surface Z-coordinate
+        interface_z = cam_calib.interface_distance
         interface_zs.append(interface_z)
 
     camera_positions = np.array(camera_positions)
@@ -463,12 +475,16 @@ def plot_camera_rig(
 
     # Helper function to plot on a single axes
     def plot_on_axes(ax: "plt.Axes") -> None:
-        """Plot camera rig on given 3D axes."""
-        # Plot camera positions
+        """Plot camera rig on given 3D axes.
+
+        Note: Z is negated for display so that "up" appears visually upward
+        (world frame is Z-down, but viewers expect up=up in plots).
+        """
+        # Plot camera positions (negate Z so "up" is visually up)
         ax.scatter(
             camera_positions[:, 0],
             camera_positions[:, 1],
-            camera_positions[:, 2],
+            -camera_positions[:, 2],
             c=colors,
             s=100,
             marker="o",
@@ -481,26 +497,26 @@ def plot_camera_rig(
             R = cam_calib.extrinsics.R
 
             # Add label
-            ax.text(C[0], C[1], C[2], f"  {cam_name}", fontsize=9)
+            ax.text(C[0], C[1], -C[2], f"  {cam_name}", fontsize=9)
 
             # Optical axis direction: Z-forward in camera frame = third column of R.T
             # (or equivalently, third row of R)
             optical_axis = R.T @ np.array([0.0, 0.0, 1.0])
 
-            # Draw arrow
+            # Draw arrow (negate Z components)
             ax.quiver(
                 C[0],
                 C[1],
-                C[2],
+                -C[2],
                 optical_axis[0] * arrow_length,
                 optical_axis[1] * arrow_length,
-                optical_axis[2] * arrow_length,
+                -optical_axis[2] * arrow_length,
                 color=colors[i],
                 arrow_length_ratio=0.3,
                 linewidth=2,
             )
 
-        # Plot water surface plane
+        # Plot water surface plane (negate Z)
         mean_interface_z = np.mean(interface_zs)
 
         # Create grid for plane
@@ -517,17 +533,14 @@ def plot_camera_rig(
         xx, yy = np.meshgrid(
             np.linspace(x_min, x_max, 10), np.linspace(y_min, y_max, 10)
         )
-        zz = np.full_like(xx, mean_interface_z)
+        zz = np.full_like(xx, -mean_interface_z)
 
         ax.plot_surface(xx, yy, zz, alpha=0.3, color="lightblue", label="Water Surface")
 
         # Set labels
         ax.set_xlabel("X (m)")
         ax.set_ylabel("Y (m)")
-        ax.set_zlabel("Z (m, down)")
-
-        # Invert Z axis so "up" appears visually upward
-        ax.invert_zaxis()
+        ax.set_zlabel("-Z (m, up)")
 
         # Equal aspect ratio
         ax.set_box_aspect([1, 1, 1])
@@ -546,13 +559,23 @@ def plot_camera_rig(
 
     axes[1].view_init(elev=90, azim=-90)
     axes[1].set_title("Top-Down (XY)")
+    axes[1].invert_yaxis()  # Match camera Y-down convention for correct CW/CCW
 
     axes[2].view_init(elev=0, azim=0)
     axes[2].set_title("Side (XZ)")
 
     # Set overall figure title
     fig.suptitle(title, fontsize=16)
-    fig.tight_layout()
+    fig.text(
+        0.5,
+        0.01,
+        "Note: Z is negated for display (world frame is Z-down; see calibration output for true coordinates)",
+        ha="center",
+        fontsize=8,
+        fontstyle="italic",
+        color="gray",
+    )
+    fig.tight_layout(rect=[0, 0.03, 1, 1])
 
     return fig
 
@@ -619,7 +642,7 @@ def plot_reprojection_quiver(
         ax.set_ylim(height, 0)
         ax.set_xlabel("u (pixels)")
         ax.set_ylabel("v (pixels)")
-        ax.set_title(f"{camera_name} — No detections")
+        ax.set_title(f"{camera_name} - No detections")
         return fig
 
     pixel_positions = np.array(pixel_positions)
@@ -655,7 +678,7 @@ def plot_reprojection_quiver(
     rms = calibration.cameras[camera_name].intrinsics.image_size
     if camera_name in reprojection_errors.per_camera:
         rms_val = reprojection_errors.per_camera[camera_name]
-        ax.set_title(f"{camera_name} — RMS: {rms_val:.3f} px")
+        ax.set_title(f"{camera_name} - RMS: {rms_val:.3f} px")
     else:
         ax.set_title(f"{camera_name}")
 
@@ -671,6 +694,7 @@ def save_diagnostic_report(
     detections: DetectionResult,
     output_dir: Path,
     save_images: bool = True,
+    auxiliary_reprojection: ReprojectionErrors | None = None,
 ) -> dict[str, Path]:
     """
     Save diagnostic report to disk.
@@ -683,11 +707,12 @@ def save_diagnostic_report(
     - depth_errors.csv: Depth-stratified error table
 
     Args:
-        report: DiagnosticReport to save
-        calibration: CalibrationResult for camera rig and quiver plots
+        report: DiagnosticReport to save (contains primary-only stats)
+        calibration: CalibrationResult for camera rig and quiver plots (full result with all cameras)
         detections: DetectionResult for quiver plots
         output_dir: Directory for output files (created if doesn't exist)
         save_images: Whether to render and save images
+        auxiliary_reprojection: Optional reprojection errors for auxiliary cameras
 
     Returns:
         Dict mapping output type to file path:
@@ -705,8 +730,8 @@ def save_diagnostic_report(
     # Save JSON summary
     json_path = output_dir / "diagnostics.json"
 
-    # Compute water surface consistency
-    water_surface = compute_water_surface_consistency(calibration)
+    # Compute camera heights
+    camera_heights = compute_camera_heights(calibration)
 
     json_data = {
         "summary": report.summary,
@@ -726,13 +751,20 @@ def save_diagnostic_report(
             "percent_error": report.reconstruction.percent_error,
             "num_frames": report.reconstruction.num_frames,
         },
-        "water_surface": {
-            "mean": water_surface["mean"],
-            "std": water_surface["std"],
-            "spread": water_surface["spread"],
-            "per_camera": water_surface["per_camera"],
+        "camera_heights": {
+            "water_z": camera_heights["water_z"],
+            "per_camera_height": camera_heights["per_camera_height"],
+            "mean_height": camera_heights["mean_height"],
+            "height_spread": camera_heights["height_spread"],
         },
     }
+
+    # Add auxiliary camera metrics if present
+    if auxiliary_reprojection and auxiliary_reprojection.per_camera:
+        json_data["auxiliary_cameras"] = {
+            cam_name: {"reprojection_rms": rms}
+            for cam_name, rms in auxiliary_reprojection.per_camera.items()
+        }
     with open(json_path, "w") as f:
         json.dump(json_data, f, indent=2)
     result["json"] = json_path

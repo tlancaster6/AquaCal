@@ -217,9 +217,10 @@ class TestCalibrationConfig:
 
         assert config.n_air == 1.0
         assert config.n_water == 1.333
-        assert config.interface_normal_fixed is True
+        assert config.interface_normal_fixed is False
         assert config.robust_loss == "huber"
         assert config.min_cameras_per_frame == 2
+        assert config.refine_intrinsics is False
 
     def test_creation_with_custom_values(self):
         """Should accept custom parameter values."""

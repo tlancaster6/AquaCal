@@ -26,7 +26,7 @@ from aquacal.calibration._optim_common import (
     compute_residuals,
     make_sparse_jacobian_func,
 )
-from aquacal.calibration.extrinsics import refractive_solve_pnp
+from aquacal.calibration.extrinsics import refractive_solve_pnp, _average_rotations
 from aquacal.utils.transforms import (
     rvec_to_matrix,
     matrix_to_rvec,
@@ -129,13 +129,18 @@ def optimize_interface(
     min_corners: int = 4,
     use_sparse_jacobian: bool = True,
     verbose: int = 0,
-    water_z_weight: float = 0.0,
+    normal_fixed: bool = True,
 ) -> tuple[dict[str, CameraExtrinsics], dict[str, float], list[BoardPose], float]:
     """
     Jointly optimize camera extrinsics, interface distances, and board poses.
 
     This is Stage 3 of the calibration pipeline. It refines the initial estimates
     from Stage 2 by accounting for refraction at the air-water interface.
+
+    Internally, a single global water_z parameter replaces N per-camera interface
+    distances. Per-camera distances are derived as d_i = water_z - C_z_i, where
+    C_z_i is the camera center's Z coordinate. This eliminates the degeneracy
+    between camera height and interface distance by construction.
 
     Args:
         detections: Underwater ChArUco detections from detect_all_frames
@@ -156,13 +161,13 @@ def optimize_interface(
             Dramatically improves performance for large camera arrays.
         verbose: Verbosity level for scipy.optimize.least_squares (default 0).
             0 = silent, 1 = one-line per iteration, 2 = full per-iteration report.
-        water_z_weight: Weight for water surface consistency regularization.
-            0.0 disables regularization (default).
+        normal_fixed: If False, estimate reference camera tilt (2 DOF) to account
+            for non-perpendicular camera-to-water-surface alignment.
 
     Returns:
         Tuple of:
         - dict[str, CameraExtrinsics]: Optimized extrinsics for all cameras
-        - dict[str, float]: Optimized interface distances per camera
+        - dict[str, float]: Optimized interface distances per camera (derived from water_z)
         - list[BoardPose]: Optimized board poses for each frame used
         - float: Final RMS reprojection error in pixels
 
@@ -211,18 +216,25 @@ def optimize_interface(
             f"Need at least {min_corners} corners per detection."
         )
 
+    # Compute initial water_z from reference camera
+    # C_z_ref = 0 since reference camera is at origin, so water_z = d_ref
+    initial_water_z = initial_interface_distances[reference_camera]
+
     # Pack initial parameters
     initial_params = pack_params(
         initial_extrinsics,
-        initial_interface_distances,
+        initial_water_z,
         initial_board_poses,
         reference_camera,
         camera_order,
         frame_order,
+        normal_fixed=normal_fixed,
     )
 
     # Build bounds
-    lower, upper = build_bounds(camera_order, frame_order, reference_camera)
+    lower, upper = build_bounds(
+        camera_order, frame_order, reference_camera, normal_fixed=normal_fixed,
+    )
 
     # Reference extrinsics (fixed during optimization)
     reference_extrinsics = initial_extrinsics[reference_camera]
@@ -241,7 +253,7 @@ def optimize_interface(
         frame_order,
         min_corners,
         False,  # refine_intrinsics
-        water_z_weight,
+        normal_fixed,
     )
 
     # Build sparse Jacobian if enabled
@@ -253,7 +265,7 @@ def optimize_interface(
             camera_order,
             frame_order,
             min_corners,
-            water_z_weight=water_z_weight,
+            normal_fixed=normal_fixed,
         )
         jac = make_sparse_jacobian_func(
             compute_residuals, cost_args, jac_sparsity, (lower, upper),
@@ -282,6 +294,7 @@ def optimize_interface(
         reference_extrinsics,
         camera_order,
         frame_order,
+        normal_fixed=normal_fixed,
     )
 
     # Compute final RMS error
@@ -293,52 +306,159 @@ def optimize_interface(
     return opt_extrinsics, opt_distances, board_poses_list, rms_error
 
 
+def _multi_frame_pnp_init(
+    obs_frames: list[tuple[int, NDArray[np.int32], NDArray[np.float64]]],
+    board_poses: dict[int, BoardPose],
+    intrinsics: CameraIntrinsics,
+    board: BoardGeometry,
+    water_z: float,
+    interface_normal: NDArray[np.float64],
+    n_air: float,
+    n_water: float,
+    top_n: int = 10,
+    outlier_threshold: float = 0.5,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]] | None:
+    """Multi-frame PnP initialization for robust camera pose estimation.
+
+    Runs refractive PnP on multiple frames, filters outliers based on C_z,
+    and returns a weighted average pose. This is more robust than single-frame
+    PnP for overhead cameras where depth is ill-conditioned.
+
+    Args:
+        obs_frames: List of (frame_idx, corner_ids, corners_2d) tuples
+        board_poses: Fixed board poses from Stage 3 (frame_idx -> BoardPose)
+        intrinsics: Camera intrinsic parameters
+        board: Board geometry
+        water_z: Global water surface Z from Stage 3
+        interface_normal: Interface normal vector
+        n_air: Refractive index of air
+        n_water: Refractive index of water
+        top_n: Number of top frames to use (by corner count)
+        outlier_threshold: Maximum deviation from median C_z in meters
+
+    Returns:
+        Tuple of (rvec, tvec) in world frame, or None if all frames fail
+    """
+    # Sort frames by corner count and take top N
+    sorted_frames = sorted(obs_frames, key=lambda x: len(x[1]), reverse=True)
+    selected_frames = sorted_frames[:top_n]
+
+    # Run PnP on each frame and collect results
+    pnp_results = []
+    for frame_idx, corner_ids, corners_2d in selected_frames:
+        pnp_result = refractive_solve_pnp(
+            intrinsics, corners_2d, corner_ids, board,
+            water_z, interface_normal, n_air, n_water,
+        )
+
+        if pnp_result is None:
+            continue
+
+        rvec_bc, tvec_bc = pnp_result
+
+        # Transform to world frame
+        bp = board_poses[frame_idx]
+        R_bw = rvec_to_matrix(bp.rvec)
+        R_bc = rvec_to_matrix(rvec_bc)
+        R_wb, t_wb = invert_pose(R_bw, bp.tvec)
+        R_wc, t_wc = compose_poses(R_bc, tvec_bc, R_wb, t_wb)
+
+        # Compute camera center in world frame
+        C = -R_wc.T @ t_wc
+        C_z = C[2]
+
+        num_corners = len(corner_ids)
+        pnp_results.append((R_wc, t_wc, C_z, num_corners))
+
+    if len(pnp_results) == 0:
+        return None
+
+    # Filter outliers based on C_z
+    C_z_values = np.array([r[2] for r in pnp_results])
+    median_C_z = np.median(C_z_values)
+
+    filtered_results = []
+    for R_wc, t_wc, C_z, num_corners in pnp_results:
+        if abs(C_z - median_C_z) <= outlier_threshold:
+            filtered_results.append((R_wc, t_wc, num_corners))
+
+    # Fallback: if all filtered out, use the one closest to median
+    if len(filtered_results) == 0:
+        closest_idx = np.argmin(np.abs(C_z_values - median_C_z))
+        R_wc, t_wc, C_z, num_corners = pnp_results[closest_idx]
+        return matrix_to_rvec(R_wc), t_wc
+
+    # Fallback: if only one survives, use it
+    if len(filtered_results) == 1:
+        R_wc, t_wc, _ = filtered_results[0]
+        return matrix_to_rvec(R_wc), t_wc
+
+    # Average rotations and translations, weighted by corner count
+    rotations = [r[0] for r in filtered_results]
+    translations = [r[1] for r in filtered_results]
+    weights = [float(r[2]) for r in filtered_results]
+
+    # Normalize weights
+    total_weight = sum(weights)
+    normalized_weights = [w / total_weight for w in weights]
+
+    # Average rotation using weighted chordal L2 mean
+    R_avg = _average_rotations(rotations, normalized_weights)
+
+    # Average translation with same weights
+    t_avg = np.zeros(3, dtype=np.float64)
+    for t, w in zip(translations, normalized_weights):
+        t_avg += w * t
+
+    return matrix_to_rvec(R_avg), t_avg
+
+
 def register_auxiliary_camera(
     camera_name: str,
     intrinsics: CameraIntrinsics,
     detections: DetectionResult,
     board_poses: dict[int, BoardPose],
     board: BoardGeometry,
-    initial_interface_distance: float = 0.15,
+    water_z: float,
     interface_normal: Vec3 | None = None,
     n_air: float = 1.0,
     n_water: float = 1.333,
     min_corners: int = 4,
-    target_water_z: float | None = None,
-    water_z_weight: float = 10.0,
+    refine_intrinsics: bool = False,
     verbose: int = 0,
-) -> tuple[CameraExtrinsics, float, float]:
+) -> tuple[CameraExtrinsics, float, float] | tuple[CameraExtrinsics, float, float, CameraIntrinsics]:
     """Register a single auxiliary camera against fixed board poses.
 
-    Estimates the camera's extrinsics and interface distance by minimizing
-    refractive reprojection error against known board poses from Stage 3.
-    The board poses are treated as fixed ground truth.
+    Estimates the camera's extrinsics by minimizing refractive reprojection
+    error against known board poses from Stage 3. The interface distance is
+    derived from the known global water_z and the camera's Z position:
+    d = water_z - C_z. This is a 6-parameter problem (extrinsics only)
+    with no degeneracy. Optionally refines intrinsics (fx, fy, cx, cy) for
+    a 10-parameter optimization.
 
     Args:
         camera_name: Name of the auxiliary camera
-        intrinsics: Camera intrinsic parameters
+        intrinsics: Camera intrinsic parameters (initial values, refined if refine_intrinsics=True)
         detections: Full detection results (must contain this camera's detections)
         board_poses: Fixed board poses from Stage 3 (frame_idx -> BoardPose)
         board: Board geometry
-        initial_interface_distance: Starting interface distance estimate
+        water_z: Global water surface Z from Stage 3 (required)
         interface_normal: Interface normal (default [0, 0, -1])
         n_air: Refractive index of air
         n_water: Refractive index of water
         min_corners: Minimum corners per detection
-        target_water_z: Target water surface Z from primary calibration.
-            When provided, adds a soft regularization residual anchoring
-            this camera's water_z to the primary cameras' mean.
-        water_z_weight: Weight for the water_z regularization residual.
-            Only used when target_water_z is not None.
+        refine_intrinsics: If True, also optimize fx, fy, cx, cy (10 params total).
+            Distortion coefficients are kept fixed.
         verbose: Verbosity level
 
     Returns:
-        Tuple of (extrinsics, interface_distance, rms_error)
+        When refine_intrinsics=False: Tuple of (extrinsics, interface_distance, rms_error)
+        When refine_intrinsics=True: Tuple of (extrinsics, interface_distance, rms_error, refined_intrinsics)
 
     Raises:
         InsufficientDataError: If no usable frames found
     """
-    from aquacal.core.camera import Camera
+    from aquacal.core.camera import create_camera
     from aquacal.core.interface_model import Interface
     from aquacal.core.refractive_geometry import refractive_project
 
@@ -348,8 +468,7 @@ def register_auxiliary_camera(
         interface_normal = np.asarray(interface_normal, dtype=np.float64)
 
     # --- Step 1: Collect observations ---
-    # Find frames where this camera has detections AND a board pose exists
-    obs_frames = []  # list of (frame_idx, corner_ids, corners_2d)
+    obs_frames = []
     total_corners = 0
 
     for frame_idx, frame_det in detections.frames.items():
@@ -370,48 +489,60 @@ def register_auxiliary_camera(
             f"and existing board poses."
         )
 
-    # --- Step 2: Initial guess via refractive PnP ---
-    # Use the frame with the most corners
-    best_frame = max(obs_frames, key=lambda x: len(x[1]))
-    best_frame_idx, best_ids, best_corners = best_frame
-
-    pnp_result = refractive_solve_pnp(
-        intrinsics, best_corners, best_ids, board,
-        initial_interface_distance, interface_normal, n_air, n_water,
+    # --- Step 2: Initial guess via multi-frame refractive PnP ---
+    pnp_result = _multi_frame_pnp_init(
+        obs_frames, board_poses, intrinsics, board,
+        water_z, interface_normal, n_air, n_water,
     )
 
     if pnp_result is None:
         raise InsufficientDataError(
-            f"Refractive PnP failed for auxiliary camera '{camera_name}' "
-            f"on frame {best_frame_idx} ({len(best_ids)} corners)."
+            f"Multi-frame refractive PnP failed for auxiliary camera '{camera_name}'. "
+            f"Tried {len(obs_frames)} frames but all PnP attempts failed."
         )
 
-    rvec_bc, tvec_bc = pnp_result  # board-in-camera pose
-
-    # Transform to world frame: camera extrinsics from board pose
-    bp = board_poses[best_frame_idx]
-    R_bw = rvec_to_matrix(bp.rvec)
-    R_bc = rvec_to_matrix(rvec_bc)
-    # world_to_cam = board_to_cam @ world_to_board
-    R_wb, t_wb = invert_pose(R_bw, bp.tvec)
-    R_wc, t_wc = compose_poses(R_bc, tvec_bc, R_wb, t_wb)
-
-    initial_rvec = matrix_to_rvec(R_wc)
-    initial_tvec = t_wc
+    initial_rvec, initial_tvec = pnp_result
 
     # --- Step 3: Build parameter vector ---
-    # [rvec(3), tvec(3), interface_distance(1)] = 7 params
-    x0 = np.concatenate([initial_rvec, initial_tvec, [initial_interface_distance]])
+    if refine_intrinsics:
+        # [rvec(3), tvec(3), fx, fy, cx, cy] = 10 params
+        x0 = np.concatenate([
+            initial_rvec,
+            initial_tvec,
+            [intrinsics.K[0, 0], intrinsics.K[1, 1], intrinsics.K[0, 2], intrinsics.K[1, 2]],
+        ])
+    else:
+        # [rvec(3), tvec(3)] = 6 params (extrinsics only)
+        x0 = np.concatenate([initial_rvec, initial_tvec])
 
     # --- Step 4: Residual function ---
     def residuals(x):
         rvec = x[:3]
         tvec = x[3:6]
-        iface_dist = x[6]
+
+        # Build camera intrinsics (refined or original)
+        if refine_intrinsics:
+            fx, fy, cx, cy = x[6], x[7], x[8], x[9]
+            K_refined = intrinsics.K.copy()
+            K_refined[0, 0] = fx
+            K_refined[1, 1] = fy
+            K_refined[0, 2] = cx
+            K_refined[1, 2] = cy
+            camera_intrinsics = CameraIntrinsics(
+                K=K_refined,
+                dist_coeffs=intrinsics.dist_coeffs,
+                image_size=intrinsics.image_size,
+                is_fisheye=intrinsics.is_fisheye,
+            )
+        else:
+            camera_intrinsics = intrinsics
 
         R = rvec_to_matrix(rvec)
         ext = CameraExtrinsics(R=R, t=tvec)
-        camera = Camera(camera_name, intrinsics, ext)
+        # Interface distance is the water surface Z-coordinate
+        iface_dist = water_z
+
+        camera = create_camera(camera_name, camera_intrinsics, ext)
         interface = Interface(
             normal=interface_normal,
             camera_distances={camera_name: iface_dist},
@@ -434,19 +565,19 @@ def register_auxiliary_camera(
                     resid.append(100.0)
                     resid.append(100.0)
 
-        # Water surface Z regularization
-        if target_water_z is not None and water_z_weight > 0:
-            cam_center = -R.T @ tvec
-            water_z = cam_center[2] + iface_dist
-            resid.append(water_z_weight * (water_z - target_water_z))
-
         return np.array(resid, dtype=np.float64)
 
     # --- Step 5: Bounds ---
-    lower = np.full(7, -np.inf)
-    upper = np.full(7, np.inf)
-    lower[6] = 0.01  # interface_distance lower bound
-    upper[6] = 2.0   # interface_distance upper bound
+    if refine_intrinsics:
+        # Add bounds for fx, fy, cx, cy
+        fx0, fy0 = intrinsics.K[0, 0], intrinsics.K[1, 1]
+        w, h = intrinsics.image_size
+        lower = np.array([-np.inf]*6 + [0.5*fx0, 0.5*fy0, 0.0, 0.0])
+        upper = np.array([np.inf]*6 + [2.0*fx0, 2.0*fy0, float(w), float(h)])
+    else:
+        # All unbounded for 6-param extrinsics
+        lower = np.full(6, -np.inf)
+        upper = np.full(6, np.inf)
 
     # --- Step 6: Optimize ---
     result = least_squares(
@@ -462,14 +593,29 @@ def register_auxiliary_camera(
     # --- Step 7: Extract results ---
     opt_rvec = result.x[:3]
     opt_tvec = result.x[3:6]
-    opt_iface_dist = float(result.x[6])
 
     opt_R = rvec_to_matrix(opt_rvec)
     opt_extrinsics = CameraExtrinsics(R=opt_R, t=opt_tvec)
 
-    # RMS over reprojection residuals only (exclude regularization term)
-    n_reproj = total_corners * 2
-    reproj_residuals = result.fun[:n_reproj]
-    rms_error = float(np.sqrt(np.mean(reproj_residuals**2)))
+    # Derive final interface distance (water surface Z-coordinate)
+    opt_iface_dist = float(water_z)
 
-    return opt_extrinsics, opt_iface_dist, rms_error
+    rms_error = float(np.sqrt(np.mean(result.fun**2)))
+
+    if refine_intrinsics:
+        # Extract refined intrinsics
+        fx, fy, cx, cy = result.x[6], result.x[7], result.x[8], result.x[9]
+        K_refined = intrinsics.K.copy()
+        K_refined[0, 0] = fx
+        K_refined[1, 1] = fy
+        K_refined[0, 2] = cx
+        K_refined[1, 2] = cy
+        refined_intrinsics = CameraIntrinsics(
+            K=K_refined,
+            dist_coeffs=intrinsics.dist_coeffs,
+            image_size=intrinsics.image_size,
+            is_fisheye=intrinsics.is_fisheye,
+        )
+        return opt_extrinsics, opt_iface_dist, rms_error, refined_intrinsics
+    else:
+        return opt_extrinsics, opt_iface_dist, rms_error
