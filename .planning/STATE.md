@@ -34,6 +34,7 @@ Progress: [██░░░░░░░░] 11%
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 01 | 02 | 107s | 2 | 4 |
+| 01 | 01 | 8 min | 2 | 6 |
 
 ## Accumulated Context
 
@@ -46,6 +47,8 @@ Recent decisions affecting current work:
 - Real + synthetic example data to build trust and demonstrate correctness
 - Jupyter notebooks for interactive, visual examples ideal for research audience
 - License choice needed before public release (deferred to Phase 6)
+- [Phase 01-foundation-and-cleanup]: Migrated dev/ documentation to .planning/ for GSD compatibility
+- [Phase 01-foundation-and-cleanup]: Removed pre-GSD agent infrastructure to avoid confusion
 
 ### Pending Todos
 
