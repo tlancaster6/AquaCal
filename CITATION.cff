@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: "AquaCal"
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+authors:
+  - given-names: Tucker
+    family-names: Lancaster
+repository-code: "https://github.com/tlancaster6/AquaCal"
+license: MIT
+keywords:
+  - calibration
+  - multi-camera
+  - underwater
+  - refraction
+  - computer-vision
+  - snell-law
+version: 1.0.0
+date-released: "2026-02-14"
