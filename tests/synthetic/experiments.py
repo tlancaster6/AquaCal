@@ -21,6 +21,7 @@ from tests.synthetic.ground_truth import create_scenario, SyntheticScenario
 from tests.synthetic.experiment_helpers import (
     calibrate_synthetic,
     compute_per_camera_errors,
+    evaluate_reconstruction,
 )
 
 # Consistent color palette
@@ -76,7 +77,9 @@ def run_experiment_1(output_dir: str | Path, seed: int = 42) -> dict:
     # Generate plots
     print("  Generating plots...")
     _plot_focal_length_error(errors_refractive, errors_nonrefractive, output_dir)
-    _plot_camera_xy_positions(scenario, result_refractive, result_nonrefractive, output_dir)
+    _plot_camera_xy_positions(
+        scenario, result_refractive, result_nonrefractive, output_dir
+    )
     _plot_camera_z_error(errors_refractive, errors_nonrefractive, output_dir)
     _plot_distortion_error(errors_refractive, errors_nonrefractive, output_dir)
 
@@ -100,8 +103,12 @@ def _plot_focal_length_error(
     x = np.arange(len(camera_names))
     width = 0.35
 
-    focal_errors_refr = [errors_refr[cam]["focal_length_error_pct"] for cam in camera_names]
-    focal_errors_nonrefr = [errors_nonrefr[cam]["focal_length_error_pct"] for cam in camera_names]
+    focal_errors_refr = [
+        errors_refr[cam]["focal_length_error_pct"] for cam in camera_names
+    ]
+    focal_errors_nonrefr = [
+        errors_nonrefr[cam]["focal_length_error_pct"] for cam in camera_names
+    ]
 
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.bar(
@@ -160,7 +167,13 @@ def _plot_camera_xy_positions(
         # Plot ground truth (black dot)
         if cam_name == camera_names[0]:
             ax.scatter(
-                x_gt, y_gt, color="black", s=100, zorder=3, label="Ground Truth", marker="o"
+                x_gt,
+                y_gt,
+                color="black",
+                s=100,
+                zorder=3,
+                label="Ground Truth",
+                marker="o",
             )
         else:
             ax.scatter(x_gt, y_gt, color="black", s=100, zorder=3, marker="o")
@@ -177,7 +190,9 @@ def _plot_camera_xy_positions(
                 alpha=0.7,
             )
         else:
-            ax.scatter(x_refr, y_refr, color=COLOR_REFRACTIVE, s=50, zorder=4, alpha=0.7)
+            ax.scatter(
+                x_refr, y_refr, color=COLOR_REFRACTIVE, s=50, zorder=4, alpha=0.7
+            )
         ax.arrow(
             x_gt,
             y_gt,
@@ -203,7 +218,12 @@ def _plot_camera_xy_positions(
             )
         else:
             ax.scatter(
-                x_nonrefr, y_nonrefr, color=COLOR_NON_REFRACTIVE, s=50, zorder=4, alpha=0.7
+                x_nonrefr,
+                y_nonrefr,
+                color=COLOR_NON_REFRACTIVE,
+                s=50,
+                zorder=4,
+                alpha=0.7,
             )
         ax.arrow(
             x_gt,
@@ -238,7 +258,9 @@ def _plot_camera_z_error(
     height = 0.35
 
     z_errors_refr = [errors_refr[cam]["z_position_error_mm"] for cam in camera_names]
-    z_errors_nonrefr = [errors_nonrefr[cam]["z_position_error_mm"] for cam in camera_names]
+    z_errors_nonrefr = [
+        errors_nonrefr[cam]["z_position_error_mm"] for cam in camera_names
+    ]
 
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.barh(
@@ -457,7 +479,12 @@ def run_experiment_2(output_dir: str | Path, seed: int = 42) -> dict:
 
         # Generate dense 7x7 XY grid test poses
         test_poses = generate_dense_xy_grid(
-            depth=depth, n_grid=7, xy_extent=0.5, tilt_deg=3.0, frame_offset=1000, seed=seed
+            depth=depth,
+            n_grid=7,
+            xy_extent=0.5,
+            tilt_deg=3.0,
+            frame_offset=1000,
+            seed=seed,
         )
 
         # Generate test detections (using ground truth parameters)
@@ -473,7 +500,9 @@ def run_experiment_2(output_dir: str | Path, seed: int = 42) -> dict:
 
         # Evaluate reconstruction for both calibrations
         errors_refr = evaluate_reconstruction(result_refractive, board, test_detections)
-        errors_nonrefr = evaluate_reconstruction(result_nonrefractive, board, test_detections)
+        errors_nonrefr = evaluate_reconstruction(
+            result_nonrefractive, board, test_detections
+        )
 
         # Compute metrics
         signed_mean_refr = errors_refr.signed_mean * 1000  # to mm
@@ -691,7 +720,13 @@ def _plot_xy_heatmaps(
     all_depths = sorted(spatial_refr.keys())
     if len(all_depths) >= 5:
         # Take first, 25%, 50%, 75%, last
-        indices = [0, len(all_depths) // 4, len(all_depths) // 2, 3 * len(all_depths) // 4, -1]
+        indices = [
+            0,
+            len(all_depths) // 4,
+            len(all_depths) // 2,
+            3 * len(all_depths) // 4,
+            -1,
+        ]
         selected_depths = [all_depths[i] for i in indices]
     else:
         selected_depths = all_depths
@@ -812,7 +847,9 @@ def _save_depth_metrics_csv(
     csv_path = output_dir / "exp2_depth_metrics.csv"
 
     # Merge results by depth
-    depths = sorted(set([r["depth"] for r in results_refr] + [r["depth"] for r in results_nonrefr]))
+    depths = sorted(
+        set([r["depth"] for r in results_refr] + [r["depth"] for r in results_nonrefr])
+    )
 
     refr_by_depth = {r["depth"]: r for r in results_refr}
     nonrefr_by_depth = {r["depth"]: r for r in results_nonrefr}
@@ -977,22 +1014,32 @@ def run_experiment_3(output_dir: str | Path, seed: int = 42) -> dict:
             )
 
         # Evaluate reconstruction
-        dist_errors_refr = evaluate_reconstruction(result_refractive, board, test_detections)
-        dist_errors_nonrefr = evaluate_reconstruction(result_nonrefractive, board, test_detections)
+        dist_errors_refr = evaluate_reconstruction(
+            result_refractive, board, test_detections
+        )
+        dist_errors_nonrefr = evaluate_reconstruction(
+            result_nonrefractive, board, test_detections
+        )
 
         # Compute aggregate metrics
         rmse_refr = dist_errors_refr.rmse * 1000  # to mm
         rmse_nonrefr = dist_errors_nonrefr.rmse * 1000
 
         # Mean focal length error across cameras (%)
-        focal_err_refr = np.mean([abs(e["focal_length_error_pct"]) for e in errors_refr.values()])
+        focal_err_refr = np.mean(
+            [abs(e["focal_length_error_pct"]) for e in errors_refr.values()]
+        )
         focal_err_nonrefr = np.mean(
             [abs(e["focal_length_error_pct"]) for e in errors_nonrefr.values()]
         )
 
         # Mean absolute Z error across cameras (mm)
-        z_err_refr = np.mean([abs(e["z_position_error_mm"]) for e in errors_refr.values()])
-        z_err_nonrefr = np.mean([abs(e["z_position_error_mm"]) for e in errors_nonrefr.values()])
+        z_err_refr = np.mean(
+            [abs(e["z_position_error_mm"]) for e in errors_refr.values()]
+        )
+        z_err_nonrefr = np.mean(
+            [abs(e["z_position_error_mm"]) for e in errors_nonrefr.values()]
+        )
 
         results_refr.append(
             {
@@ -1235,7 +1282,9 @@ def _save_exp3_depth_scaling_csv(
     csv_path = output_dir / "exp3_depth_scaling.csv"
 
     # Merge results by depth
-    depths = sorted(set([r["depth"] for r in results_refr] + [r["depth"] for r in results_nonrefr]))
+    depths = sorted(
+        set([r["depth"] for r in results_refr] + [r["depth"] for r in results_nonrefr])
+    )
 
     refr_by_depth = {r["depth"]: r for r in results_refr}
     nonrefr_by_depth = {r["depth"]: r for r in results_nonrefr}
@@ -1298,8 +1347,12 @@ def assemble_summary(output_dir: str | Path) -> None:
             data = list(reader)
 
         # Compute mean focal length error (%) for both models
-        focal_refr = np.mean([float(row["focal_length_error_pct_refr"]) for row in data])
-        focal_nonrefr = np.mean([float(row["focal_length_error_pct_nonrefr"]) for row in data])
+        focal_refr = np.mean(
+            [float(row["focal_length_error_pct_refr"]) for row in data]
+        )
+        focal_nonrefr = np.mean(
+            [float(row["focal_length_error_pct_nonrefr"]) for row in data]
+        )
 
         # Compute mean absolute Z error (mm) for both models
         z_refr = np.mean([abs(float(row["z_error_mm_refr"])) for row in data])
