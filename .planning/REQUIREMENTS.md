@@ -1,0 +1,120 @@
+# Requirements: AquaCal
+
+**Defined:** 2026-02-14
+**Core Value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
+
+## v1 Requirements
+
+Requirements for initial public release. Each maps to roadmap phases.
+
+### Cleanup
+
+- [ ] **CLEAN-01**: Legacy development artifacts (old agent configs, task files, handoffs) are removed from the repository
+- [ ] **CLEAN-02**: Repository is free of files that would confuse GSD agents or external contributors
+
+### Packaging
+
+- [ ] **PKG-01**: User can install AquaCal via `pip install aquacal` from PyPI
+- [ ] **PKG-02**: Package follows semantic versioning with a published changelog (CHANGELOG.md)
+- [ ] **PKG-03**: Package metadata (description, classifiers, URLs) is complete and correct on PyPI
+- [ ] **PKG-04**: Package installs cleanly on Python 3.10, 3.11, and 3.12
+
+### Tutorial
+
+- [ ] **TUT-01**: User can follow a getting started tutorial from raw videos to calibration result
+- [ ] **TUT-02**: Tutorial covers the full pipeline: config creation, intrinsic calibration, extrinsic estimation, joint optimization, validation
+- [ ] **TUT-03**: Tutorial explains how to interpret diagnostic output and common failure modes
+
+### Theory Documentation
+
+- [ ] **THEO-01**: User can read a refractive geometry explanation covering Snell's law, ray tracing through the air-water interface, and the projection model
+- [ ] **THEO-02**: User can read coordinate convention documentation covering world frame (Z-down), camera frame (OpenCV), and interface normal orientation
+- [ ] **THEO-03**: User can read optimizer documentation covering the four-stage pipeline, parameter vector layout, sparse Jacobian strategy, and loss functions
+
+### Jupyter Notebooks
+
+- [ ] **NB-01**: User can run a Jupyter notebook demonstrating the end-to-end calibration pipeline
+- [ ] **NB-02**: User can run a Jupyter notebook demonstrating calibration result visualization and diagnostics
+- [ ] **NB-03**: User can run a Jupyter notebook demonstrating synthetic data generation and validation
+
+### Example Datasets
+
+- [ ] **DATA-01**: A real calibration dataset (from an actual underwater rig) is available for download
+- [ ] **DATA-02**: Synthetic calibration datasets with known ground truth are available
+- [ ] **DATA-03**: Example datasets are small enough for reasonable download (<50MB total) or hosted externally with download instructions
+
+### CI/CD
+
+- [ ] **CI-01**: GitHub Actions workflow runs tests on push/PR across Python 3.10, 3.11, 3.12
+- [ ] **CI-02**: Tests run on both Linux and Windows in CI matrix
+- [ ] **CI-03**: Automated PyPI publishing on git tag via Trusted Publishing (OIDC, no API tokens)
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Documentation
+
+- **DOC-01**: Sphinx API reference auto-generated from docstrings, hosted on Read the Docs
+- **DOC-02**: README badges (build status, coverage, PyPI version, license)
+
+### Community
+
+- **COMM-01**: CONTRIBUTING.md with development setup instructions
+- **COMM-02**: CODE_OF_CONDUCT.md (PSF standard)
+- **COMM-03**: CITATION.cff for academic attribution
+- **COMM-04**: Zenodo DOI for persistent citation
+
+### Academic
+
+- **ACAD-01**: JOSS publication for peer-reviewed software paper
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| GUI application | Not target audience — researchers use CLI/Python |
+| Real-time calibration | Batch processing is the use case |
+| Camera driver integration | Hardware-specific, fragile — users provide video files |
+| Conda-forge recipe | Defer until PyPI adoption validates demand |
+| Docker container | Defer until reproducibility requests arrive |
+| HDF5 export | JSON/YAML sufficient for calibration results |
+| Non-ChArUco calibration targets | ChArUco only for initial release |
+| Multi-language bindings | Python-only for now |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CLEAN-01 | — | Pending |
+| CLEAN-02 | — | Pending |
+| PKG-01 | — | Pending |
+| PKG-02 | — | Pending |
+| PKG-03 | — | Pending |
+| PKG-04 | — | Pending |
+| TUT-01 | — | Pending |
+| TUT-02 | — | Pending |
+| TUT-03 | — | Pending |
+| THEO-01 | — | Pending |
+| THEO-02 | — | Pending |
+| THEO-03 | — | Pending |
+| NB-01 | — | Pending |
+| NB-02 | — | Pending |
+| NB-03 | — | Pending |
+| DATA-01 | — | Pending |
+| DATA-02 | — | Pending |
+| DATA-03 | — | Pending |
+| CI-01 | — | Pending |
+| CI-02 | — | Pending |
+| CI-03 | — | Pending |
+
+**Coverage:**
+- v1 requirements: 21 total
+- Mapped to phases: 0
+- Unmapped: 21
+
+---
+*Requirements defined: 2026-02-14*
+*Last updated: 2026-02-14 after initial definition*
