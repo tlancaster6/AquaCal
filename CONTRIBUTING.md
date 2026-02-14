@@ -28,7 +28,8 @@ Thank you for your interest in contributing to AquaCal. This guide will help you
 
 ## Code Style
 
-- **Formatter**: Black (run `black src/ tests/` before committing)
+- **Formatter**: Ruff (run `ruff format src/ tests/` before committing)
+- **Linter**: Ruff (run `ruff check src/ tests/` to check for issues)
 - **Docstrings**: Google style
 - **Type hints**: Use `numpy.typing.NDArray` with shape information in docstrings
 - **Imports ordering**:
@@ -37,6 +38,8 @@ Thank you for your interest in contributing to AquaCal. This guide will help you
   3. Local imports (from aquacal)
 
   Separate each group with a blank line.
+
+This project uses pre-commit hooks. Install with `pre-commit install` to automatically check formatting and linting before each commit.
 
 ## Running Tests
 
@@ -61,9 +64,35 @@ python -m pytest tests/unit/test_camera.py -v
 2. Create a feature branch (`git checkout -b feature/your-feature`)
 3. Make your changes and add tests
 4. Ensure all tests pass
-5. Format your code with Black
-6. Commit your changes with a clear message
+5. Format and lint your code with ruff (`ruff format src/ tests/ && ruff check src/ tests/`)
+6. Commit your changes with a clear message (see Commit Messages below)
 7. Push to your fork and submit a pull request
+
+### Commit Messages
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automated versioning and changelog generation. Format your commit messages as:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+```
+
+**Types:**
+- `feat:` A new feature (triggers minor version bump, e.g., 1.0.0 → 1.1.0)
+- `fix:` A bug fix (triggers patch version bump, e.g., 1.0.0 → 1.0.1)
+- `docs:` Documentation changes only
+- `test:` Adding or updating tests
+- `refactor:` Code changes that neither fix bugs nor add features
+- `chore:` Maintenance tasks (dependencies, tooling, etc.)
+
+**Scope** (optional): The area of the codebase affected, e.g., `calibration`, `cli`, `core`
+
+**Examples:**
+- `feat(calibration): add support for tilted water surfaces`
+- `fix(projection): correct Newton-Raphson convergence criterion`
+- `docs: update README installation instructions`
+- `test(synthetic): add test for multi-camera pose graph`
 
 ## Deprecation Policy
 

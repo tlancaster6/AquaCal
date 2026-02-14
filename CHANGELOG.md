@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-02-14
+
 ### Added
 
 - Refractive multi-camera calibration pipeline with four stages:
@@ -20,3 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI interface for running calibration from YAML configuration files
 - Coordinate system conventions (Z-down world frame, OpenCV camera convention)
 - Support for arbitrary camera positioning and orientation relative to water surface
+
+[Unreleased]: https://github.com/tlancaster6/AquaCal/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/tlancaster6/AquaCal/releases/tag/v1.0.0
