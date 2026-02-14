@@ -1,4 +1,4 @@
-/# Roadmap: AquaCal
+# Roadmap: AquaCal
 
 ## Overview
 
@@ -48,6 +48,7 @@ Plans:
   3. GitHub Actions workflow publishes to PyPI on git tag via Trusted Publishing (OIDC, no API tokens)
   4. Pre-commit configuration exists with ruff (linter/formatter) -- mypy skipped per user decision
   5. Codecov integration reports test coverage on pull requests
+  6. Semantic release automates version bumping and tag creation from conventional commits
 **Plans:** 3 plans
 
 Plans:
