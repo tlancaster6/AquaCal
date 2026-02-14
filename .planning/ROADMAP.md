@@ -1,4 +1,4 @@
-# Roadmap: AquaCal
+/# Roadmap: AquaCal
 
 ## Overview
 
@@ -13,11 +13,11 @@ Transform AquaCal from a working calibration library into a pip-installable PyPI
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation and Cleanup** - Package infrastructure and repository cleanup
-- [ ] **Phase 2: Example Data** - Synthetic and real calibration datasets
-- [ ] **Phase 3: Documentation Site** - Sphinx API reference and user guide
-- [ ] **Phase 4: Interactive Tutorials** - Jupyter notebooks demonstrating workflows
-- [ ] **Phase 5: CI/CD Automation** - Multi-platform testing and release workflows
-- [ ] **Phase 6: Public Release** - PyPI v1.0.0 and community files
+- [ ] **Phase 2: CI/CD Automation** - Multi-platform testing and release workflows
+- [ ] **Phase 3: Public Release** - PyPI v1.0.0 and community files
+- [ ] **Phase 4: Example Data** - Synthetic and real calibration datasets
+- [ ] **Phase 5: Documentation Site** - Sphinx API reference and user guide
+- [ ] **Phase 6: Interactive Tutorials** - Jupyter notebooks demonstrating workflows
 
 ## Phase Details
 
@@ -38,7 +38,39 @@ Plans:
 - [ ] 01-02-PLAN.md -- Complete pyproject.toml metadata, create CHANGELOG.md and CONTRIBUTING.md
 - [ ] 01-03-PLAN.md -- Build package and validate installation
 
-### Phase 2: Example Data
+### Phase 2: CI/CD Automation
+**Goal**: Automated testing across Python versions and platforms with GitHub Actions workflows for tests, docs, and PyPI publishing
+**Depends on**: Phase 1
+**Requirements**: CI-01, CI-02, CI-03
+**Success Criteria** (what must be TRUE):
+  1. GitHub Actions workflow runs pytest on push/PR across Python 3.10, 3.11, 3.12 on Linux and Windows
+  2. GitHub Actions workflow builds Sphinx documentation on PR to catch doc build errors before merge
+  3. GitHub Actions workflow publishes to PyPI on git tag via Trusted Publishing (OIDC, no API tokens)
+  4. Pre-commit configuration exists with ruff (linter/formatter) and mypy (type checking)
+  5. Codecov integration reports test coverage on pull requests
+**Plans**: TBD
+
+Plans:
+- [ ] 02-01-PLAN: TBD
+
+### Phase 3: Public Release
+**Goal**: AquaCal v1.0.0 is live on PyPI with community files, README badges, and Zenodo DOI
+**Depends on**: Phase 2
+**Requirements**: PKG-01 (final validation)
+**Success Criteria** (what must be TRUE):
+  1. User can `pip install aquacal` and import the library on any supported platform
+  2. PyPI package page displays correct metadata with links to GitHub, docs, and changelog
+  3. GitHub Release exists for v1.0.0 with CHANGELOG excerpt and installation instructions
+  4. Zenodo DOI is minted for v1.0.0 release with citation metadata
+  5. README includes badges for build status, coverage, PyPI version, license, DOI
+  6. CONTRIBUTING.md provides development setup instructions and PR guidelines
+  7. CODE_OF_CONDUCT.md exists using PSF Code of Conduct
+**Plans**: TBD
+
+Plans:
+- [ ] 03-01-PLAN: TBD
+
+### Phase 4: Example Data
 **Goal**: Researchers have access to both synthetic calibration datasets with known ground truth and real-world example data
 **Depends on**: Phase 1
 **Requirements**: DATA-01, DATA-02, DATA-03
@@ -50,11 +82,11 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 02-01-PLAN: TBD
+- [ ] 04-01-PLAN: TBD
 
-### Phase 3: Documentation Site
+### Phase 5: Documentation Site
 **Goal**: Comprehensive documentation site with auto-generated API reference and user guide hosted on Read the Docs
-**Depends on**: Phase 2
+**Depends on**: Phase 4
 **Requirements**: THEO-01, THEO-02, THEO-03
 **Success Criteria** (what must be TRUE):
   1. User can read refractive geometry explanation covering Snell's law, ray tracing, and projection model
@@ -66,51 +98,19 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 03-01-PLAN: TBD
+- [ ] 05-01-PLAN: TBD
 
-### Phase 4: Interactive Tutorials
+### Phase 6: Interactive Tutorials
 **Goal**: Jupyter notebook tutorials demonstrate end-to-end calibration, visualization, and comparison workflows
-**Depends on**: Phase 3
+**Depends on**: Phase 5
 **Requirements**: TUT-01, TUT-02, TUT-03, NB-01, NB-02, NB-03
 **Success Criteria** (what must be TRUE):
   1. User can run a notebook demonstrating full pipeline: config creation, intrinsic calibration, extrinsic estimation, joint optimization, validation
   2. User can run a notebook demonstrating calibration result visualization and diagnostics interpretation
   3. User can run a notebook demonstrating synthetic data generation and ground-truth validation
   4. Tutorial explains common failure modes (insufficient overlap, degenerate board poses, interface distance convergence)
-  5. All notebooks execute end-to-end without manual data preparation using Phase 2 datasets
+  5. All notebooks execute end-to-end without manual data preparation using Phase 4 datasets
   6. Notebooks are integrated into Sphinx documentation via nbsphinx for rendered HTML display
-**Plans**: TBD
-
-Plans:
-- [ ] 04-01-PLAN: TBD
-
-### Phase 5: CI/CD Automation
-**Goal**: Automated testing across Python versions and platforms with GitHub Actions workflows for tests, docs, and PyPI publishing
-**Depends on**: Phase 4
-**Requirements**: CI-01, CI-02, CI-03
-**Success Criteria** (what must be TRUE):
-  1. GitHub Actions workflow runs pytest on push/PR across Python 3.10, 3.11, 3.12 on Linux and Windows
-  2. GitHub Actions workflow builds Sphinx documentation on PR to catch doc build errors before merge
-  3. GitHub Actions workflow publishes to PyPI on git tag via Trusted Publishing (OIDC, no API tokens)
-  4. Pre-commit configuration exists with ruff (linter/formatter) and mypy (type checking)
-  5. Codecov integration reports test coverage on pull requests
-**Plans**: TBD
-
-Plans:
-- [ ] 05-01-PLAN: TBD
-
-### Phase 6: Public Release
-**Goal**: AquaCal v1.0.0 is live on PyPI with community files, README badges, and Zenodo DOI
-**Depends on**: Phase 5
-**Requirements**: PKG-01 (final validation)
-**Success Criteria** (what must be TRUE):
-  1. User can `pip install aquacal` and import the library on any supported platform
-  2. PyPI package page displays correct metadata with links to GitHub, docs, and changelog
-  3. GitHub Release exists for v1.0.0 with CHANGELOG excerpt and installation instructions
-  4. Zenodo DOI is minted for v1.0.0 release with citation metadata
-  5. README includes badges for build status, coverage, PyPI version, license, DOI
-  6. CONTRIBUTING.md provides development setup instructions and PR guidelines
-  7. CODE_OF_CONDUCT.md exists using PSF Code of Conduct
 **Plans**: TBD
 
 Plans:
@@ -124,8 +124,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Cleanup | 3/3 | Complete | 2026-02-14 |
-| 2. Example Data | 0/TBD | Not started | - |
-| 3. Documentation Site | 0/TBD | Not started | - |
-| 4. Interactive Tutorials | 0/TBD | Not started | - |
-| 5. CI/CD Automation | 0/TBD | Not started | - |
-| 6. Public Release | 0/TBD | Not started | - |
+| 2. CI/CD Automation | 0/TBD | Not started | - |
+| 3. Public Release | 0/TBD | Not started | - |
+| 4. Example Data | 0/TBD | Not started | - |
+| 5. Documentation Site | 0/TBD | Not started | - |
+| 6. Interactive Tutorials | 0/TBD | Not started | - |
