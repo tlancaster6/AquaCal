@@ -10,30 +10,31 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 ## Current Position
 
 Phase: 2 of 6 (CI/CD Automation)
-Plan: 1 of 3
+Plan: 2 of 3
 Status: In progress
-Last activity: 2026-02-14 — Completed 02-01: Pre-commit configuration and tool setup
+Last activity: 2026-02-14 — Completed 02-02: GitHub Actions test workflows
 
-Progress: [███░░░░░░░] 20%
+Progress: [████░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 148 seconds
-- Total execution time: 0.16 hours
+- Total plans completed: 5
+- Average duration: 146 seconds
+- Total execution time: 0.20 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 3 | 514s | 171s |
-| 02 | 1 | 80s | 80s |
+| 02 | 2 | 237s | 119s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 02 | 02 | 157s | 2 | 2 |
 | 02 | 01 | 80s | 2 | 2 |
 | 01 | 03 | 5 min | 2 | 0 |
 | 01 | 02 | 107s | 2 | 4 |
@@ -57,6 +58,9 @@ Recent decisions affecting current work:
 - **Roadmap reorder**: CI/CD (Phase 2) and Public Release (Phase 3) moved ahead of Example Data, Docs, and Tutorials (Phases 4-6) to unblock dependent project
 - [Phase 02-ci-cd-automation]: Use ruff instead of black/mypy (faster, all-in-one tool)
 - [Phase 02-ci-cd-automation]: Lenient lint rules initially (E4, E7, E9, F, W, I) to avoid overwhelming noise
+- [Phase 02-ci-cd-automation]: Pre-commit enforced in CI to catch contributors who skip local hooks
+- [Phase 02-ci-cd-automation]: Slow tests separated to manual trigger to maintain fast PR feedback
+- [Phase 02-ci-cd-automation]: Coverage upload graceful (fail_ci_if_error: false) until Codecov configured
 
 ### Pending Todos
 
@@ -83,5 +87,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-14 (plan execution)
-Stopped at: Completed 02-01-PLAN.md (Pre-commit configuration and tool setup)
+Stopped at: Completed 02-02-PLAN.md (GitHub Actions test workflows)
 Resume file: None
