@@ -88,33 +88,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLEAN-01 | — | Pending |
-| CLEAN-02 | — | Pending |
-| PKG-01 | — | Pending |
-| PKG-02 | — | Pending |
-| PKG-03 | — | Pending |
-| PKG-04 | — | Pending |
-| TUT-01 | — | Pending |
-| TUT-02 | — | Pending |
-| TUT-03 | — | Pending |
-| THEO-01 | — | Pending |
-| THEO-02 | — | Pending |
-| THEO-03 | — | Pending |
-| NB-01 | — | Pending |
-| NB-02 | — | Pending |
-| NB-03 | — | Pending |
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| CI-01 | — | Pending |
-| CI-02 | — | Pending |
-| CI-03 | — | Pending |
+| CLEAN-01 | Phase 1 | Pending |
+| CLEAN-02 | Phase 1 | Pending |
+| PKG-01 | Phase 1, Phase 6 | Pending |
+| PKG-02 | Phase 1 | Pending |
+| PKG-03 | Phase 1 | Pending |
+| PKG-04 | Phase 1 | Pending |
+| TUT-01 | Phase 4 | Pending |
+| TUT-02 | Phase 4 | Pending |
+| TUT-03 | Phase 4 | Pending |
+| THEO-01 | Phase 3 | Pending |
+| THEO-02 | Phase 3 | Pending |
+| THEO-03 | Phase 3 | Pending |
+| NB-01 | Phase 4 | Pending |
+| NB-02 | Phase 4 | Pending |
+| NB-03 | Phase 4 | Pending |
+| DATA-01 | Phase 2 | Pending |
+| DATA-02 | Phase 2 | Pending |
+| DATA-03 | Phase 2 | Pending |
+| CI-01 | Phase 5 | Pending |
+| CI-02 | Phase 5 | Pending |
+| CI-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0
-- Unmapped: 21
+- Mapped to phases: 21
+- Unmapped: 0
+
+**Note:** PKG-01 appears in both Phase 1 (initial validation) and Phase 6 (final production release).
 
 ---
 *Requirements defined: 2026-02-14*
-*Last updated: 2026-02-14 after initial definition*
+*Last updated: 2026-02-14 after roadmap creation*
