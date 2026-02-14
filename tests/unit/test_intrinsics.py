@@ -23,7 +23,7 @@ def board_config() -> BoardConfig:
         squares_y=5,
         square_size=0.04,
         marker_size=0.03,
-        dictionary="DICT_4X4_50"
+        dictionary="DICT_4X4_50",
     )
 
 
@@ -37,11 +37,7 @@ def board(board_config: BoardConfig) -> BoardGeometry:
 def synthetic_intrinsics() -> CameraIntrinsics:
     """Known intrinsics for synthetic data generation."""
     return CameraIntrinsics(
-        K=np.array([
-            [500.0, 0, 320],
-            [0, 500.0, 240],
-            [0, 0, 1]
-        ], dtype=np.float64),
+        K=np.array([[500.0, 0, 320], [0, 500.0, 240], [0, 0, 1]], dtype=np.float64),
         dist_coeffs=np.array([0.1, -0.2, 0.0, 0.0, 0.1], dtype=np.float64),
         image_size=(640, 480),
     )
@@ -58,10 +54,10 @@ def calibration_video(
     """
     video_path = tmp_path / "calibration.mp4"
     w, h = synthetic_intrinsics.image_size
-    K = synthetic_intrinsics.K
-    dist = synthetic_intrinsics.dist_coeffs
+    _K = synthetic_intrinsics.K
+    _dist = synthetic_intrinsics.dist_coeffs
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(str(video_path), fourcc, 30.0, (w, h))
 
     cv_board = board.get_opencv_board()
@@ -76,7 +72,7 @@ def calibration_video(
         angle = (i - 10) * 3  # -30 to +30 degrees
         scale = 0.8 + (i % 5) * 0.1  # Vary size
         tx = 50 + (i % 4) * 100  # Vary x position
-        ty = 30 + (i % 3) * 80   # Vary y position
+        ty = 30 + (i % 3) * 80  # Vary y position
 
         # Simple affine transform for board placement
         M = cv2.getRotationMatrix2D((200, 150), angle, scale)
@@ -150,7 +146,7 @@ class TestCalibrateSingle:
         """Raises ValueError for video with no valid detections."""
         # Create blank video
         video_path = tmp_path / "blank.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(video_path), fourcc, 30.0, (640, 480))
         for _ in range(5):
             writer.write(np.full((480, 640, 3), 128, dtype=np.uint8))
@@ -164,7 +160,7 @@ class TestCalibrateSingle:
         # Create a video with some frames having collinear corners (all on same row)
         # and some frames with non-collinear corners
         video_path = tmp_path / "collinear_test.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(video_path), fourcc, 30.0, (640, 480))
 
         cv_board = board.get_opencv_board()
@@ -209,16 +205,17 @@ class TestCalibrateAll:
         # Create second video (copy of first for simplicity)
         video2 = tmp_path / "cam1.mp4"
         import shutil
+
         shutil.copy(calibration_video, video2)
 
         paths = {
-            'cam0': str(calibration_video),
-            'cam1': str(video2),
+            "cam0": str(calibration_video),
+            "cam1": str(video2),
         }
 
         results = calibrate_intrinsics_all(paths, board)
 
-        assert set(results.keys()) == {'cam0', 'cam1'}
+        assert set(results.keys()) == {"cam0", "cam1"}
         for name, (intrinsics, error) in results.items():
             assert isinstance(intrinsics, CameraIntrinsics)
             assert isinstance(error, float)
@@ -227,9 +224,10 @@ class TestCalibrateAll:
         """Calls progress callback for each camera."""
         video2 = tmp_path / "cam1.mp4"
         import shutil
+
         shutil.copy(calibration_video, video2)
 
-        paths = {'cam0': str(calibration_video), 'cam1': str(video2)}
+        paths = {"cam0": str(calibration_video), "cam1": str(video2)}
         calls = []
 
         def callback(name, current, total):
@@ -238,30 +236,36 @@ class TestCalibrateAll:
         calibrate_intrinsics_all(paths, board, progress_callback=callback)
 
         assert len(calls) == 2
-        assert calls[0] == ('cam0', 1, 2)
-        assert calls[1] == ('cam1', 2, 2)
+        assert calls[0] == ("cam0", 1, 2)
+        assert calls[1] == ("cam1", 2, 2)
 
 
 class TestSelectCalibrationFrames:
     def test_returns_all_if_under_max(self):
         """Returns all detections if count <= max_frames."""
         detections = [
-            (np.array([0, 1, 2]), np.array([[100, 100], [200, 100], [150, 200]], dtype=np.float64))
+            (
+                np.array([0, 1, 2]),
+                np.array([[100, 100], [200, 100], [150, 200]], dtype=np.float64),
+            )
             for _ in range(5)
         ]
 
-        selected = _select_calibration_frames(detections, max_frames=10, image_size=(640, 480))
+        selected = _select_calibration_frames(
+            detections, max_frames=10, image_size=(640, 480)
+        )
 
         assert len(selected) == 5
 
     def test_limits_to_max_frames(self):
         """Limits output to max_frames."""
         detections = [
-            (np.array([0, 1, 2, 3]), np.random.rand(4, 2) * 640)
-            for _ in range(20)
+            (np.array([0, 1, 2, 3]), np.random.rand(4, 2) * 640) for _ in range(20)
         ]
 
-        selected = _select_calibration_frames(detections, max_frames=10, image_size=(640, 480))
+        selected = _select_calibration_frames(
+            detections, max_frames=10, image_size=(640, 480)
+        )
 
         assert len(selected) == 10
 
@@ -270,17 +274,21 @@ class TestSelectCalibrationFrames:
         # Clustered corners (low coverage)
         clustered = (
             np.array([0, 1, 2, 3]),
-            np.array([[300, 200], [310, 200], [300, 210], [310, 210]], dtype=np.float64)
+            np.array(
+                [[300, 200], [310, 200], [300, 210], [310, 210]], dtype=np.float64
+            ),
         )
 
         # Spread corners (high coverage)
         spread = (
             np.array([0, 1, 2, 3]),
-            np.array([[50, 50], [590, 50], [50, 430], [590, 430]], dtype=np.float64)
+            np.array([[50, 50], [590, 50], [50, 430], [590, 430]], dtype=np.float64),
         )
 
         detections = [clustered, spread]
-        selected = _select_calibration_frames(detections, max_frames=1, image_size=(640, 480))
+        selected = _select_calibration_frames(
+            detections, max_frames=1, image_size=(640, 480)
+        )
 
         # Should select the spread one
         np.testing.assert_array_equal(selected[0][1], spread[1])
@@ -290,11 +298,7 @@ class TestValidateIntrinsics:
     def test_good_intrinsics_passes(self):
         """Returns no warnings for well-calibrated intrinsics."""
         intrinsics = CameraIntrinsics(
-            K=np.array([
-                [800.0, 0, 640],
-                [0, 800.0, 480],
-                [0, 0, 1]
-            ], dtype=np.float64),
+            K=np.array([[800.0, 0, 640], [0, 800.0, 480], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.array([0.1, -0.05, 0.0, 0.0, 0.02], dtype=np.float64),
             image_size=(1280, 960),
         )
@@ -308,16 +312,14 @@ class TestValidateIntrinsics:
         """Detects extreme distortion that breaks roundtrip."""
         # Extreme distortion coefficients that will cause large roundtrip errors
         intrinsics = CameraIntrinsics(
-            K=np.array([
-                [500.0, 0, 320],
-                [0, 500.0, 240],
-                [0, 0, 1]
-            ], dtype=np.float64),
+            K=np.array([[500.0, 0, 320], [0, 500.0, 240], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.array([5.0, -10.0, 0.0, 0.0, 20.0], dtype=np.float64),
             image_size=(640, 480),
         )
 
-        warnings = validate_intrinsics(intrinsics, camera_name="bad_cam", max_roundtrip_error_px=0.5)
+        warnings = validate_intrinsics(
+            intrinsics, camera_name="bad_cam", max_roundtrip_error_px=0.5
+        )
 
         # Should have at least one warning
         assert len(warnings) > 0
@@ -328,11 +330,7 @@ class TestValidateIntrinsics:
         """Detects when distortion polynomial goes negative."""
         # Large negative k1 will cause distortion factor to go negative
         intrinsics = CameraIntrinsics(
-            K=np.array([
-                [500.0, 0, 320],
-                [0, 500.0, 240],
-                [0, 0, 1]
-            ], dtype=np.float64),
+            K=np.array([[500.0, 0, 320], [0, 500.0, 240], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.array([-5.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float64),
             image_size=(640, 480),
         )
@@ -341,16 +339,16 @@ class TestValidateIntrinsics:
 
         # Should have at least one warning about distortion model
         assert len(warnings) > 0
-        assert any("distortion" in w.lower() and ("negative" in w.lower() or "non-monotonic" in w.lower()) for w in warnings)
+        assert any(
+            "distortion" in w.lower()
+            and ("negative" in w.lower() or "non-monotonic" in w.lower())
+            for w in warnings
+        )
 
     def test_fx_check_passes_within_tolerance(self):
         """Passes fx check when within tolerance."""
         intrinsics = CameraIntrinsics(
-            K=np.array([
-                [800.0, 0, 320],
-                [0, 800.0, 240],
-                [0, 0, 1]
-            ], dtype=np.float64),
+            K=np.array([[800.0, 0, 320], [0, 800.0, 240], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.array([0.1, -0.05, 0.0, 0.0, 0.0], dtype=np.float64),
             image_size=(640, 480),
         )
@@ -360,7 +358,7 @@ class TestValidateIntrinsics:
             intrinsics,
             camera_name="test_cam",
             expected_fx=820.0,
-            fx_tolerance_fraction=0.3
+            fx_tolerance_fraction=0.3,
         )
 
         # Should not warn about fx
@@ -369,11 +367,7 @@ class TestValidateIntrinsics:
     def test_fx_check_warns_outside_tolerance(self):
         """Warns when fx is outside tolerance."""
         intrinsics = CameraIntrinsics(
-            K=np.array([
-                [500.0, 0, 320],
-                [0, 500.0, 240],
-                [0, 0, 1]
-            ], dtype=np.float64),
+            K=np.array([[500.0, 0, 320], [0, 500.0, 240], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.array([0.1, -0.05, 0.0, 0.0, 0.0], dtype=np.float64),
             image_size=(640, 480),
         )
@@ -383,7 +377,7 @@ class TestValidateIntrinsics:
             intrinsics,
             camera_name="bad_fx_cam",
             expected_fx=1000.0,
-            fx_tolerance_fraction=0.3
+            fx_tolerance_fraction=0.3,
         )
 
         # Should warn about fx
@@ -394,11 +388,7 @@ class TestValidateIntrinsics:
         """Fisheye intrinsics skip monotonicity check."""
         # Create fisheye intrinsics with large coefficients
         intrinsics = CameraIntrinsics(
-            K=np.array([
-                [400.0, 0, 640],
-                [0, 400.0, 480],
-                [0, 0, 1]
-            ], dtype=np.float64),
+            K=np.array([[400.0, 0, 640], [0, 400.0, 480], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.array([0.5, -0.3, 0.1, -0.05], dtype=np.float64),
             image_size=(1280, 960),
             is_fisheye=True,
@@ -415,11 +405,7 @@ class TestValidateIntrinsics:
     def test_returns_empty_list_on_success(self):
         """Returns empty list for successful validation."""
         intrinsics = CameraIntrinsics(
-            K=np.array([
-                [800.0, 0, 640],
-                [0, 800.0, 480],
-                [0, 0, 1]
-            ], dtype=np.float64),
+            K=np.array([[800.0, 0, 640], [0, 800.0, 480], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.array([0.05, -0.02, 0.0, 0.0, 0.01], dtype=np.float64),
             image_size=(1280, 960),
         )
@@ -432,13 +418,11 @@ class TestValidateIntrinsics:
     def test_rational_model_validation(self):
         """Validates 8-coefficient rational model."""
         intrinsics = CameraIntrinsics(
-            K=np.array([
-                [800.0, 0, 640],
-                [0, 800.0, 480],
-                [0, 0, 1]
-            ], dtype=np.float64),
+            K=np.array([[800.0, 0, 640], [0, 800.0, 480], [0, 0, 1]], dtype=np.float64),
             # 8-coeff rational model with reasonable values
-            dist_coeffs=np.array([0.1, -0.05, 0.0, 0.0, 0.02, 0.01, 0.005, 0.001], dtype=np.float64),
+            dist_coeffs=np.array(
+                [0.1, -0.05, 0.0, 0.0, 0.02, 0.01, 0.005, 0.001], dtype=np.float64
+            ),
             image_size=(1280, 960),
         )
 

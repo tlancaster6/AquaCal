@@ -103,8 +103,14 @@ def valid_config_yaml():
         },
         "cameras": ["cam0", "cam1"],
         "paths": {
-            "intrinsic_videos": {"cam0": "/path/to/cam0_inair.mp4", "cam1": "/path/to/cam1_inair.mp4"},
-            "extrinsic_videos": {"cam0": "/path/to/cam0_uw.mp4", "cam1": "/path/to/cam1_uw.mp4"},
+            "intrinsic_videos": {
+                "cam0": "/path/to/cam0_inair.mp4",
+                "cam1": "/path/to/cam1_inair.mp4",
+            },
+            "extrinsic_videos": {
+                "cam0": "/path/to/cam0_uw.mp4",
+                "cam1": "/path/to/cam1_uw.mp4",
+            },
             "output_dir": "/path/to/output",
         },
         "interface": {
@@ -135,9 +141,7 @@ class TestLoadConfig:
 
     def test_load_config_valid(self, valid_config_yaml):
         """Test loading a valid config file."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -165,34 +169,34 @@ class TestLoadConfig:
     def test_load_config_missing_board_section(self, valid_config_yaml):
         """Test that missing 'board' section raises ValueError."""
         del valid_config_yaml["board"]
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
-            with pytest.raises(ValueError, match="Missing required config section: board"):
+            with pytest.raises(
+                ValueError, match="Missing required config section: board"
+            ):
                 load_config(f.name)
 
     def test_load_config_missing_cameras_section(self, valid_config_yaml):
         """Test that missing 'cameras' section raises ValueError."""
         del valid_config_yaml["cameras"]
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
-            with pytest.raises(ValueError, match="Missing required config section: cameras"):
+            with pytest.raises(
+                ValueError, match="Missing required config section: cameras"
+            ):
                 load_config(f.name)
 
     def test_load_config_missing_paths_section(self, valid_config_yaml):
         """Test that missing 'paths' section raises ValueError."""
         del valid_config_yaml["paths"]
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
-            with pytest.raises(ValueError, match="Missing required config section: paths"):
+            with pytest.raises(
+                ValueError, match="Missing required config section: paths"
+            ):
                 load_config(f.name)
 
     def test_load_config_defaults(self):
@@ -211,9 +215,7 @@ class TestLoadConfig:
                 "output_dir": "/output",
             },
         }
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(minimal_config, f)
             f.flush()
             config = load_config(f.name)
@@ -243,9 +245,7 @@ class TestLoadConfig:
             "dictionary": "DICT_4X4_100",
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -282,9 +282,7 @@ class TestLoadConfig:
         if "intrinsic_board" in valid_config_yaml:
             del valid_config_yaml["intrinsic_board"]
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -298,9 +296,7 @@ class TestLoadConfig:
         if "initial_distances" in valid_config_yaml.get("interface", {}):
             del valid_config_yaml["interface"]["initial_distances"]
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -315,9 +311,7 @@ class TestLoadConfig:
             "cam1": 0.28,
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -329,9 +323,7 @@ class TestLoadConfig:
         """Test loading config with scalar initial_distance (expanded to all cameras)."""
         valid_config_yaml["interface"]["initial_distances"] = 0.3
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -339,14 +331,14 @@ class TestLoadConfig:
         assert config.initial_interface_distances is not None
         assert config.initial_interface_distances == {"cam0": 0.3, "cam1": 0.3}
 
-    def test_load_config_with_incomplete_initial_distances_dict(self, valid_config_yaml):
+    def test_load_config_with_incomplete_initial_distances_dict(
+        self, valid_config_yaml
+    ):
         """Test that incomplete initial_distances dict raises ValueError."""
         # Only provide distance for cam0, not cam1
         valid_config_yaml["interface"]["initial_distances"] = {"cam0": 0.25}
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(
@@ -358,9 +350,7 @@ class TestLoadConfig:
         """Test that negative scalar initial_distance raises ValueError."""
         valid_config_yaml["interface"]["initial_distances"] = -0.15
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(ValueError, match="initial_distances must be positive"):
@@ -373,9 +363,7 @@ class TestLoadConfig:
             "cam1": -0.15,
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(
@@ -393,9 +381,7 @@ class TestLoadConfig:
             "cam2": 0.30,  # Extra camera not in cameras list
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -415,9 +401,7 @@ class TestLoadConfig:
         """Test that invalid type for initial_distances raises ValueError."""
         valid_config_yaml["interface"]["initial_distances"] = "invalid"
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(
@@ -429,9 +413,7 @@ class TestLoadConfig:
         """Test loading config with frame_step specified."""
         valid_config_yaml["detection"]["frame_step"] = 5
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -444,9 +426,7 @@ class TestLoadConfig:
         if "frame_step" in valid_config_yaml.get("detection", {}):
             del valid_config_yaml["detection"]["frame_step"]
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -457,9 +437,7 @@ class TestLoadConfig:
         """Test loading config with legacy_pattern: true."""
         valid_config_yaml["board"]["legacy_pattern"] = True
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -470,9 +448,7 @@ class TestLoadConfig:
         """Test loading config with legacy_pattern: false."""
         valid_config_yaml["board"]["legacy_pattern"] = False
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -485,9 +461,7 @@ class TestLoadConfig:
         if "legacy_pattern" in valid_config_yaml["board"]:
             del valid_config_yaml["board"]["legacy_pattern"]
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -505,16 +479,16 @@ class TestLoadConfig:
             "legacy_pattern": True,
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
 
         assert config.intrinsic_board.legacy_pattern is True
 
-    def test_load_config_intrinsic_board_legacy_pattern_defaults_false(self, valid_config_yaml):
+    def test_load_config_intrinsic_board_legacy_pattern_defaults_false(
+        self, valid_config_yaml
+    ):
         """Test that intrinsic_board legacy_pattern defaults to False when omitted."""
         valid_config_yaml["intrinsic_board"] = {
             "squares_x": 12,
@@ -523,9 +497,7 @@ class TestLoadConfig:
             "marker_size": 0.018,
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -536,25 +508,29 @@ class TestLoadConfig:
         """Fisheye cameras load correctly when subset of auxiliary_cameras."""
         valid_config_yaml["auxiliary_cameras"] = ["aux_cam"]
         valid_config_yaml["fisheye_cameras"] = ["aux_cam"]
-        valid_config_yaml["paths"]["intrinsic_videos"]["aux_cam"] = "/path/to/aux_inair.mp4"
-        valid_config_yaml["paths"]["extrinsic_videos"]["aux_cam"] = "/path/to/aux_uw.mp4"
+        valid_config_yaml["paths"]["intrinsic_videos"]["aux_cam"] = (
+            "/path/to/aux_inair.mp4"
+        )
+        valid_config_yaml["paths"]["extrinsic_videos"]["aux_cam"] = (
+            "/path/to/aux_uw.mp4"
+        )
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
 
         assert config.fisheye_cameras == ["aux_cam"]
 
-    def test_load_config_fisheye_cameras_not_in_auxiliary_raises(self, valid_config_yaml):
+    def test_load_config_fisheye_cameras_not_in_auxiliary_raises(
+        self, valid_config_yaml
+    ):
         """ValueError if fisheye_cameras entry is not in auxiliary_cameras."""
-        valid_config_yaml["fisheye_cameras"] = ["cam0"]  # cam0 is primary, not auxiliary
+        valid_config_yaml["fisheye_cameras"] = [
+            "cam0"
+        ]  # cam0 is primary, not auxiliary
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(ValueError, match="subset of auxiliary_cameras"):
@@ -565,12 +541,14 @@ class TestLoadConfig:
         valid_config_yaml["auxiliary_cameras"] = ["aux_cam"]
         valid_config_yaml["fisheye_cameras"] = ["aux_cam"]
         valid_config_yaml["rational_model_cameras"] = ["aux_cam"]
-        valid_config_yaml["paths"]["intrinsic_videos"]["aux_cam"] = "/path/to/aux_inair.mp4"
-        valid_config_yaml["paths"]["extrinsic_videos"]["aux_cam"] = "/path/to/aux_uw.mp4"
+        valid_config_yaml["paths"]["intrinsic_videos"]["aux_cam"] = (
+            "/path/to/aux_inair.mp4"
+        )
+        valid_config_yaml["paths"]["extrinsic_videos"]["aux_cam"] = (
+            "/path/to/aux_uw.mp4"
+        )
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(ValueError, match="disjoint"):
@@ -578,9 +556,7 @@ class TestLoadConfig:
 
     def test_load_config_fisheye_cameras_defaults_empty(self, valid_config_yaml):
         """fisheye_cameras defaults to empty list when not in config."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             config = load_config(f.name)
@@ -770,7 +746,9 @@ class TestSaveBoardReferenceImages:
             intrinsic_path = output_dir / "board_intrinsic.png"
 
             assert extrinsic_path.exists(), "board_extrinsic.png not saved"
-            assert not intrinsic_path.exists(), "board_intrinsic.png should not be saved when boards are identical"
+            assert not intrinsic_path.exists(), (
+                "board_intrinsic.png should not be saved when boards are identical"
+            )
 
             # Verify extrinsic image is not empty
             assert extrinsic_path.stat().st_size > 0
@@ -903,9 +881,7 @@ class TestRunCalibration:
 
     def test_run_calibration_loads_config_and_delegates(self, valid_config_yaml):
         """Test that run_calibration loads config and calls run_calibration_from_config."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
 
@@ -914,7 +890,7 @@ class TestRunCalibration:
             ) as mock_run:
                 mock_run.return_value = MagicMock(spec=CalibrationResult)
 
-                result = run_calibration(f.name)
+                _result = run_calibration(f.name)
 
                 # Verify run_calibration_from_config was called
                 mock_run.assert_called_once()
@@ -942,10 +918,16 @@ class TestRunCalibrationFromConfig:
             patch("aquacal.calibration.pipeline.build_pose_graph") as mock_pose_graph,
             patch("aquacal.calibration.pipeline.estimate_extrinsics") as mock_ext,
             patch("aquacal.calibration.pipeline.optimize_interface") as mock_opt,
-            patch("aquacal.calibration.pipeline.compute_reprojection_errors") as mock_reproj,
+            patch(
+                "aquacal.calibration.pipeline.compute_reprojection_errors"
+            ) as mock_reproj,
             patch("aquacal.calibration.pipeline.compute_3d_distance_errors") as mock_3d,
-            patch("aquacal.calibration.pipeline.generate_diagnostic_report") as mock_diag,
-            patch("aquacal.calibration.pipeline.save_diagnostic_report") as mock_save_diag,
+            patch(
+                "aquacal.calibration.pipeline.generate_diagnostic_report"
+            ) as mock_diag,
+            patch(
+                "aquacal.calibration.pipeline.save_diagnostic_report"
+            ) as mock_save_diag,
             patch("aquacal.calibration.pipeline.save_calibration") as mock_save_cal,
         ):
             # Setup return values
@@ -1261,7 +1243,10 @@ class TestRunCalibrationFromConfig:
             captured = capsys.readouterr()
 
             # Check that validation pose estimation message is printed
-            assert "[Validation] Estimating board poses for held-out frames" in captured.out
+            assert (
+                "[Validation] Estimating board poses for held-out frames"
+                in captured.out
+            )
             assert "Estimated" in captured.out
             assert "validation frame poses" in captured.out
 
@@ -1284,10 +1269,16 @@ class TestAuxiliaryCameraSeparation:
             patch("aquacal.calibration.pipeline.estimate_extrinsics") as mock_ext,
             patch("aquacal.calibration.pipeline.optimize_interface") as mock_opt,
             patch("aquacal.calibration.pipeline.register_auxiliary_camera") as mock_aux,
-            patch("aquacal.calibration.pipeline.compute_reprojection_errors") as mock_reproj,
+            patch(
+                "aquacal.calibration.pipeline.compute_reprojection_errors"
+            ) as mock_reproj,
             patch("aquacal.calibration.pipeline.compute_3d_distance_errors") as mock_3d,
-            patch("aquacal.calibration.pipeline.generate_diagnostic_report") as mock_diag,
-            patch("aquacal.calibration.pipeline.save_diagnostic_report") as mock_save_diag,
+            patch(
+                "aquacal.calibration.pipeline.generate_diagnostic_report"
+            ) as mock_diag,
+            patch(
+                "aquacal.calibration.pipeline.save_diagnostic_report"
+            ) as mock_save_diag,
             patch("aquacal.calibration.pipeline.save_calibration") as mock_save_cal,
         ):
             # Setup return values
@@ -1305,7 +1296,8 @@ class TestAuxiliaryCameraSeparation:
                     detections[cam] = Detection(
                         corner_ids=np.array([0, 1, 2, 3], dtype=np.int32),
                         corners_2d=np.array(
-                            [[100, 100], [200, 100], [100, 200], [200, 200]], dtype=np.float64
+                            [[100, 100], [200, 100], [100, 200], [200, 200]],
+                            dtype=np.float64,
                         ),
                     )
                 frames[i] = FrameDetections(frame_idx=i, detections=detections)

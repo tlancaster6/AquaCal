@@ -104,10 +104,9 @@ class TestCreateParser:
 
     def test_calibrate_options(self):
         parser = create_parser()
-        args = parser.parse_args([
-            "calibrate", "config.yaml",
-            "-v", "-o", "/output", "--dry-run"
-        ])
+        args = parser.parse_args(
+            ["calibrate", "config.yaml", "-v", "-o", "/output", "--dry-run"]
+        )
         assert args.verbose is True
         assert args.output_dir == Path("/output")
         assert args.dry_run is True
@@ -123,10 +122,9 @@ class TestCreateParser:
 
     def test_compare_options(self):
         parser = create_parser()
-        args = parser.parse_args([
-            "compare", "/dir1", "/dir2", "/dir3",
-            "-o", "/custom_output", "--no-plots"
-        ])
+        args = parser.parse_args(
+            ["compare", "/dir1", "/dir2", "/dir3", "-o", "/custom_output", "--no-plots"]
+        )
         assert args.command == "compare"
         assert args.directories == [Path("/dir1"), Path("/dir2"), Path("/dir3")]
         assert args.output_dir == Path("/custom_output")
@@ -193,12 +191,17 @@ class TestCmdInit:
         output_file = tmp_path / "config.yaml"
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -234,13 +237,19 @@ class TestCmdInit:
         output_file = tmp_path / "config.yaml"
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-            "--pattern", r"experiment_(cam\d+)_trial",
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+                "--pattern",
+                r"experiment_(cam\d+)_trial",
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -277,12 +286,17 @@ class TestCmdInit:
         output_file = tmp_path / "config.yaml"
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -312,12 +326,17 @@ class TestCmdInit:
         output_file = tmp_path / "config.yaml"
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -344,12 +363,17 @@ class TestCmdInit:
         output_file = tmp_path / "config.yaml"
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -372,12 +396,17 @@ class TestCmdInit:
         output_file.touch()  # Pre-create the file
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -395,12 +424,17 @@ class TestCmdInit:
         output_file = tmp_path / "config.yaml"
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -422,13 +456,19 @@ class TestCmdInit:
 
         # No capture groups
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-            "--pattern", r"cam\d+",  # No capture group
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+                "--pattern",
+                r"cam\d+",  # No capture group
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -437,13 +477,19 @@ class TestCmdInit:
         assert "exactly one capture group" in captured.err
 
         # Multiple capture groups
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-            "--pattern", r"(cam)(\d+)",  # Two capture groups
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+                "--pattern",
+                r"(cam)(\d+)",  # Two capture groups
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -459,12 +505,17 @@ class TestCmdInit:
         output_file = tmp_path / "config.yaml"
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -485,12 +536,17 @@ class TestCmdInit:
         output_file = tmp_path / "config.yaml"
 
         parser = create_parser()
-        args = parser.parse_args([
-            "init",
-            "--intrinsic-dir", str(intrinsic_dir),
-            "--extrinsic-dir", str(extrinsic_dir),
-            "--output", str(output_file),
-        ])
+        args = parser.parse_args(
+            [
+                "init",
+                "--intrinsic-dir",
+                str(intrinsic_dir),
+                "--extrinsic-dir",
+                str(extrinsic_dir),
+                "--output",
+                str(output_file),
+            ]
+        )
 
         exit_code = cmd_init(args)
 
@@ -556,10 +612,15 @@ class TestCmdCompare:
         # Run compare command
         parser = create_parser()
         output_dir = tmp_path / "comparison_output"
-        args = parser.parse_args([
-            "compare", str(dir1), str(dir2),
-            "-o", str(output_dir),
-        ])
+        args = parser.parse_args(
+            [
+                "compare",
+                str(dir1),
+                str(dir2),
+                "-o",
+                str(output_dir),
+            ]
+        )
 
         exit_code = cmd_compare(args)
 
@@ -644,11 +705,16 @@ class TestCmdCompare:
 
         parser = create_parser()
         output_dir = tmp_path / "comparison_output"
-        args = parser.parse_args([
-            "compare", str(dir1), str(dir2),
-            "-o", str(output_dir),
-            "--no-plots",
-        ])
+        args = parser.parse_args(
+            [
+                "compare",
+                str(dir1),
+                str(dir2),
+                "-o",
+                str(output_dir),
+                "--no-plots",
+            ]
+        )
 
         exit_code = cmd_compare(args)
 
@@ -683,10 +749,15 @@ class TestCmdCompare:
 
         parser = create_parser()
         output_dir = tmp_path / "comparison_output"
-        args = parser.parse_args([
-            "compare", str(dir1), str(dir2),
-            "-o", str(output_dir),
-        ])
+        args = parser.parse_args(
+            [
+                "compare",
+                str(dir1),
+                str(dir2),
+                "-o",
+                str(output_dir),
+            ]
+        )
 
         # Should succeed without crashing
         exit_code = cmd_compare(args)

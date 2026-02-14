@@ -48,9 +48,7 @@ def compare_calibrations(
     if len(results) < 2:
         raise ValueError(f"Need at least 2 results to compare, got {len(results)}")
     if len(results) != len(labels):
-        raise ValueError(
-            f"Mismatch: {len(results)} results but {len(labels)} labels"
-        )
+        raise ValueError(f"Mismatch: {len(results)} results but {len(labels)} labels")
     if len(set(labels)) != len(labels):
         raise ValueError(f"Labels must be unique, got duplicates in {labels}")
 
@@ -96,7 +94,9 @@ def _build_metric_table(
         # But validation errors are absolute distances, so RMSE = sqrt(mean(x^2))
         # We have mean and std, so we can compute: RMSE^2 = mean^2 + std^2 (if errors are zero-mean)
         # Actually, std^2 = mean((x - mu)^2), so mean(x^2) = std^2 + mean^2
-        rmse_3d = np.sqrt(diag.validation_3d_error_mean**2 + diag.validation_3d_error_std**2)
+        rmse_3d = np.sqrt(
+            diag.validation_3d_error_mean**2 + diag.validation_3d_error_std**2
+        )
 
         # Percent error: not well-defined without a reference scale
         # Use mean error / mean depth as a rough proxy
@@ -108,7 +108,9 @@ def _build_metric_table(
         first_camera = next(iter(result.cameras.values()))
         water_z = first_camera.interface_distance
 
-        pct_error = (diag.validation_3d_error_mean / water_z * 100) if water_z > 0 else 0.0
+        pct_error = (
+            (diag.validation_3d_error_mean / water_z * 100) if water_z > 0 else 0.0
+        )
 
         rows.append(
             {
@@ -437,8 +439,10 @@ def write_comparison_report(
                     {
                         "label": label,
                         "bin_center_z": binned.bin_centers[i],
-                        "signed_mean_mm": binned.signed_means[i] * 1000.0,  # Convert to mm
-                        "signed_std_mm": binned.signed_stds[i] * 1000.0,  # Convert to mm
+                        "signed_mean_mm": binned.signed_means[i]
+                        * 1000.0,  # Convert to mm
+                        "signed_std_mm": binned.signed_stds[i]
+                        * 1000.0,  # Convert to mm
                         "count": binned.counts[i],
                     }
                 )
@@ -702,6 +706,7 @@ def plot_xy_error_heatmaps(grids: dict[str, "SpatialErrorGrid"]):
         - Depth bins with zero measurements across ALL runs are skipped
     """
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.colors import TwoSlopeNorm
@@ -732,7 +737,14 @@ def plot_xy_error_heatmaps(grids: dict[str, "SpatialErrorGrid"]):
     if not valid_depth_bins:
         # All bins are empty - return empty figure
         fig, ax = plt.subplots(figsize=(8, 6))
-        ax.text(0.5, 0.5, "No spatial data", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "No spatial data",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         ax.set_title("Signed Error by XY Position and Depth")
         return fig
 
@@ -758,7 +770,9 @@ def plot_xy_error_heatmaps(grids: dict[str, "SpatialErrorGrid"]):
 
     # Create figure
     figsize = (3 * n_cols + 1.5, 3 * n_runs + 1)
-    fig, axes = plt.subplots(n_runs, n_cols, figsize=figsize, squeeze=False, constrained_layout=True)
+    fig, axes = plt.subplots(
+        n_runs, n_cols, figsize=figsize, squeeze=False, constrained_layout=True
+    )
 
     # Plot each run x depth bin combination
     for row_idx, label in enumerate(sorted_labels):

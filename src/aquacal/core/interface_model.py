@@ -27,7 +27,7 @@ class Interface:
         normal: Vec3,
         camera_distances: dict[str, float],
         n_air: float = 1.0,
-        n_water: float = 1.333
+        n_water: float = 1.333,
     ):
         """
         Initialize interface.
@@ -83,7 +83,9 @@ class Interface:
             fixed world Z position.
         """
         z_interface = self.camera_distances[camera_name]
-        return np.array([camera_center[0], camera_center[1], z_interface], dtype=np.float64)
+        return np.array(
+            [camera_center[0], camera_center[1], z_interface], dtype=np.float64
+        )
 
     @property
     def n_ratio_air_to_water(self) -> float:
@@ -97,10 +99,7 @@ class Interface:
 
 
 def ray_plane_intersection(
-    ray_origin: Vec3,
-    ray_direction: Vec3,
-    plane_point: Vec3,
-    plane_normal: Vec3
+    ray_origin: Vec3, ray_direction: Vec3, plane_point: Vec3, plane_normal: Vec3
 ) -> tuple[Vec3, float] | tuple[None, None]:
     """
     Compute intersection of ray with plane.

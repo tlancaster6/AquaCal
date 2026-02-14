@@ -179,20 +179,26 @@ class TestLoadCalibration:
         loaded = load_calibration(path)
 
         # Check cameras
-        assert set(loaded.cameras.keys()) == set(sample_calibration_result.cameras.keys())
+        assert set(loaded.cameras.keys()) == set(
+            sample_calibration_result.cameras.keys()
+        )
         for name in loaded.cameras:
             orig = sample_calibration_result.cameras[name]
             load = loaded.cameras[name]
             assert load.name == orig.name
             np.testing.assert_allclose(load.intrinsics.K, orig.intrinsics.K)
-            np.testing.assert_allclose(load.intrinsics.dist_coeffs, orig.intrinsics.dist_coeffs)
+            np.testing.assert_allclose(
+                load.intrinsics.dist_coeffs, orig.intrinsics.dist_coeffs
+            )
             assert load.intrinsics.image_size == orig.intrinsics.image_size
             np.testing.assert_allclose(load.extrinsics.R, orig.extrinsics.R)
             np.testing.assert_allclose(load.extrinsics.t, orig.extrinsics.t)
             assert load.interface_distance == orig.interface_distance
 
         # Check interface
-        np.testing.assert_allclose(loaded.interface.normal, sample_calibration_result.interface.normal)
+        np.testing.assert_allclose(
+            loaded.interface.normal, sample_calibration_result.interface.normal
+        )
         assert loaded.interface.n_air == sample_calibration_result.interface.n_air
         assert loaded.interface.n_water == sample_calibration_result.interface.n_water
 
@@ -201,10 +207,16 @@ class TestLoadCalibration:
         assert loaded.board.dictionary == sample_calibration_result.board.dictionary
 
         # Check diagnostics
-        assert loaded.diagnostics.reprojection_error_rms == sample_calibration_result.diagnostics.reprojection_error_rms
+        assert (
+            loaded.diagnostics.reprojection_error_rms
+            == sample_calibration_result.diagnostics.reprojection_error_rms
+        )
 
         # Check metadata
-        assert loaded.metadata.calibration_date == sample_calibration_result.metadata.calibration_date
+        assert (
+            loaded.metadata.calibration_date
+            == sample_calibration_result.metadata.calibration_date
+        )
 
     def test_accepts_string_path(self, tmp_path, sample_calibration_result):
         """Accepts string path argument."""
@@ -262,7 +274,10 @@ class TestOptionalFields:
         )
 
         assert loaded.diagnostics.per_frame_errors is not None
-        assert loaded.diagnostics.per_frame_errors == sample_diagnostics_full.per_frame_errors
+        assert (
+            loaded.diagnostics.per_frame_errors
+            == sample_diagnostics_full.per_frame_errors
+        )
 
 
 class TestNumpyArrays:
@@ -294,7 +309,9 @@ class TestNumpyArrays:
 
 
 class TestPerFrameErrorsIntKeys:
-    def test_int_keys_preserved(self, tmp_path, sample_calibration_result, sample_diagnostics_full):
+    def test_int_keys_preserved(
+        self, tmp_path, sample_calibration_result, sample_diagnostics_full
+    ):
         """per_frame_errors dict keys are converted to int on load."""
         result = CalibrationResult(
             cameras=sample_calibration_result.cameras,
@@ -314,7 +331,9 @@ class TestPerFrameErrorsIntKeys:
 
 
 class TestFisheyeSerialization:
-    def test_fisheye_flag_roundtrip(self, tmp_path, sample_calibration_result, sample_metadata):
+    def test_fisheye_flag_roundtrip(
+        self, tmp_path, sample_calibration_result, sample_metadata
+    ):
         """is_fisheye=True survives save/load roundtrip."""
         # Create a fisheye camera
         fisheye_intrinsics = CameraIntrinsics(
@@ -349,7 +368,9 @@ class TestFisheyeSerialization:
         assert loaded.cameras["cam0"].intrinsics.is_fisheye is False
         assert len(loaded.cameras["fisheye_cam"].intrinsics.dist_coeffs) == 4
 
-    def test_backward_compat_missing_fisheye_field(self, tmp_path, sample_calibration_result):
+    def test_backward_compat_missing_fisheye_field(
+        self, tmp_path, sample_calibration_result
+    ):
         """Loading JSON without is_fisheye field defaults to False."""
         path = tmp_path / "calibration.json"
         save_calibration(sample_calibration_result, path)
@@ -366,7 +387,9 @@ class TestFisheyeSerialization:
         for cam in loaded.cameras.values():
             assert cam.intrinsics.is_fisheye is False
 
-    def test_fisheye_flag_only_written_when_true(self, tmp_path, sample_calibration_result):
+    def test_fisheye_flag_only_written_when_true(
+        self, tmp_path, sample_calibration_result
+    ):
         """is_fisheye is only written to JSON when True (backward compat)."""
         path = tmp_path / "calibration.json"
         save_calibration(sample_calibration_result, path)

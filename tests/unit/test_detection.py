@@ -5,7 +5,12 @@ import cv2
 import numpy as np
 from pathlib import Path
 
-from aquacal.config.schema import BoardConfig, Detection, FrameDetections, DetectionResult
+from aquacal.config.schema import (
+    BoardConfig,
+    Detection,
+    FrameDetections,
+    DetectionResult,
+)
 from aquacal.core.board import BoardGeometry
 from aquacal.io.detection import detect_charuco, detect_all_frames
 from aquacal.io.video import VideoSet
@@ -19,7 +24,7 @@ def board_config() -> BoardConfig:
         squares_y=4,
         square_size=0.04,
         marker_size=0.03,
-        dictionary="DICT_4X4_50"
+        dictionary="DICT_4X4_50",
     )
 
 
@@ -58,32 +63,33 @@ def charuco_image_warped(charuco_image: np.ndarray) -> np.ndarray:
 
     # Define perspective transform (slight rotation/tilt)
     src_pts = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
-    dst_pts = np.float32([[50, 30], [w-30, 50], [w-50, h-30], [30, h-50]])
+    dst_pts = np.float32([[50, 30], [w - 30, 50], [w - 50, h - 30], [30, h - 50]])
 
     M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-    warped = cv2.warpPerspective(charuco_image, M, (w, h),
-                                  borderValue=(255, 255, 255))
+    warped = cv2.warpPerspective(charuco_image, M, (w, h), borderValue=(255, 255, 255))
 
     return warped
 
 
 @pytest.fixture
-def test_videos_with_charuco(tmp_path: Path, charuco_image_warped: np.ndarray) -> dict[str, str]:
+def test_videos_with_charuco(
+    tmp_path: Path, charuco_image_warped: np.ndarray
+) -> dict[str, str]:
     """
     Create test videos containing ChArUco board frames.
     """
     paths = {}
     h, w = charuco_image_warped.shape[:2]
 
-    for cam_name in ['cam0', 'cam1']:
-        path = tmp_path / f'{cam_name}.mp4'
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    for cam_name in ["cam0", "cam1"]:
+        path = tmp_path / f"{cam_name}.mp4"
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(path), fourcc, 30.0, (w, h))
 
         for i in range(10):
             # Add slight variation per frame (brightness)
             frame = charuco_image_warped.copy()
-            frame = cv2.convertScaleAbs(frame, alpha=1.0 + i*0.01, beta=0)
+            frame = cv2.convertScaleAbs(frame, alpha=1.0 + i * 0.01, beta=0)
             writer.write(frame)
 
         writer.release()
@@ -134,11 +140,7 @@ class TestDetectCharuco:
         """Uses intrinsics for corner refinement."""
         # Simple intrinsic matrix
         h, w = charuco_image_warped.shape[:2]
-        K = np.array([
-            [500, 0, w/2],
-            [0, 500, h/2],
-            [0, 0, 1]
-        ], dtype=np.float64)
+        K = np.array([[500, 0, w / 2], [0, 500, h / 2], [0, 0, 1]], dtype=np.float64)
         dist = np.zeros(5, dtype=np.float64)
 
         detection = detect_charuco(charuco_image_warped, board, K, dist)
@@ -166,7 +168,7 @@ class TestDetectAllFrames:
         result = detect_all_frames(test_videos_with_charuco, board)
 
         assert isinstance(result, DetectionResult)
-        assert result.camera_names == ['cam0', 'cam1']
+        assert result.camera_names == ["cam0", "cam1"]
         assert result.total_frames == 10
 
     def test_with_video_set(self, board, test_videos_with_charuco):
@@ -189,7 +191,9 @@ class TestDetectAllFrames:
         """Filters detections by min_corners."""
         # With very high min_corners, might get fewer results
         result_low = detect_all_frames(test_videos_with_charuco, board, min_corners=4)
-        result_high = detect_all_frames(test_videos_with_charuco, board, min_corners=100)
+        result_high = detect_all_frames(
+            test_videos_with_charuco, board, min_corners=100
+        )
 
         # High threshold should have fewer or equal frames
         assert len(result_high.frames) <= len(result_low.frames)
@@ -197,6 +201,7 @@ class TestDetectAllFrames:
     def test_progress_callback(self, board, test_videos_with_charuco):
         """Calls progress callback after each frame."""
         calls = []
+
         def callback(current, total):
             calls.append((current, total))
 
@@ -208,11 +213,14 @@ class TestDetectAllFrames:
     def test_progress_callback_with_frame_step(self, board, test_videos_with_charuco):
         """Callback receives sequential processed counts with frame_step > 1."""
         calls = []
+
         def callback(current, total):
             calls.append((current, total))
 
         # With 10 total frames and frame_step=2, should process 5 frames
-        detect_all_frames(test_videos_with_charuco, board, frame_step=2, progress_callback=callback)
+        detect_all_frames(
+            test_videos_with_charuco, board, frame_step=2, progress_callback=callback
+        )
 
         # Should have 5 calls with sequential counts
         assert len(calls) == 5
@@ -233,12 +241,11 @@ class TestDetectAllFrames:
         """Uses intrinsics when provided."""
         K = np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64)
         dist = np.zeros(5, dtype=np.float64)
-        intrinsics = {
-            'cam0': (K, dist),
-            'cam1': (K, dist)
-        }
+        intrinsics = {"cam0": (K, dist), "cam1": (K, dist)}
 
-        result = detect_all_frames(test_videos_with_charuco, board, intrinsics=intrinsics)
+        result = detect_all_frames(
+            test_videos_with_charuco, board, intrinsics=intrinsics
+        )
 
         assert isinstance(result, DetectionResult)
 
@@ -246,9 +253,11 @@ class TestDetectAllFrames:
         """Works with intrinsics for only some cameras."""
         K = np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64)
         dist = np.zeros(5, dtype=np.float64)
-        intrinsics = {'cam0': (K, dist)}  # Only cam0
+        intrinsics = {"cam0": (K, dist)}  # Only cam0
 
-        result = detect_all_frames(test_videos_with_charuco, board, intrinsics=intrinsics)
+        result = detect_all_frames(
+            test_videos_with_charuco, board, intrinsics=intrinsics
+        )
 
         assert isinstance(result, DetectionResult)
 
@@ -268,9 +277,9 @@ class TestDetectAllFramesEdgeCases:
         """Handles videos with no detectable boards."""
         # Create blank video
         paths = {}
-        for cam in ['cam0']:
-            path = tmp_path / f'{cam}.mp4'
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        for cam in ["cam0"]:
+            path = tmp_path / f"{cam}.mp4"
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             writer = cv2.VideoWriter(str(path), fourcc, 30.0, (640, 480))
             for _ in range(5):
                 writer.write(np.full((480, 640, 3), 128, dtype=np.uint8))

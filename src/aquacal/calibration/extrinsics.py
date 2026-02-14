@@ -300,7 +300,7 @@ def build_pose_graph(
         comp_strs = []
         for i, comp in enumerate(components):
             cameras_in_comp = [n for n in comp if not n.startswith("f")]
-            comp_strs.append(f"Component {i+1}: {cameras_in_comp}")
+            comp_strs.append(f"Component {i + 1}: {cameras_in_comp}")
         raise ConnectivityError(
             f"Pose graph is not connected. Found {len(components)} components:\n"
             + "\n".join(comp_strs)
@@ -402,9 +402,14 @@ def _refine_poses_multi_frame(
             # PnP: board in camera frame
             if interface_distances is not None and cam_name in interface_distances:
                 result = refractive_solve_pnp(
-                    intrinsics[cam_name], obs.corners_2d, obs.corner_ids,
-                    board, interface_distances[cam_name],
-                    interface_normal, n_air, n_water,
+                    intrinsics[cam_name],
+                    obs.corners_2d,
+                    obs.corner_ids,
+                    board,
+                    interface_distances[cam_name],
+                    interface_normal,
+                    n_air,
+                    n_water,
                 )
             else:
                 result = estimate_board_pose(
@@ -454,9 +459,14 @@ def _refine_poses_multi_frame(
             # PnP: board in camera frame
             if interface_distances is not None and cam_name in interface_distances:
                 result = refractive_solve_pnp(
-                    intrinsics[cam_name], obs.corners_2d, obs.corner_ids,
-                    board, interface_distances[cam_name],
-                    interface_normal, n_air, n_water,
+                    intrinsics[cam_name],
+                    obs.corners_2d,
+                    obs.corner_ids,
+                    board,
+                    interface_distances[cam_name],
+                    interface_normal,
+                    n_air,
+                    n_water,
                 )
             else:
                 result = estimate_board_pose(
@@ -607,9 +617,14 @@ def estimate_extrinsics(
 
                 if interface_distances is not None and cam_name in interface_distances:
                     result = refractive_solve_pnp(
-                        intrinsics[cam_name], obs.corners_2d, obs.corner_ids,
-                        board, interface_distances[cam_name],
-                        interface_normal, n_air, n_water,
+                        intrinsics[cam_name],
+                        obs.corners_2d,
+                        obs.corner_ids,
+                        board,
+                        interface_distances[cam_name],
+                        interface_normal,
+                        n_air,
+                        n_water,
                     )
                 else:
                     result = estimate_board_pose(
@@ -655,9 +670,14 @@ def estimate_extrinsics(
 
                 if interface_distances is not None and cam_name in interface_distances:
                     result = refractive_solve_pnp(
-                        intrinsics[cam_name], obs.corners_2d, obs.corner_ids,
-                        board, interface_distances[cam_name],
-                        interface_normal, n_air, n_water,
+                        intrinsics[cam_name],
+                        obs.corners_2d,
+                        obs.corner_ids,
+                        board,
+                        interface_distances[cam_name],
+                        interface_normal,
+                        n_air,
+                        n_water,
                     )
                 else:
                     result = estimate_board_pose(
@@ -683,9 +703,17 @@ def estimate_extrinsics(
     if progress_callback is not None:
         progress_callback("_averaging", len(visited_cameras), total_cameras)
     camera_poses, board_poses = _refine_poses_multi_frame(
-        camera_poses, board_poses, obs_index, pose_graph,
-        intrinsics, board, reference_camera,
-        interface_distances, interface_normal, n_air, n_water,
+        camera_poses,
+        board_poses,
+        obs_index,
+        pose_graph,
+        intrinsics,
+        board,
+        reference_camera,
+        interface_distances,
+        interface_normal,
+        n_air,
+        n_water,
     )
 
     # Convert to CameraExtrinsics

@@ -51,11 +51,10 @@ class BoardGeometry:
         for corner_id in range(cols * rows):
             col = corner_id % cols
             row = corner_id // cols
-            positions[corner_id] = np.array([
-                col * self.config.square_size,
-                row * self.config.square_size,
-                0.0
-            ], dtype=np.float64)
+            positions[corner_id] = np.array(
+                [col * self.config.square_size, row * self.config.square_size, 0.0],
+                dtype=np.float64,
+            )
         return positions
 
     @property
@@ -98,7 +97,7 @@ class BoardGeometry:
             (self.config.squares_x, self.config.squares_y),
             self.config.square_size,
             self.config.marker_size,
-            dictionary
+            dictionary,
         )
         if self.config.legacy_pattern:
             board.setLegacyPattern(True)
@@ -144,7 +143,7 @@ class BoardGeometry:
             >>> pts.shape
             (3, 3)
         """
-        return np.array([
-            self.corner_positions[int(corner_id)]
-            for corner_id in corner_ids
-        ], dtype=np.float64)
+        return np.array(
+            [self.corner_positions[int(corner_id)] for corner_id in corner_ids],
+            dtype=np.float64,
+        )

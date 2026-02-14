@@ -151,7 +151,9 @@ def generate_camera_array(
         radius = spacing * n_cameras / (2 * np.pi)
         for a in angles:
             positions.append(
-                np.array([radius * np.cos(a), radius * np.sin(a), 0.0], dtype=np.float64)
+                np.array(
+                    [radius * np.cos(a), radius * np.sin(a), 0.0], dtype=np.float64
+                )
             )
     else:
         raise ValueError(f"Unknown layout: {layout}")

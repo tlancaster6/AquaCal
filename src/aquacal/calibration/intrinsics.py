@@ -106,9 +106,7 @@ def validate_intrinsics(
         cy = K[1, 2]
 
         # Compute r_max = distance from principal point to farthest corner
-        corners = np.array([
-            [0, 0], [w, 0], [0, h], [w, h]
-        ], dtype=np.float64)
+        corners = np.array([[0, 0], [w, 0], [0, h], [w, h]], dtype=np.float64)
         # Convert to normalized coordinates
         r_values = []
         for corner in corners:
@@ -122,7 +120,11 @@ def validate_intrinsics(
         r_samples = np.linspace(0, r_max, 200)
 
         # Compute distortion factor at each radius
-        k1, k2, p1, p2, k3 = dist_coeffs[:5] if len(dist_coeffs) >= 5 else (*dist_coeffs, *[0]*(5-len(dist_coeffs)))
+        k1, k2, p1, p2, k3 = (
+            dist_coeffs[:5]
+            if len(dist_coeffs) >= 5
+            else (*dist_coeffs, *[0] * (5 - len(dist_coeffs)))
+        )
 
         # For 8-coeff rational model
         if len(dist_coeffs) == 8:
@@ -132,7 +134,9 @@ def validate_intrinsics(
             distortion_factor = numerator / denominator
         else:
             # 5-coeff model
-            distortion_factor = 1 + k1 * r_samples**2 + k2 * r_samples**4 + k3 * r_samples**6
+            distortion_factor = (
+                1 + k1 * r_samples**2 + k2 * r_samples**4 + k3 * r_samples**6
+            )
 
         # Check for negative values
         if np.any(distortion_factor < 0):
@@ -150,9 +154,13 @@ def validate_intrinsics(
                 # Check if any decrease is > 5% of previous value
                 for i in range(len(diffs)):
                     if diffs[i] < 0:
-                        pct_decrease = abs(diffs[i]) / abs(distortion_factor[i]) if distortion_factor[i] != 0 else 0
+                        pct_decrease = (
+                            abs(diffs[i]) / abs(distortion_factor[i])
+                            if distortion_factor[i] != 0
+                            else 0
+                        )
                         if pct_decrease > 0.05:
-                            r_val = r_samples[i+1]
+                            r_val = r_samples[i + 1]
                             warnings.append(
                                 f"[{camera_name}] Distortion model is non-monotonic at r={r_val:.3f} "
                                 f"(image covers r_max={r_max:.3f}). Model is ill-conditioned."
@@ -170,7 +178,7 @@ def validate_intrinsics(
         if pct_fx > fx_tolerance_fraction:
             warnings.append(
                 f"[{camera_name}] Calibrated fx={fx_actual:.1f} differs from expected "
-                f"{expected_fx:.1f} by {pct_fx*100:.0f}% (tolerance: {fx_tolerance_fraction*100:.0f}%)."
+                f"{expected_fx:.1f} by {pct_fx * 100:.0f}% (tolerance: {fx_tolerance_fraction * 100:.0f}%)."
             )
 
         # Check fy similarly
@@ -179,7 +187,7 @@ def validate_intrinsics(
         if pct_fy > fx_tolerance_fraction:
             warnings.append(
                 f"[{camera_name}] Calibrated fy={fy_actual:.1f} differs from expected "
-                f"{expected_fx:.1f} by {pct_fy*100:.0f}% (tolerance: {fx_tolerance_fraction*100:.0f}%)."
+                f"{expected_fx:.1f} by {pct_fy * 100:.0f}% (tolerance: {fx_tolerance_fraction * 100:.0f}%)."
             )
 
     return warnings
@@ -264,8 +272,7 @@ def calibrate_intrinsics_single(
 
     if len(selected) < 4:
         raise ValueError(
-            f"Insufficient frames for calibration: {len(selected)} "
-            f"(need at least 4)"
+            f"Insufficient frames for calibration: {len(selected)} (need at least 4)"
         )
 
     if fisheye and rational_model:
@@ -273,7 +280,7 @@ def calibrate_intrinsics_single(
 
     # Prepare data for OpenCV calibration
     object_points = []  # 3D points in board frame
-    image_points = []   # 2D points in image
+    image_points = []  # 2D points in image
 
     for corner_ids, corners_2d in selected:
         obj_pts = board.get_corner_array(corner_ids)
@@ -289,8 +296,7 @@ def calibrate_intrinsics_single(
         D_init = np.zeros((4, 1), dtype=np.float64)
 
         fisheye_flags = (
-            cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC
-            + cv2.fisheye.CALIB_CHECK_COND
+            cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC + cv2.fisheye.CALIB_CHECK_COND
         )
 
         try:

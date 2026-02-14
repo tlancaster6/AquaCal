@@ -36,6 +36,7 @@ class BoardConfig:
         legacy_pattern: If True, board uses legacy ChArUco pattern with marker in top-left cell.
             Default False (new pattern with solid square in top-left cell)
     """
+
     squares_x: int
     squares_y: int
     square_size: float  # meters
@@ -55,6 +56,7 @@ class CameraIntrinsics:
         image_size: Image dimensions as (width, height) in pixels
         is_fisheye: If True, uses equidistant fisheye projection model
     """
+
     K: Mat3  # 3x3 intrinsic matrix
     dist_coeffs: NDArray[np.float64]  # pinhole: length 5 or 8; fisheye: length 4
     image_size: tuple[int, int]  # (width, height)
@@ -71,6 +73,7 @@ class CameraExtrinsics:
         R: 3x3 rotation matrix, world -> camera
         t: 3x1 translation vector, world -> camera
     """
+
     R: Mat3  # 3x3 rotation matrix, world -> camera
     t: Vec3  # 3x1 translation vector
 
@@ -98,6 +101,7 @@ class CameraCalibration:
         is_auxiliary: If True, this camera was registered post-hoc against
             fixed board poses (excluded from joint Stage 3/4 optimization).
     """
+
     name: str
     intrinsics: CameraIntrinsics
     extrinsics: CameraExtrinsics
@@ -117,6 +121,7 @@ class InterfaceParams:
         n_air: Refractive index of air (default 1.0)
         n_water: Refractive index of water (default 1.333 for fresh water at 20°C)
     """
+
     normal: Vec3  # unit vector, points from water toward air (typically [0, 0, -1])
     n_air: float = 1.0
     n_water: float = 1.333
@@ -133,6 +138,7 @@ class CalibrationResult:
         diagnostics: Calibration quality metrics
         metadata: Metadata for reproducibility
     """
+
     cameras: dict[str, CameraCalibration]
     interface: InterfaceParams
     board: BoardConfig
@@ -152,6 +158,7 @@ class DiagnosticsData:
         per_corner_residuals: Optional (N, 2) array of pixel errors for each corner
         per_frame_errors: Optional dict mapping frame index to error value
     """
+
     reprojection_error_rms: float  # pixels (primary cameras only)
     reprojection_error_per_camera: dict[str, float]  # primary cameras only
     validation_3d_error_mean: float  # meters (primary cameras only)
@@ -171,6 +178,7 @@ class CalibrationMetadata:
         num_frames_used: Number of frames used in calibration
         num_frames_holdout: Number of frames held out for validation
     """
+
     calibration_date: str
     software_version: str
     config_hash: str
@@ -226,6 +234,7 @@ class CalibrationConfig:
             controls primary camera refinement in Stage 4). Distortion coefficients
             are NOT refined.
     """
+
     board: BoardConfig
     camera_names: list[str]
     intrinsic_video_paths: dict[str, Path]
@@ -240,7 +249,9 @@ class CalibrationConfig:
     min_corners_per_frame: int = 8
     min_cameras_per_frame: int = 2
     frame_step: int = 1  # Process every Nth frame (1 = all frames)
-    holdout_fraction: float = 0.2  # Random selection; frames are held out entirely (not per-detection)
+    holdout_fraction: float = (
+        0.2  # Random selection; frames are held out entirely (not per-detection)
+    )
     max_calibration_frames: int | None = None  # None = no limit, use all frames
     refine_intrinsics: bool = False
     refine_auxiliary_intrinsics: bool = False  # If True, Stage 4b refines auxiliary camera intrinsics (fx, fy, cx, cy) alongside extrinsics. Requires auxiliary_cameras to be set. Independent of refine_intrinsics (which controls primary camera refinement in Stage 4). Distortion coefficients are NOT refined.
@@ -260,6 +271,7 @@ class BoardPose:
         rvec: Rodrigues rotation vector (3,)
         tvec: Translation vector (3,)
     """
+
     frame_idx: int
     rvec: Vec3  # Rodrigues rotation vector
     tvec: Vec3  # translation vector
@@ -273,6 +285,7 @@ class Detection:
         corner_ids: Array of corner IDs detected, shape (N,)
         corners_2d: Array of 2D corner positions in pixels, shape (N, 2)
     """
+
     corner_ids: NDArray[np.int32]  # shape (N,)
     corners_2d: NDArray[np.float64]  # shape (N, 2)
 
@@ -294,6 +307,7 @@ class FrameDetections:
         frame_idx: Frame index in the video sequence
         detections: Dict mapping camera names to Detection objects
     """
+
     frame_idx: int
     detections: dict[str, Detection]  # camera_name -> Detection
 
@@ -325,6 +339,7 @@ class DetectionResult:
         camera_names: List of all camera names in the dataset
         total_frames: Total number of frames processed
     """
+
     frames: dict[int, FrameDetections]  # frame_idx -> FrameDetections
     camera_names: list[str]
     total_frames: int
@@ -343,21 +358,26 @@ class DetectionResult:
 
 # --- Custom Exceptions ---
 
+
 class CalibrationError(Exception):
     """Base class for calibration-related errors."""
+
     pass
 
 
 class InsufficientDataError(CalibrationError):
     """Raised when there isn't enough data for calibration."""
+
     pass
 
 
 class ConvergenceError(CalibrationError):
     """Raised when optimization fails to converge."""
+
     pass
 
 
 class ConnectivityError(CalibrationError):
     """Raised when pose graph is not connected (cameras cannot be linked)."""
+
     pass

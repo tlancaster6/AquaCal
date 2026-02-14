@@ -245,7 +245,10 @@ def compute_3d_distance_errors(
                 frame_had_measurements = True
 
                 if per_pair is not None:
-                    pair_key = (id1, id2)  # Already in order from get_adjacent_corner_pairs
+                    pair_key = (
+                        id1,
+                        id2,
+                    )  # Already in order from get_adjacent_corner_pairs
                     # Keep worst absolute error for each pair across frames
                     abs_error = abs(signed_error)
                     if pair_key not in per_pair or abs_error > abs(per_pair[pair_key]):
@@ -468,9 +471,13 @@ def compute_xy_error_grids(
         # Select measurements in this depth bin
         if d == n_depth_bins - 1:
             # Last bin: include right edge
-            depth_mask = (z_values >= depth_bin_edges[d]) & (z_values <= depth_bin_edges[d + 1])
+            depth_mask = (z_values >= depth_bin_edges[d]) & (
+                z_values <= depth_bin_edges[d + 1]
+            )
         else:
-            depth_mask = (z_values >= depth_bin_edges[d]) & (z_values < depth_bin_edges[d + 1])
+            depth_mask = (z_values >= depth_bin_edges[d]) & (
+                z_values < depth_bin_edges[d + 1]
+            )
 
         if not np.any(depth_mask):
             continue  # No measurements in this depth bin

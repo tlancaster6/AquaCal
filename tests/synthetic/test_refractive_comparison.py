@@ -38,9 +38,9 @@ class TestExperiment1:
 
         for cam, errs in errors.items():
             focal_err = abs(errs["focal_length_error_pct"])
-            assert (
-                focal_err < 0.5
-            ), f"Refractive focal error for {cam} is {focal_err:.2f}% (threshold 0.5%)"
+            assert focal_err < 0.5, (
+                f"Refractive focal error for {cam} is {focal_err:.2f}% (threshold 0.5%)"
+            )
 
     def test_nonrefractive_focal_length_error_large(self, experiment_results):
         """Non-refractive model should show focal length bias."""
@@ -63,9 +63,9 @@ class TestExperiment1:
 
         for cam, errs in errors.items():
             z_err = abs(errs["z_position_error_mm"])
-            assert (
-                z_err < 5.0
-            ), f"Refractive Z error for {cam} is {z_err:.2f}mm (threshold 5mm)"
+            assert z_err < 5.0, (
+                f"Refractive Z error for {cam} is {z_err:.2f}mm (threshold 5mm)"
+            )
 
     def test_nonrefractive_z_error_large(self, experiment_results):
         """Non-refractive model should show Z position bias."""
@@ -74,9 +74,9 @@ class TestExperiment1:
 
         # Mean Z error should exceed 10mm
         mean_z_err = np.mean([abs(e["z_position_error_mm"]) for e in errors.values()])
-        assert (
-            mean_z_err > 10.0
-        ), f"Non-refractive mean Z error is {mean_z_err:.2f}mm (threshold 10mm)"
+        assert mean_z_err > 10.0, (
+            f"Non-refractive mean Z error is {mean_z_err:.2f}mm (threshold 10mm)"
+        )
 
     def test_xy_error_similar(self, experiment_results):
         """XY position should be similar for both models (not affected by refraction)."""
@@ -88,10 +88,12 @@ class TestExperiment1:
             xy_err_refr = errors_refr[cam]["xy_position_error_mm"]
             xy_err_nonrefr = errors_nonrefr[cam]["xy_position_error_mm"]
 
-            assert xy_err_refr < 15.0, f"Refractive XY error for {cam} is {xy_err_refr:.2f}mm"
-            assert (
-                xy_err_nonrefr < 15.0
-            ), f"Non-refractive XY error for {cam} is {xy_err_nonrefr:.2f}mm"
+            assert xy_err_refr < 15.0, (
+                f"Refractive XY error for {cam} is {xy_err_refr:.2f}mm"
+            )
+            assert xy_err_nonrefr < 15.0, (
+                f"Non-refractive XY error for {cam} is {xy_err_nonrefr:.2f}mm"
+            )
 
     def test_plots_created(self, experiment_results):
         """All expected plots should be created."""
@@ -128,9 +130,9 @@ class TestExperiment2:
         signed_means = [r["signed_mean_mm"] for r in results["results_refractive"]]
 
         error_range = max(signed_means) - min(signed_means)
-        assert (
-            error_range < 0.5
-        ), f"Refractive signed error range is {error_range:.2f}mm (threshold 0.5mm)"
+        assert error_range < 0.5, (
+            f"Refractive signed error range is {error_range:.2f}mm (threshold 0.5mm)"
+        )
 
     def test_nonrefractive_depth_dependent(self, experiment_results):
         """Non-refractive model should show depth-dependent bias."""
@@ -138,21 +140,21 @@ class TestExperiment2:
         signed_means = [r["signed_mean_mm"] for r in results["results_nonrefractive"]]
 
         error_range = max(signed_means) - min(signed_means)
-        assert (
-            error_range > 1.0
-        ), f"Non-refractive signed error range is {error_range:.2f}mm (threshold 1mm)"
+        assert error_range > 1.0, (
+            f"Non-refractive signed error range is {error_range:.2f}mm (threshold 1mm)"
+        )
 
     def test_refractive_rmse_stable(self, experiment_results):
         """Refractive model should have stable RMSE across depths."""
         results, _ = experiment_results
-        rmse_values = [r["rmse_mm"] for r in results["results_refractive"]]
+        _rmse_values = [r["rmse_mm"] for r in results["results_refractive"]]
 
         for depth_result in results["results_refractive"]:
             rmse = depth_result["rmse_mm"]
             depth = depth_result["depth"]
-            assert (
-                rmse < 1.0
-            ), f"Refractive RMSE at depth {depth}m is {rmse:.2f}mm (threshold 1mm)"
+            assert rmse < 1.0, (
+                f"Refractive RMSE at depth {depth}m is {rmse:.2f}mm (threshold 1mm)"
+            )
 
     def test_scale_factor_refractive_near_one(self, experiment_results):
         """Refractive model should have scale factor near 1.0 at all depths."""
@@ -202,9 +204,9 @@ class TestExperiment3:
         for depth_result in results["results_refractive"]:
             rmse = depth_result["rmse_mm"]
             depth = depth_result["depth"]
-            assert (
-                rmse < 1.0
-            ), f"Refractive RMSE at depth {depth}m is {rmse:.2f}mm (threshold 1mm)"
+            assert rmse < 1.0, (
+                f"Refractive RMSE at depth {depth}m is {rmse:.2f}mm (threshold 1mm)"
+            )
 
     def test_nonrefractive_rmse_grows(self, experiment_results):
         """Non-refractive model RMSE should grow with depth."""
@@ -224,7 +226,9 @@ class TestExperiment3:
         """Non-refractive focal error should grow with calibration depth."""
         results, _ = experiment_results
 
-        focal_at_shallow = results["results_nonrefractive"][0]["focal_err_pct"]  # Z=0.85m
+        focal_at_shallow = results["results_nonrefractive"][0][
+            "focal_err_pct"
+        ]  # Z=0.85m
         focal_at_deep = results["results_nonrefractive"][-1]["focal_err_pct"]  # Z=2.5m
 
         assert focal_at_deep > focal_at_shallow, (

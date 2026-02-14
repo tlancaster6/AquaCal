@@ -15,7 +15,7 @@ def board_config():
         squares_y=6,
         square_size=0.03,  # 3cm
         marker_size=0.022,
-        dictionary="DICT_4X4_50"
+        dictionary="DICT_4X4_50",
     )
 
 
@@ -30,34 +30,24 @@ class TestBoardGeometry:
     def test_corner_0_at_origin(self, board_config):
         """Corner 0 should be at origin."""
         board = BoardGeometry(board_config)
-        np.testing.assert_allclose(
-            board.corner_positions[0],
-            np.array([0, 0, 0])
-        )
+        np.testing.assert_allclose(board.corner_positions[0], np.array([0, 0, 0]))
 
     def test_corner_1_position(self, board_config):
         """Corner 1 should be one square_size to the right."""
         board = BoardGeometry(board_config)
-        np.testing.assert_allclose(
-            board.corner_positions[1],
-            np.array([0.03, 0, 0])
-        )
+        np.testing.assert_allclose(board.corner_positions[1], np.array([0.03, 0, 0]))
 
     def test_corner_7_position(self, board_config):
         """Corner 7 (first of second row) should be one square_size down."""
         board = BoardGeometry(board_config)
-        np.testing.assert_allclose(
-            board.corner_positions[7],
-            np.array([0, 0.03, 0])
-        )
+        np.testing.assert_allclose(board.corner_positions[7], np.array([0, 0.03, 0]))
 
     def test_last_corner_position(self, board_config):
         """Last corner (ID 34) should be at bottom-right."""
         board = BoardGeometry(board_config)
         # 7x5 grid, so last corner is at (6, 4) in grid coordinates
         np.testing.assert_allclose(
-            board.corner_positions[34],
-            np.array([6 * 0.03, 4 * 0.03, 0])
+            board.corner_positions[34], np.array([6 * 0.03, 4 * 0.03, 0])
         )
 
     def test_all_corners_have_z_zero(self, board_config):
@@ -82,7 +72,7 @@ class TestBoardGeometry:
                 transformed[corner_id],
                 pos,
                 rtol=1e-10,
-                err_msg=f"Corner {corner_id} not preserved under identity transform"
+                err_msg=f"Corner {corner_id} not preserved under identity transform",
             )
 
     def test_transform_translation(self, board_config):
@@ -95,7 +85,7 @@ class TestBoardGeometry:
                 transformed[corner_id],
                 pos + tvec,
                 rtol=1e-10,
-                err_msg=f"Corner {corner_id} not correctly translated"
+                err_msg=f"Corner {corner_id} not correctly translated",
             )
 
     def test_transform_rotation_90deg(self, board_config):
@@ -107,11 +97,7 @@ class TestBoardGeometry:
 
         # After 90deg rotation about Z: [x, y, z] -> [-y, x, z]
         # Corner 1 at [0.03, 0, 0] should go to [0, 0.03, 0]
-        np.testing.assert_allclose(
-            transformed[1],
-            np.array([0, 0.03, 0]),
-            atol=1e-10
-        )
+        np.testing.assert_allclose(transformed[1], np.array([0, 0.03, 0]), atol=1e-10)
 
     def test_get_corner_array_shape(self, board_config):
         """get_corner_array should return (N, 3) array."""
@@ -167,15 +153,14 @@ class TestBoardGeometry:
             squares_y=4,
             square_size=0.05,
             marker_size=0.04,
-            dictionary="DICT_5X5_100"
+            dictionary="DICT_5X5_100",
         )
         board = BoardGeometry(config)
 
         assert board.num_corners == 4 * 3  # 12 corners
         # Last corner should be at (3*0.05, 2*0.05, 0)
         np.testing.assert_allclose(
-            board.corner_positions[11],
-            np.array([3 * 0.05, 2 * 0.05, 0])
+            board.corner_positions[11], np.array([3 * 0.05, 2 * 0.05, 0])
         )
 
     def test_corner_positions_property_returns_same_dict(self, board_config):

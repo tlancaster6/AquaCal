@@ -278,7 +278,9 @@ def generate_recommendations(
             f"Primary reprojection RMS ({reprojection.rms:.2f} px) is excellent (<0.5 px)"
         )
     elif reprojection.rms < 1.0:
-        recs.append(f"Primary reprojection RMS ({reprojection.rms:.2f} px) is good (<1.0 px)")
+        recs.append(
+            f"Primary reprojection RMS ({reprojection.rms:.2f} px) is good (<1.0 px)"
+        )
     else:
         recs.append(
             f"Primary reprojection RMS ({reprojection.rms:.2f} px) is elevated - review calibration"
@@ -296,7 +298,11 @@ def generate_recommendations(
     # Auxiliary camera check
     if auxiliary_reprojection and auxiliary_reprojection.per_camera:
         aux_mean = np.mean(list(auxiliary_reprojection.per_camera.values()))
-        primary_mean = np.mean(list(reprojection.per_camera.values())) if reprojection.per_camera else 0.0
+        primary_mean = (
+            np.mean(list(reprojection.per_camera.values()))
+            if reprojection.per_camera
+            else 0.0
+        )
         if aux_mean > primary_mean * 2.0 and primary_mean > 0:
             recs.append(
                 f"Auxiliary cameras have higher error (mean {aux_mean:.2f} px vs primary {primary_mean:.2f} px) - "
@@ -307,15 +313,15 @@ def generate_recommendations(
     if reconstruction.num_comparisons > 0:
         if reconstruction.mean < 0.001:
             recs.append(
-                f"3D reconstruction error ({reconstruction.mean*1000:.2f} mm) is excellent"
+                f"3D reconstruction error ({reconstruction.mean * 1000:.2f} mm) is excellent"
             )
         elif reconstruction.mean < 0.002:
             recs.append(
-                f"3D reconstruction error ({reconstruction.mean*1000:.2f} mm) is good"
+                f"3D reconstruction error ({reconstruction.mean * 1000:.2f} mm) is good"
             )
         else:
             recs.append(
-                f"3D reconstruction error ({reconstruction.mean*1000:.2f} mm) is elevated"
+                f"3D reconstruction error ({reconstruction.mean * 1000:.2f} mm) is elevated"
             )
 
         # Scale bias detection
@@ -351,12 +357,12 @@ def generate_recommendations(
         water_z = camera_heights["water_z"]
 
         recs.append(
-            f"Camera heights above water: mean {mean_height*1000:.1f} mm, spread {height_spread*1000:.1f} mm"
+            f"Camera heights above water: mean {mean_height * 1000:.1f} mm, spread {height_spread * 1000:.1f} mm"
         )
 
         if height_spread > 0.05:
             recs.append(
-                f"Camera height spread ({height_spread*1000:.1f} mm) is large - check camera mounting"
+                f"Camera height spread ({height_spread * 1000:.1f} mm) is large - check camera mounting"
             )
 
     return recs
@@ -405,7 +411,10 @@ def generate_diagnostic_report(
 
     # Generate recommendations (includes auxiliary camera check)
     recommendations = generate_recommendations(
-        reprojection_errors, reconstruction_errors, depth_errors, camera_heights,
+        reprojection_errors,
+        reconstruction_errors,
+        depth_errors,
+        camera_heights,
         auxiliary_reprojection,
     )
 

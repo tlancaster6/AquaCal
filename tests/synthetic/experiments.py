@@ -822,7 +822,7 @@ def _plot_single_xy_heatmap(
                 grid[j, i] = np.mean(signed_errors[mask])
 
     # Plot heatmap
-    im = ax.imshow(
+    _im = ax.imshow(
         grid,
         origin="lower",
         extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],

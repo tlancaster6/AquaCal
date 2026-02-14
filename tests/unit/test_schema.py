@@ -60,7 +60,7 @@ class TestBoardConfig:
             squares_y=7,
             square_size=0.04,
             marker_size=0.03,
-            dictionary="DICT_4X4_50"
+            dictionary="DICT_4X4_50",
         )
         assert board.squares_x == 5
         assert board.squares_y == 7
@@ -122,7 +122,7 @@ class TestCameraCalibration:
             name="cam0",
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distance=0.12
+            interface_distance=0.12,
         )
 
         assert calib.name == "cam0"
@@ -144,9 +144,7 @@ class TestInterfaceParams:
     def test_custom_values(self):
         """Should allow custom refractive indices."""
         interface = InterfaceParams(
-            normal=np.array([0.0, 0.0, -1.0]),
-            n_air=1.0,
-            n_water=1.34
+            normal=np.array([0.0, 0.0, -1.0]), n_air=1.0, n_water=1.34
         )
         assert interface.n_water == 1.34
 
@@ -160,7 +158,7 @@ class TestDiagnosticsData:
             reprojection_error_rms=0.5,
             reprojection_error_per_camera={"cam0": 0.4, "cam1": 0.6},
             validation_3d_error_mean=0.002,
-            validation_3d_error_std=0.001
+            validation_3d_error_std=0.001,
         )
         assert diag.reprojection_error_rms == 0.5
         assert diag.per_corner_residuals is None
@@ -177,7 +175,7 @@ class TestDiagnosticsData:
             validation_3d_error_mean=0.002,
             validation_3d_error_std=0.001,
             per_corner_residuals=residuals,
-            per_frame_errors=frame_errors
+            per_frame_errors=frame_errors,
         )
         assert diag.per_corner_residuals.shape == (100, 2)
         assert diag.per_frame_errors[1] == 0.4
@@ -193,7 +191,7 @@ class TestCalibrationMetadata:
             software_version="0.1.0",
             config_hash="abc123",
             num_frames_used=50,
-            num_frames_holdout=10
+            num_frames_holdout=10,
         )
         assert meta.calibration_date == "2026-02-03"
         assert meta.software_version == "0.1.0"
@@ -212,7 +210,7 @@ class TestCalibrationConfig:
             camera_names=["cam0", "cam1"],
             intrinsic_video_paths={"cam0": Path("cam0_int.mp4")},
             extrinsic_video_paths={"cam0": Path("cam0_ext.mp4")},
-            output_dir=Path("output")
+            output_dir=Path("output"),
         )
 
         assert config.n_air == 1.0
@@ -233,7 +231,7 @@ class TestCalibrationConfig:
             output_dir=Path("."),
             n_water=1.34,
             robust_loss="soft_l1",
-            min_corners_per_frame=10
+            min_corners_per_frame=10,
         )
 
         assert config.n_water == 1.34
@@ -252,7 +250,7 @@ class TestCalibrationResult:
             reprojection_error_rms=0.5,
             reprojection_error_per_camera={},
             validation_3d_error_mean=0.002,
-            validation_3d_error_std=0.001
+            validation_3d_error_std=0.001,
         )
         meta = CalibrationMetadata("2026-02-03", "0.1.0", "abc", 50, 10)
 
@@ -261,7 +259,7 @@ class TestCalibrationResult:
             interface=interface,
             board=board,
             diagnostics=diag,
-            metadata=meta
+            metadata=meta,
         )
 
         assert result.board == board
@@ -276,9 +274,7 @@ class TestBoardPose:
     def test_creation(self):
         """Should create valid board pose."""
         pose = BoardPose(
-            frame_idx=5,
-            rvec=np.array([0.1, 0.2, 0.3]),
-            tvec=np.array([1.0, 2.0, 3.0])
+            frame_idx=5, rvec=np.array([0.1, 0.2, 0.3]), tvec=np.array([1.0, 2.0, 3.0])
         )
         assert pose.frame_idx == 5
         assert pose.rvec.shape == (3,)
@@ -292,7 +288,7 @@ class TestDetection:
         """Should compute number of corners correctly."""
         det = Detection(
             corner_ids=np.array([0, 1, 2, 3]),
-            corners_2d=np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64)
+            corners_2d=np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float64),
         )
         assert det.num_corners == 4
 
@@ -300,7 +296,7 @@ class TestDetection:
         """Should handle empty detection."""
         det = Detection(
             corner_ids=np.array([], dtype=np.int32),
-            corners_2d=np.array([], dtype=np.float64).reshape(0, 2)
+            corners_2d=np.array([], dtype=np.float64).reshape(0, 2),
         )
         assert det.num_corners == 0
 
@@ -312,16 +308,15 @@ class TestFrameDetections:
         """Should return list of camera names."""
         det0 = Detection(
             corner_ids=np.array([0, 1]),
-            corners_2d=np.array([[0, 0], [1, 0]], dtype=np.float64)
+            corners_2d=np.array([[0, 0], [1, 0]], dtype=np.float64),
         )
         det1 = Detection(
             corner_ids=np.array([0, 1]),
-            corners_2d=np.array([[0, 0], [1, 0]], dtype=np.float64)
+            corners_2d=np.array([[0, 0], [1, 0]], dtype=np.float64),
         )
 
         frame_det = FrameDetections(
-            frame_idx=0,
-            detections={"cam0": det0, "cam1": det1}
+            frame_idx=0, detections={"cam0": det0, "cam1": det1}
         )
 
         cameras = frame_det.cameras_with_detections
@@ -332,13 +327,11 @@ class TestFrameDetections:
     def test_num_cameras(self):
         """Should count cameras with detections."""
         det0 = Detection(
-            corner_ids=np.array([0]),
-            corners_2d=np.array([[0, 0]], dtype=np.float64)
+            corner_ids=np.array([0]), corners_2d=np.array([[0, 0]], dtype=np.float64)
         )
 
         frame_det = FrameDetections(
-            frame_idx=0,
-            detections={"cam0": det0, "cam1": det0, "cam2": det0}
+            frame_idx=0, detections={"cam0": det0, "cam1": det0, "cam2": det0}
         )
 
         assert frame_det.num_cameras == 3
@@ -356,8 +349,7 @@ class TestDetectionResult:
     def test_get_frames_with_min_cameras(self):
         """Should filter frames by minimum camera count."""
         det = Detection(
-            corner_ids=np.array([0]),
-            corners_2d=np.array([[0, 0]], dtype=np.float64)
+            corner_ids=np.array([0]), corners_2d=np.array([[0, 0]], dtype=np.float64)
         )
 
         # Frame 0: 1 camera
@@ -370,9 +362,7 @@ class TestDetectionResult:
         }
 
         result = DetectionResult(
-            frames=frames,
-            camera_names=["cam0", "cam1", "cam2"],
-            total_frames=10
+            frames=frames, camera_names=["cam0", "cam1", "cam2"], total_frames=10
         )
 
         # Test different thresholds
@@ -383,11 +373,7 @@ class TestDetectionResult:
 
     def test_empty_result(self):
         """Should handle detection result with no frames."""
-        result = DetectionResult(
-            frames={},
-            camera_names=["cam0"],
-            total_frames=0
-        )
+        result = DetectionResult(frames={}, camera_names=["cam0"], total_frames=0)
         assert result.get_frames_with_min_cameras(1) == []
 
 
@@ -450,6 +436,7 @@ class TestPublicAPI:
             run_calibration,
             load_config,
         )
+
         # Verify they're the real objects, not None
         assert callable(load_calibration)
         assert callable(save_calibration)
@@ -459,6 +446,7 @@ class TestPublicAPI:
     def test_version_string(self):
         """__version__ is a non-empty string."""
         import aquacal
+
         assert isinstance(aquacal.__version__, str)
         assert len(aquacal.__version__) > 0
 
@@ -467,4 +455,5 @@ class TestPublicAPI:
         from aquacal.core import Camera, Interface, refractive_project
         from aquacal.calibration import optimize_interface
         from aquacal.triangulation import triangulate_point
+
         assert callable(refractive_project)

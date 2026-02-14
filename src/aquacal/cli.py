@@ -202,13 +202,19 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"Error: Intrinsic directory not found: {intrinsic_dir}", file=sys.stderr)
         return 1
     if not intrinsic_dir.is_dir():
-        print(f"Error: Intrinsic path is not a directory: {intrinsic_dir}", file=sys.stderr)
+        print(
+            f"Error: Intrinsic path is not a directory: {intrinsic_dir}",
+            file=sys.stderr,
+        )
         return 1
     if not extrinsic_dir.exists():
         print(f"Error: Extrinsic directory not found: {extrinsic_dir}", file=sys.stderr)
         return 1
     if not extrinsic_dir.is_dir():
-        print(f"Error: Extrinsic path is not a directory: {extrinsic_dir}", file=sys.stderr)
+        print(
+            f"Error: Extrinsic path is not a directory: {extrinsic_dir}",
+            file=sys.stderr,
+        )
         return 1
 
     # Check output file doesn't already exist
@@ -225,7 +231,10 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     n_groups = regex.groups
     if n_groups != 1:
-        print(f"Error: Regex must have exactly one capture group, found {n_groups}", file=sys.stderr)
+        print(
+            f"Error: Regex must have exactly one capture group, found {n_groups}",
+            file=sys.stderr,
+        )
         return 1
 
     # Scan directories for video files
@@ -254,10 +263,16 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     # Check for empty results
     if not intrinsic_files:
-        print(f"Error: No video files found in intrinsic directory: {intrinsic_dir}", file=sys.stderr)
+        print(
+            f"Error: No video files found in intrinsic directory: {intrinsic_dir}",
+            file=sys.stderr,
+        )
         return 1
     if not extrinsic_files:
-        print(f"Error: No video files found in extrinsic directory: {extrinsic_dir}", file=sys.stderr)
+        print(
+            f"Error: No video files found in extrinsic directory: {extrinsic_dir}",
+            file=sys.stderr,
+        )
         return 1
 
     # Compute intersection and check for mismatches
@@ -266,7 +281,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     intersection = intrinsic_cameras & extrinsic_cameras
 
     if not intersection:
-        print("Error: No common camera names found between directories", file=sys.stderr)
+        print(
+            "Error: No common camera names found between directories", file=sys.stderr
+        )
         print(f"  Intrinsic cameras: {sorted(intrinsic_cameras)}", file=sys.stderr)
         print(f"  Extrinsic cameras: {sorted(extrinsic_cameras)}", file=sys.stderr)
         return 1
@@ -287,7 +304,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     camera_names = sorted(intersection)
 
     # Generate config YAML content
-    config_content = _generate_config_yaml(camera_names, intrinsic_files, extrinsic_files, output_path)
+    config_content = _generate_config_yaml(
+        camera_names, intrinsic_files, extrinsic_files, output_path
+    )
 
     # Write to file
     try:
@@ -319,7 +338,10 @@ def cmd_compare(args: argparse.Namespace) -> int:
 
     # Validate minimum 2 directories
     if len(directories) < 2:
-        print(f"Error: Need at least 2 directories to compare, got {len(directories)}", file=sys.stderr)
+        print(
+            f"Error: Need at least 2 directories to compare, got {len(directories)}",
+            file=sys.stderr,
+        )
         return 1
 
     # Check all directories exist
@@ -420,7 +442,12 @@ def cmd_compare(args: argparse.Namespace) -> int:
 
     # Print summary
     print(f"Comparing {len(results)} calibration runs...")
-    loaded_info = ", ".join([f"{label} ({len(result.cameras)} cameras)" for label, result in zip(labels, results)])
+    loaded_info = ", ".join(
+        [
+            f"{label} ({len(result.cameras)} cameras)"
+            for label, result in zip(labels, results)
+        ]
+    )
     print(f"Loaded: {loaded_info}\n")
 
     print(f"Results written to {output_dir}/")
@@ -486,78 +513,90 @@ def _generate_config_yaml(
     for cam in camera_names:
         lines.append(f"  - {cam}")
 
-    lines.extend([
-        "",
-        "# Optional: cameras needing 8-coefficient rational distortion model",
-        "# Use for wide-angle lenses where the standard 5-coefficient model is insufficient",
-        "# rational_model_cameras:",
-    ])
+    lines.extend(
+        [
+            "",
+            "# Optional: cameras needing 8-coefficient rational distortion model",
+            "# Use for wide-angle lenses where the standard 5-coefficient model is insufficient",
+            "# rational_model_cameras:",
+        ]
+    )
 
     for cam in camera_names:
         lines.append(f"  # - {cam}")
 
-    lines.extend([
-        "",
-        "# Optional: auxiliary cameras (registered post-hoc, excluded from joint optimization)",
-        "# Move camera names from 'cameras' to here if they should not participate in Stage 3",
-        "# auxiliary_cameras:",
-    ])
+    lines.extend(
+        [
+            "",
+            "# Optional: auxiliary cameras (registered post-hoc, excluded from joint optimization)",
+            "# Move camera names from 'cameras' to here if they should not participate in Stage 3",
+            "# auxiliary_cameras:",
+        ]
+    )
 
     for cam in camera_names:
         lines.append(f"  # - {cam}")
 
-    lines.extend([
-        "",
-        "paths:",
-        "  intrinsic_videos:",
-    ])
+    lines.extend(
+        [
+            "",
+            "paths:",
+            "  intrinsic_videos:",
+        ]
+    )
 
     for cam in camera_names:
         path_str = str(intrinsic_files[cam]).replace("\\", "/")
         lines.append(f'    {cam}: "{path_str}"')
 
-    lines.extend([
-        "  extrinsic_videos:",
-    ])
+    lines.extend(
+        [
+            "  extrinsic_videos:",
+        ]
+    )
 
     for cam in camera_names:
         path_str = str(extrinsic_files[cam]).replace("\\", "/")
         lines.append(f'    {cam}: "{path_str}"')
 
-    lines.extend([
-        f'  output_dir: "{str(config_path.resolve().parent / "output").replace(chr(92), "/")}"',
-        "",
-        "interface:",
-        "  n_air: 1.0             # Refractive index of air",
-        "  n_water: 1.333         # Refractive index of water (fresh water at 20C)",
-        "  normal_fixed: false    # If true, assume reference camera is perpendicular to water surface",
-        "",
-        "  # Optional: approximate camera-to-water-surface distances (meters)",
-        "  # Improves Stage 3 initialization. Doesn't need to be exact (within 2-3x is fine)",
-        "  # initial_distances:",
-    ])
+    lines.extend(
+        [
+            f'  output_dir: "{str(config_path.resolve().parent / "output").replace(chr(92), "/")}"',
+            "",
+            "interface:",
+            "  n_air: 1.0             # Refractive index of air",
+            "  n_water: 1.333         # Refractive index of water (fresh water at 20C)",
+            "  normal_fixed: false    # If true, assume reference camera is perpendicular to water surface",
+            "",
+            "  # Optional: approximate camera-to-water-surface distances (meters)",
+            "  # Improves Stage 3 initialization. Doesn't need to be exact (within 2-3x is fine)",
+            "  # initial_distances:",
+        ]
+    )
 
     for cam in camera_names:
         lines.append(f"  #   {cam}: 0.20")
 
-    lines.extend([
-        "",
-        "optimization:",
-        '  robust_loss: "huber"   # Options: "huber", "soft_l1", "linear"',
-        "  loss_scale: 1.0        # Residual scale for robust loss (pixels)",
-        "  # max_calibration_frames: 150  # Max frames for Stage 3/4 (null = no limit)",
-        "  # refine_intrinsics: false  # Stage 4: refine focal lengths and principal points",
-        "",
-        "detection:",
-        "  min_corners: 8         # Minimum corners per frame to use detection",
-        "  min_cameras: 2         # Minimum cameras seeing board to use frame",
-        "  frame_step: 5          # Process every Nth frame (1 = all frames)",
-        "",
-        "validation:",
-        "  holdout_fraction: 0.2  # Fraction of frames held out for validation",
-        "  save_detailed_residuals: true  # Save per-corner residual data",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "optimization:",
+            '  robust_loss: "huber"   # Options: "huber", "soft_l1", "linear"',
+            "  loss_scale: 1.0        # Residual scale for robust loss (pixels)",
+            "  # max_calibration_frames: 150  # Max frames for Stage 3/4 (null = no limit)",
+            "  # refine_intrinsics: false  # Stage 4: refine focal lengths and principal points",
+            "",
+            "detection:",
+            "  min_corners: 8         # Minimum corners per frame to use detection",
+            "  min_cameras: 2         # Minimum cameras seeing board to use frame",
+            "  frame_step: 5          # Process every Nth frame (1 = all frames)",
+            "",
+            "validation:",
+            "  holdout_fraction: 0.2  # Fraction of frames held out for validation",
+            "  save_detailed_residuals: true  # Save per-corner residual data",
+            "",
+        ]
+    )
 
     return "\n".join(lines)
 

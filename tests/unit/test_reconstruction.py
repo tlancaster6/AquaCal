@@ -269,7 +269,7 @@ def test_triangulate_charuco_corners_basic(
         triangulated = result[cid]
         expected = corner_positions_3d[cid]
         error = np.linalg.norm(triangulated - expected)
-        assert error < 0.001, f"Corner {cid}: error {error*1000:.3f}mm > 1mm"
+        assert error < 0.001, f"Corner {cid}: error {error * 1000:.3f}mm > 1mm"
 
 
 def test_triangulate_charuco_corners_empty_frame(
@@ -374,8 +374,8 @@ def test_compute_3d_distance_errors_perfect(
     errors = compute_3d_distance_errors(calibration, detections, board_geometry)
 
     # Should have low error (< 0.1mm)
-    assert errors.mean < 0.0001, f"Mean error {errors.mean*1000:.3f}mm > 0.1mm"
-    assert errors.max_error < 0.001, f"Max error {errors.max_error*1000:.3f}mm > 1mm"
+    assert errors.mean < 0.0001, f"Mean error {errors.mean * 1000:.3f}mm > 0.1mm"
+    assert errors.max_error < 0.001, f"Max error {errors.max_error * 1000:.3f}mm > 1mm"
     assert errors.num_comparisons == 3  # Adjacent pairs: (0,1), (1,2), (2,3)
     assert errors.num_frames == 1
     # Check new fields
@@ -431,7 +431,9 @@ def test_compute_3d_distance_errors_with_noise(
 
     # With noise, error should be non-zero but reasonable
     assert errors.mean > 0.0
-    assert errors.mean < 0.020  # Less than 2 cm (reasonable for 1px noise at this distance)
+    assert (
+        errors.mean < 0.020
+    )  # Less than 2 cm (reasonable for 1px noise at this distance)
     assert errors.num_comparisons == 3  # Adjacent pairs: (0,1), (1,2), (2,3)
     assert errors.num_frames == 1
     # Check new fields exist and are reasonable
@@ -472,7 +474,9 @@ def test_compute_3d_distance_errors_multiple_frames(
         corner_positions_3d = {}
         for cid in corner_ids:
             board_pos = board_geometry.corner_positions[cid]
-            corner_positions_3d[cid] = board_pos + np.array([0.0, 0.0, 0.6 + frame_idx * 0.1])
+            corner_positions_3d[cid] = board_pos + np.array(
+                [0.0, 0.0, 0.6 + frame_idx * 0.1]
+            )
 
         frame_det = create_synthetic_detections(
             calibration, board_geometry, corner_ids, corner_positions_3d, frame_idx
@@ -534,7 +538,9 @@ def test_compute_3d_distance_errors_signed_error(
     errors = compute_3d_distance_errors(calibration, detections, board_geometry)
 
     # With 1% scale, distances should be ~1% larger
-    assert errors.signed_mean > 0, "Signed mean should be positive for overestimated distances"
+    assert errors.signed_mean > 0, (
+        "Signed mean should be positive for overestimated distances"
+    )
     expected_signed_error = 0.01 * board_config.square_size  # ~0.4mm
     assert abs(errors.signed_mean - expected_signed_error) < 0.0002  # Within 0.2mm
 

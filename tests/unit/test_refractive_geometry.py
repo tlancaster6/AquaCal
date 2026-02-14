@@ -21,7 +21,7 @@ def simple_camera():
     intrinsics = CameraIntrinsics(
         K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
         dist_coeffs=np.zeros(5),
-        image_size=(640, 480)
+        image_size=(640, 480),
     )
     extrinsics = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
     return Camera("cam0", intrinsics, extrinsics)
@@ -32,9 +32,9 @@ def simple_interface():
     """Horizontal interface at Z=0.15."""
     return Interface(
         normal=np.array([0, 0, -1]),
-        camera_distances={'cam0': 0.15},
+        camera_distances={"cam0": 0.15},
         n_air=1.0,
-        n_water=1.333
+        n_water=1.333,
     )
 
 
@@ -42,7 +42,7 @@ class TestSnellsLaw3D:
     def test_normal_incidence(self):
         """Ray perpendicular to surface passes straight through."""
         incident = np.array([0, 0, 1])  # Down (+Z)
-        normal = np.array([0, 0, -1])   # Up (water to air)
+        normal = np.array([0, 0, -1])  # Up (water to air)
         n_ratio = 1.0 / 1.333
 
         refracted = snells_law_3d(incident, normal, n_ratio)
@@ -411,16 +411,16 @@ class TestOffsetCameraRoundTrip:
         intrinsics = CameraIntrinsics(
             K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.zeros(5),
-            image_size=(640, 480)
+            image_size=(640, 480),
         )
         # Camera at X=-0.3 (t=[0.3, 0, 0] means C=[-0.3, 0, 0])
         extrinsics = CameraExtrinsics(R=np.eye(3), t=np.array([0.3, 0.0, 0.0]))
         camera = Camera("cam_offset", intrinsics, extrinsics)
         interface = Interface(
             normal=np.array([0, 0, -1]),
-            camera_distances={'cam_offset': 0.15},
+            camera_distances={"cam_offset": 0.15},
             n_air=1.0,
-            n_water=1.333
+            n_water=1.333,
         )
 
         point = np.array([0.05, 0.025, 0.30])
@@ -437,23 +437,23 @@ class TestOffsetCameraRoundTrip:
         error = np.linalg.norm(closest - point)
 
         # Should have sub-micrometer accuracy
-        assert error < 1e-9, f"Round-trip error {error*1000:.6f} mm is too large"
+        assert error < 1e-9, f"Round-trip error {error * 1000:.6f} mm is too large"
 
     def test_round_trip_offset_camera_xy(self):
         """Test round-trip with camera offset in both X and Y."""
         intrinsics = CameraIntrinsics(
             K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.zeros(5),
-            image_size=(640, 480)
+            image_size=(640, 480),
         )
         # Camera at X=0.2, Y=0.1
         extrinsics = CameraExtrinsics(R=np.eye(3), t=np.array([-0.2, -0.1, 0.0]))
         camera = Camera("cam_xy", intrinsics, extrinsics)
         interface = Interface(
             normal=np.array([0, 0, -1]),
-            camera_distances={'cam_xy': 0.15},
+            camera_distances={"cam_xy": 0.15},
             n_air=1.0,
-            n_water=1.333
+            n_water=1.333,
         )
 
         point = np.array([0.05, 0.025, 0.30])
@@ -468,21 +468,21 @@ class TestOffsetCameraRoundTrip:
         closest = origin + t * direction
         error = np.linalg.norm(closest - point)
 
-        assert error < 1e-9, f"Round-trip error {error*1000:.6f} mm is too large"
+        assert error < 1e-9, f"Round-trip error {error * 1000:.6f} mm is too large"
 
     def test_round_trip_multiple_offset_cameras(self):
         """Test round-trip consistency across multiple offset cameras."""
         intrinsics = CameraIntrinsics(
             K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.zeros(5),
-            image_size=(640, 480)
+            image_size=(640, 480),
         )
 
         camera_offsets = [
-            np.array([0.0, 0.0, 0.0]),    # Origin
-            np.array([0.3, 0.0, 0.0]),    # X offset
-            np.array([0.0, 0.3, 0.0]),    # Y offset
-            np.array([0.15, 0.2, 0.0]),   # XY offset
+            np.array([0.0, 0.0, 0.0]),  # Origin
+            np.array([0.3, 0.0, 0.0]),  # X offset
+            np.array([0.0, 0.3, 0.0]),  # Y offset
+            np.array([0.15, 0.2, 0.0]),  # XY offset
             np.array([-0.1, 0.25, 0.0]),  # Negative X
         ]
 
@@ -495,15 +495,13 @@ class TestOffsetCameraRoundTrip:
         max_error = 0.0
         for i, t_offset in enumerate(camera_offsets):
             camera = Camera(
-                f"cam{i}",
-                intrinsics,
-                CameraExtrinsics(R=np.eye(3), t=t_offset)
+                f"cam{i}", intrinsics, CameraExtrinsics(R=np.eye(3), t=t_offset)
             )
             interface = Interface(
                 normal=np.array([0, 0, -1]),
-                camera_distances={f'cam{i}': 0.15},
+                camera_distances={f"cam{i}": 0.15},
                 n_air=1.0,
-                n_water=1.333
+                n_water=1.333,
             )
 
             for point in test_points:
@@ -520,7 +518,7 @@ class TestOffsetCameraRoundTrip:
                 error = np.linalg.norm(closest - point)
                 max_error = max(max_error, error)
 
-        assert max_error < 1e-9, f"Max round-trip error {max_error*1000:.6f} mm"
+        assert max_error < 1e-9, f"Max round-trip error {max_error * 1000:.6f} mm"
 
 
 class TestRefractiveProjectFast:
@@ -571,7 +569,7 @@ class TestRefractiveProjectFast:
         intrinsics = CameraIntrinsics(
             K=np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64),
             dist_coeffs=np.zeros(5),
-            image_size=(640, 480)
+            image_size=(640, 480),
         )
 
         camera_translations = [
@@ -581,11 +579,7 @@ class TestRefractiveProjectFast:
         ]
 
         for t in camera_translations:
-            camera = Camera(
-                "cam_test",
-                intrinsics,
-                CameraExtrinsics(R=np.eye(3), t=t)
-            )
+            camera = Camera("cam_test", intrinsics, CameraExtrinsics(R=np.eye(3), t=t))
             interface = Interface(
                 normal=np.array([0, 0, -1]),
                 camera_distances={"cam_test": 0.15},
@@ -632,7 +626,7 @@ class TestRefractiveProjectFast:
         )
         point = np.array([0, 0, 0.5])
         # Should not raise - auto-selects Brent fallback
-        result = refractive_project(simple_camera, tilted, point)
+        _result = refractive_project(simple_camera, tilted, point)
         # May return None or a valid result depending on geometry
         # The key is that it doesn't raise ValueError
 
@@ -642,40 +636,36 @@ class TestRefractiveProjectBatch:
 
     def test_batch_matches_single(self, simple_camera, simple_interface):
         """Batch projection matches single-point projection."""
-        points = np.array([
-            [0.0, 0.0, 0.5],
-            [0.05, 0.02, 0.3],
-            [0.1, 0.0, 0.5],
-            [-0.05, 0.03, 0.6],
-        ])
-
-        batch_result = refractive_project_batch(
-            simple_camera, simple_interface, points
+        points = np.array(
+            [
+                [0.0, 0.0, 0.5],
+                [0.05, 0.02, 0.3],
+                [0.1, 0.0, 0.5],
+                [-0.05, 0.03, 0.6],
+            ]
         )
 
+        batch_result = refractive_project_batch(simple_camera, simple_interface, points)
+
         for i, point in enumerate(points):
-            single_result = refractive_project(
-                simple_camera, simple_interface, point
-            )
+            single_result = refractive_project(simple_camera, simple_interface, point)
             if single_result is not None:
-                np.testing.assert_allclose(
-                    batch_result[i], single_result, atol=1e-6
-                )
+                np.testing.assert_allclose(batch_result[i], single_result, atol=1e-6)
             else:
                 assert np.all(np.isnan(batch_result[i]))
 
     def test_batch_handles_invalid_points(self, simple_camera, simple_interface):
         """Batch returns NaN for invalid points."""
         z_int = simple_interface.get_interface_distance(simple_camera.name)
-        points = np.array([
-            [0.0, 0.0, 0.5],  # valid
-            [0.0, 0.0, z_int - 0.05],  # above interface
-            [0.05, 0.02, 0.3],  # valid
-        ])
-
-        result = refractive_project_batch(
-            simple_camera, simple_interface, points
+        points = np.array(
+            [
+                [0.0, 0.0, 0.5],  # valid
+                [0.0, 0.0, z_int - 0.05],  # above interface
+                [0.05, 0.02, 0.3],  # valid
+            ]
         )
+
+        result = refractive_project_batch(simple_camera, simple_interface, points)
 
         assert not np.any(np.isnan(result[0]))  # valid
         assert np.all(np.isnan(result[1]))  # invalid
@@ -694,21 +684,19 @@ class TestRefractiveProjectBatch:
     def test_batch_empty_array(self, simple_camera, simple_interface):
         """Handles empty input array."""
         points = np.zeros((0, 3))
-        result = refractive_project_batch(
-            simple_camera, simple_interface, points
-        )
+        result = refractive_project_batch(simple_camera, simple_interface, points)
         assert result.shape == (0, 2)
 
     def test_batch_point_on_axis(self, simple_camera, simple_interface):
         """Handles point directly below camera in batch."""
-        points = np.array([
-            [0.0, 0.0, 0.5],  # on axis
-            [0.05, 0.02, 0.3],  # off axis
-        ])
-
-        result = refractive_project_batch(
-            simple_camera, simple_interface, points
+        points = np.array(
+            [
+                [0.0, 0.0, 0.5],  # on axis
+                [0.05, 0.02, 0.3],  # off axis
+            ]
         )
+
+        result = refractive_project_batch(simple_camera, simple_interface, points)
 
         # On-axis should project to principal point
         np.testing.assert_allclose(result[0], [320, 240], atol=0.1)

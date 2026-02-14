@@ -28,6 +28,7 @@ from aquacal.calibration._optim_common import (
 from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
 
 import sys
+
 sys.path.insert(0, ".")
 from tests.synthetic.ground_truth import generate_synthetic_detections
 
@@ -54,9 +55,15 @@ def intrinsics() -> dict[str, CameraIntrinsics]:
     K = np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64)
     dist = np.zeros(5, dtype=np.float64)
     return {
-        "cam0": CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
-        "cam1": CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
-        "cam2": CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
+        "cam0": CameraIntrinsics(
+            K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)
+        ),
+        "cam1": CameraIntrinsics(
+            K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)
+        ),
+        "cam2": CameraIntrinsics(
+            K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)
+        ),
     }
 
 
@@ -254,7 +261,9 @@ class TestPackUnpackParams:
         """Reference camera extrinsics come from input, not packed params."""
         camera_order = ["cam0", "cam1", "cam2"]
         frame_order = [0]
-        board_poses_dict = {synthetic_board_poses[0].frame_idx: synthetic_board_poses[0]}
+        board_poses_dict = {
+            synthetic_board_poses[0].frame_idx: synthetic_board_poses[0]
+        }
 
         # Create modified extrinsics for reference camera
         modified_ref = CameraExtrinsics(
@@ -399,9 +408,9 @@ class TestOptimizeInterface:
         # Distances should be reasonably close to ground truth
         # With noise and potential degeneracies, allow 0.03m tolerance
         for cam in intrinsics:
-            assert (
-                abs(dist_opt[cam] - ground_truth_distances[cam]) < 0.03
-            ), f"Distance for {cam} off by {abs(dist_opt[cam] - ground_truth_distances[cam])}"
+            assert abs(dist_opt[cam] - ground_truth_distances[cam]) < 0.03, (
+                f"Distance for {cam} off by {abs(dist_opt[cam] - ground_truth_distances[cam])}"
+            )
 
     def test_raises_for_invalid_reference(
         self, board, intrinsics, ground_truth_extrinsics
@@ -872,7 +881,7 @@ class TestBuildJacobianSparsity:
         # Total = 31 params
 
         n_cams = len(camera_order)
-        n_frames = len(frame_order)
+        _n_frames = len(frame_order)
         n_ext = 6 * (n_cams - 1)  # 12
         water_z_col = n_ext  # 12
 
@@ -1005,7 +1014,6 @@ class TestOptimizeInterfaceWithSparseJacobian:
             assert abs(dist_sparse[cam] - dist_dense[cam]) < 0.005
 
 
-
 class TestTiltEstimation:
     """Tests for normal_fixed=False (reference camera tilt estimation)."""
 
@@ -1108,11 +1116,19 @@ class TestTiltEstimation:
         min_corners = 4
 
         sparsity_fixed = build_jacobian_sparsity(
-            detections, "cam0", camera_order, frame_order, min_corners,
+            detections,
+            "cam0",
+            camera_order,
+            frame_order,
+            min_corners,
             normal_fixed=True,
         )
         sparsity_tilt = build_jacobian_sparsity(
-            detections, "cam0", camera_order, frame_order, min_corners,
+            detections,
+            "cam0",
+            camera_order,
+            frame_order,
+            min_corners,
             normal_fixed=False,
         )
 
@@ -1153,10 +1169,16 @@ class TestTiltEstimation:
         frame_order = [bp.frame_idx for bp in synthetic_board_poses]
 
         lower_fixed, upper_fixed = build_bounds(
-            camera_order, frame_order, "cam0", normal_fixed=True,
+            camera_order,
+            frame_order,
+            "cam0",
+            normal_fixed=True,
         )
         lower_tilt, upper_tilt = build_bounds(
-            camera_order, frame_order, "cam0", normal_fixed=False,
+            camera_order,
+            frame_order,
+            "cam0",
+            normal_fixed=False,
         )
 
         # 2 extra elements
@@ -1186,7 +1208,8 @@ class TestTiltEstimation:
         R_tilt = rvec_to_matrix(tilt_rvec)
         gt_extrinsics = {
             "cam0": CameraExtrinsics(
-                R=R_tilt, t=np.zeros(3, dtype=np.float64),
+                R=R_tilt,
+                t=np.zeros(3, dtype=np.float64),
             ),
             "cam1": CameraExtrinsics(
                 R=np.eye(3, dtype=np.float64),
@@ -1296,20 +1319,33 @@ class TestTiltEstimation:
 
         # Sparsity: same shape and values
         sparsity_default = build_jacobian_sparsity(
-            detections, "cam0", camera_order, frame_order, 4,
+            detections,
+            "cam0",
+            camera_order,
+            frame_order,
+            4,
         )
         sparsity_explicit = build_jacobian_sparsity(
-            detections, "cam0", camera_order, frame_order, 4,
+            detections,
+            "cam0",
+            camera_order,
+            frame_order,
+            4,
             normal_fixed=True,
         )
         np.testing.assert_array_equal(sparsity_default, sparsity_explicit)
 
         # Bounds: same length and values
         lo_default, hi_default = build_bounds(
-            camera_order, frame_order, "cam0",
+            camera_order,
+            frame_order,
+            "cam0",
         )
         lo_explicit, hi_explicit = build_bounds(
-            camera_order, frame_order, "cam0", normal_fixed=True,
+            camera_order,
+            frame_order,
+            "cam0",
+            normal_fixed=True,
         )
         np.testing.assert_array_equal(lo_default, lo_explicit)
         np.testing.assert_array_equal(hi_default, hi_explicit)
@@ -1363,7 +1399,9 @@ class TestRegisterAuxiliaryCamera:
             multi_frame_poses.append(
                 BoardPose(
                     frame_idx=i,
-                    rvec=np.array([0.1 * (i % 3), 0.1 * (i % 2), 0.0], dtype=np.float64),
+                    rvec=np.array(
+                        [0.1 * (i % 3), 0.1 * (i % 2), 0.0], dtype=np.float64
+                    ),
                     tvec=np.array([x_offset, y_offset, 0.4], dtype=np.float64),
                 )
             )
@@ -1387,10 +1425,16 @@ class TestRegisterAuxiliaryCamera:
             corrupted_corners = (
                 detections.frames[frame_to_corrupt].detections[aux_name].corners_2d
                 + np.random.randn(
-                    detections.frames[frame_to_corrupt].detections[aux_name].num_corners, 2
-                ) * 10.0
+                    detections.frames[frame_to_corrupt]
+                    .detections[aux_name]
+                    .num_corners,
+                    2,
+                )
+                * 10.0
             )
-            detections.frames[frame_to_corrupt].detections[aux_name].corners_2d = corrupted_corners
+            detections.frames[frame_to_corrupt].detections[
+                aux_name
+            ].corners_2d = corrupted_corners
 
         # Create board_poses dict from list
         board_poses_dict = {bp.frame_idx: bp for bp in multi_frame_poses}
@@ -1474,10 +1518,14 @@ class TestRegisterAuxiliaryCamera:
         np.random.seed(42)
 
         # Create auxiliary camera at known position
-        ground_truth_C_z = 0.02  # 2cm above reference (smaller offset for better visibility)
+        ground_truth_C_z = (
+            0.02  # 2cm above reference (smaller offset for better visibility)
+        )
         aux_extrinsics = CameraExtrinsics(
             R=np.eye(3, dtype=np.float64),
-            t=np.array([0.15, 0.0, -ground_truth_C_z], dtype=np.float64),  # Closer in X too
+            t=np.array(
+                [0.15, 0.0, -ground_truth_C_z], dtype=np.float64
+            ),  # Closer in X too
         )
         aux_intrinsics = intrinsics["cam0"]
         aux_name = "aux_cam"
@@ -1903,5 +1951,9 @@ class TestRegisterAuxiliaryCamera:
         refined_cy = refined_intr.K[1, 2]
         w, h = aux_intrinsics.image_size
 
-        assert 0.0 <= refined_cx <= float(w), f"cx should be in [0, {w}], got {refined_cx}"
-        assert 0.0 <= refined_cy <= float(h), f"cy should be in [0, {h}], got {refined_cy}"
+        assert 0.0 <= refined_cx <= float(w), (
+            f"cx should be in [0, {w}], got {refined_cx}"
+        )
+        assert 0.0 <= refined_cy <= float(h), (
+            f"cy should be in [0, {h}], got {refined_cy}"
+        )

@@ -149,7 +149,9 @@ def _serialize_diagnostics(diag: DiagnosticsData) -> dict[str, Any]:
         result["per_corner_residuals"] = _ndarray_to_list(diag.per_corner_residuals)
     if diag.per_frame_errors is not None:
         # Convert int keys to strings for JSON compatibility
-        result["per_frame_errors"] = {str(k): v for k, v in diag.per_frame_errors.items()}
+        result["per_frame_errors"] = {
+            str(k): v for k, v in diag.per_frame_errors.items()
+        }
     return result
 
 

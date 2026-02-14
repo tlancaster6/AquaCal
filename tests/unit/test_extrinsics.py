@@ -50,9 +50,15 @@ def intrinsics() -> dict[str, CameraIntrinsics]:
     K = np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float64)
     dist = np.zeros(5, dtype=np.float64)
     return {
-        "cam0": CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
-        "cam1": CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
-        "cam2": CameraIntrinsics(K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)),
+        "cam0": CameraIntrinsics(
+            K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)
+        ),
+        "cam1": CameraIntrinsics(
+            K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)
+        ),
+        "cam2": CameraIntrinsics(
+            K=K.copy(), dist_coeffs=dist.copy(), image_size=(640, 480)
+        ),
     }
 
 
@@ -391,11 +397,15 @@ class TestEstimateExtrinsics:
 
         # Record callback invocations
         calls = []
+
         def callback(cam_name: str, current: int, total: int):
             calls.append((cam_name, current, total))
 
-        extrinsics_result = estimate_extrinsics(
-            graph, intrinsics, board, reference_camera="cam0",
+        _extrinsics_result = estimate_extrinsics(
+            graph,
+            intrinsics,
+            board,
+            reference_camera="cam0",
             progress_callback=callback,
         )
 
@@ -490,13 +500,21 @@ class TestRefractiveSolvePnp:
         # Generate synthetic detections using identity camera
         identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
         det = _generate_refractive_detections(
-            intrinsics["cam0"], identity_ext, "_test", board,
-            rvec_true, tvec_true, interface_distance,
+            intrinsics["cam0"],
+            identity_ext,
+            "_test",
+            board,
+            rvec_true,
+            tvec_true,
+            interface_distance,
         )
         assert det is not None
 
         result = refractive_solve_pnp(
-            intrinsics["cam0"], det.corners_2d, det.corner_ids, board,
+            intrinsics["cam0"],
+            det.corners_2d,
+            det.corner_ids,
+            board,
             interface_distance,
         )
         assert result is not None
@@ -507,11 +525,13 @@ class TestRefractiveSolvePnp:
         R_est = rvec_to_matrix(rvec_est)
         R_err = R_true.T @ R_est
         angle_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
-        assert np.degrees(angle_err) < 1.0, f"Rotation error {np.degrees(angle_err):.3f} deg"
+        assert np.degrees(angle_err) < 1.0, (
+            f"Rotation error {np.degrees(angle_err):.3f} deg"
+        )
 
         # Check translation error < 5mm
         trans_err = np.linalg.norm(tvec_est - tvec_true)
-        assert trans_err < 0.005, f"Translation error {trans_err*1000:.1f} mm"
+        assert trans_err < 0.005, f"Translation error {trans_err * 1000:.1f} mm"
 
     def test_more_accurate_than_standard_pnp(self, board, intrinsics):
         """Refractive PnP is at least 5x more accurate than standard PnP on refractive data."""
@@ -522,14 +542,22 @@ class TestRefractiveSolvePnp:
         # Generate refractive detections
         identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
         det = _generate_refractive_detections(
-            intrinsics["cam0"], identity_ext, "_test", board,
-            rvec_true, tvec_true, interface_distance,
+            intrinsics["cam0"],
+            identity_ext,
+            "_test",
+            board,
+            rvec_true,
+            tvec_true,
+            interface_distance,
         )
         assert det is not None
 
         # Standard PnP
         result_std = estimate_board_pose(
-            intrinsics["cam0"], det.corners_2d, det.corner_ids, board,
+            intrinsics["cam0"],
+            det.corners_2d,
+            det.corner_ids,
+            board,
         )
         assert result_std is not None
         _, tvec_std = result_std
@@ -537,7 +565,10 @@ class TestRefractiveSolvePnp:
 
         # Refractive PnP
         result_ref = refractive_solve_pnp(
-            intrinsics["cam0"], det.corners_2d, det.corner_ids, board,
+            intrinsics["cam0"],
+            det.corners_2d,
+            det.corner_ids,
+            board,
             interface_distance,
         )
         assert result_ref is not None
@@ -545,8 +576,8 @@ class TestRefractiveSolvePnp:
         err_ref = np.linalg.norm(tvec_ref - tvec_true)
 
         assert err_ref * 5 < err_std, (
-            f"Refractive PnP ({err_ref*1000:.1f}mm) not 5x better than "
-            f"standard PnP ({err_std*1000:.1f}mm)"
+            f"Refractive PnP ({err_ref * 1000:.1f}mm) not 5x better than "
+            f"standard PnP ({err_std * 1000:.1f}mm)"
         )
 
     def test_returns_none_for_few_points(self, board, intrinsics):
@@ -555,7 +586,8 @@ class TestRefractiveSolvePnp:
             intrinsics["cam0"],
             np.array([[100, 100], [200, 100], [150, 200]], dtype=np.float64),
             np.array([0, 1, 2], dtype=np.int32),
-            board, 0.15,
+            board,
+            0.15,
         )
         assert result is None
 
@@ -567,13 +599,21 @@ class TestRefractiveSolvePnp:
 
         identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
         det = _generate_refractive_detections(
-            intrinsics["cam0"], identity_ext, "_test", board,
-            rvec_true, tvec_true, interface_distance,
+            intrinsics["cam0"],
+            identity_ext,
+            "_test",
+            board,
+            rvec_true,
+            tvec_true,
+            interface_distance,
         )
         assert det is not None
 
         result = refractive_solve_pnp(
-            intrinsics["cam0"], det.corners_2d, det.corner_ids, board,
+            intrinsics["cam0"],
+            det.corners_2d,
+            det.corner_ids,
+            board,
             interface_distance,
         )
         assert result is not None
@@ -590,14 +630,23 @@ class TestRefractiveSolvePnp:
 
         identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
         det = _generate_refractive_detections(
-            intrinsics["cam0"], identity_ext, "_test", board,
-            rvec_true, tvec_true, 0.15,
+            intrinsics["cam0"],
+            identity_ext,
+            "_test",
+            board,
+            rvec_true,
+            tvec_true,
+            0.15,
         )
         assert det is not None
 
         # Call without interface_normal (should default to [0,0,-1])
         result = refractive_solve_pnp(
-            intrinsics["cam0"], det.corners_2d, det.corner_ids, board, 0.15,
+            intrinsics["cam0"],
+            det.corners_2d,
+            det.corner_ids,
+            board,
+            0.15,
         )
         assert result is not None
 
@@ -620,12 +669,22 @@ class TestEstimateExtrinsicsRefractive:
 
         # Generate refractive detections for each camera
         det0 = _generate_refractive_detections(
-            intrinsics["cam0"], ext0, "cam0", board,
-            board_rvec, board_tvec, interface_distance,
+            intrinsics["cam0"],
+            ext0,
+            "cam0",
+            board,
+            board_rvec,
+            board_tvec,
+            interface_distance,
         )
         det1 = _generate_refractive_detections(
-            intrinsics["cam1"], ext1, "cam1", board,
-            board_rvec, board_tvec, interface_distance,
+            intrinsics["cam1"],
+            ext1,
+            "cam1",
+            board,
+            board_rvec,
+            board_tvec,
+            interface_distance,
         )
         assert det0 is not None and det1 is not None
 
@@ -637,14 +696,19 @@ class TestEstimateExtrinsicsRefractive:
             ),
         }
         detection_result = DetectionResult(
-            frames=frames, camera_names=["cam0", "cam1"], total_frames=1,
+            frames=frames,
+            camera_names=["cam0", "cam1"],
+            total_frames=1,
         )
         graph = build_pose_graph(detection_result)
 
         # Estimate with refractive PnP
         interface_distances = {"cam0": interface_distance, "cam1": interface_distance}
         extrinsics_result = estimate_extrinsics(
-            graph, intrinsics, board, reference_camera="cam0",
+            graph,
+            intrinsics,
+            board,
+            reference_camera="cam0",
             interface_distances=interface_distances,
         )
 
@@ -691,9 +755,7 @@ class TestAverageRotations:
 
     def test_identity_input(self):
         """Averaging identity matrices returns identity."""
-        R_avg = _average_rotations(
-            [np.eye(3), np.eye(3)], [1.0, 1.0]
-        )
+        R_avg = _average_rotations([np.eye(3), np.eye(3)], [1.0, 1.0])
         np.testing.assert_allclose(R_avg, np.eye(3), atol=1e-10)
 
     def test_weights_matter(self):
@@ -709,7 +771,9 @@ class TestAverageRotations:
         R_equal = _average_rotations([R1, R2], [1.0, 1.0])
         angle_eq = np.linalg.norm(matrix_to_rvec(R_equal))
 
-        assert angle_1 < angle_eq, "Heavy weight on identity should produce smaller rotation"
+        assert angle_1 < angle_eq, (
+            "Heavy weight on identity should produce smaller rotation"
+        )
 
 
 class TestPriorityBFS:
@@ -720,15 +784,25 @@ class TestPriorityBFS:
         # Build two frames: frame 0 has 6 corners, frame 1 has 12
         few_ids = np.array([0, 1, 2, 3, 4, 5], dtype=np.int32)
         few_2d = np.array(
-            [[100, 100], [180, 100], [260, 100],
-             [100, 180], [180, 180], [260, 180]],
+            [[100, 100], [180, 100], [260, 100], [100, 180], [180, 180], [260, 180]],
             dtype=np.float64,
         )
         many_ids = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.int32)
         many_2d = np.array(
-            [[100, 100], [180, 100], [260, 100], [340, 100],
-             [100, 180], [180, 180], [260, 180], [340, 180],
-             [100, 260], [180, 260], [260, 260], [340, 260]],
+            [
+                [100, 100],
+                [180, 100],
+                [260, 100],
+                [340, 100],
+                [100, 180],
+                [180, 180],
+                [260, 180],
+                [340, 180],
+                [100, 260],
+                [180, 260],
+                [260, 260],
+                [340, 260],
+            ],
             dtype=np.float64,
         )
 
@@ -736,20 +810,30 @@ class TestPriorityBFS:
             0: FrameDetections(
                 frame_idx=0,
                 detections={
-                    "cam0": Detection(corner_ids=few_ids.copy(), corners_2d=few_2d.copy()),
-                    "cam1": Detection(corner_ids=few_ids.copy(), corners_2d=few_2d + 10),
+                    "cam0": Detection(
+                        corner_ids=few_ids.copy(), corners_2d=few_2d.copy()
+                    ),
+                    "cam1": Detection(
+                        corner_ids=few_ids.copy(), corners_2d=few_2d + 10
+                    ),
                 },
             ),
             1: FrameDetections(
                 frame_idx=1,
                 detections={
-                    "cam0": Detection(corner_ids=many_ids.copy(), corners_2d=many_2d.copy()),
-                    "cam1": Detection(corner_ids=many_ids.copy(), corners_2d=many_2d + 10),
+                    "cam0": Detection(
+                        corner_ids=many_ids.copy(), corners_2d=many_2d.copy()
+                    ),
+                    "cam1": Detection(
+                        corner_ids=many_ids.copy(), corners_2d=many_2d + 10
+                    ),
                 },
             ),
         }
         det_result = DetectionResult(
-            frames=frames, camera_names=["cam0", "cam1"], total_frames=2,
+            frames=frames,
+            camera_names=["cam0", "cam1"],
+            total_frames=2,
         )
         graph = build_pose_graph(det_result)
 
@@ -813,8 +897,13 @@ class TestMultiFrameAveraging:
             dets = {}
             for cam_name, cam_ext in camera_exts.items():
                 det = _generate_refractive_detections(
-                    intrinsics[cam_name], cam_ext, cam_name, board,
-                    brvec, btvec, interface_distance,
+                    intrinsics[cam_name],
+                    cam_ext,
+                    cam_name,
+                    board,
+                    brvec,
+                    btvec,
+                    interface_distance,
                 )
                 if det is not None:
                     dets[cam_name] = det
@@ -824,13 +913,18 @@ class TestMultiFrameAveraging:
         assert len(frames) >= 2, "Need at least 2 usable frames"
 
         det_result = DetectionResult(
-            frames=frames, camera_names=["cam0", "cam1", "cam2"], total_frames=len(frames),
+            frames=frames,
+            camera_names=["cam0", "cam1", "cam2"],
+            total_frames=len(frames),
         )
         graph = build_pose_graph(det_result)
 
         interface_distances = {cam: interface_distance for cam in camera_exts}
         result = estimate_extrinsics(
-            graph, intrinsics, board, reference_camera="cam0",
+            graph,
+            intrinsics,
+            board,
+            reference_camera="cam0",
             interface_distances=interface_distances,
         )
 

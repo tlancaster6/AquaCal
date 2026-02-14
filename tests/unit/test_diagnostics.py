@@ -5,7 +5,8 @@ import tempfile
 from pathlib import Path
 
 import matplotlib
-matplotlib.use('Agg')  # Set non-interactive backend for testing
+
+matplotlib.use("Agg")  # Set non-interactive backend for testing
 import numpy as np
 import pandas as pd
 import pytest
@@ -42,7 +43,11 @@ from aquacal.validation.diagnostics import (
 def board_config():
     """Standard board configuration."""
     return BoardConfig(
-        squares_x=5, squares_y=4, square_size=0.03, marker_size=0.022, dictionary="DICT_4X4_50"
+        squares_x=5,
+        squares_y=4,
+        square_size=0.03,
+        marker_size=0.022,
+        dictionary="DICT_4X4_50",
     )
 
 
@@ -61,7 +66,10 @@ def camera_calibration():
     t = np.array([0.0, 0.0, 0.5])
     extrinsics = CameraExtrinsics(R=R, t=t)
     return CameraCalibration(
-        name="cam0", intrinsics=intrinsics, extrinsics=extrinsics, interface_distance=0.5
+        name="cam0",
+        intrinsics=intrinsics,
+        extrinsics=extrinsics,
+        interface_distance=0.5,
     )
 
 
@@ -98,7 +106,9 @@ def simple_detections():
     # Frame 0: 4 corners in cam0
     det0 = Detection(
         corner_ids=np.array([0, 1, 2, 3], dtype=np.int32),
-        corners_2d=np.array([[100, 100], [200, 100], [100, 200], [200, 200]], dtype=np.float64),
+        corners_2d=np.array(
+            [[100, 100], [200, 100], [100, 200], [200, 200]], dtype=np.float64
+        ),
     )
     frame0 = FrameDetections(frame_idx=0, detections={"cam0": det0})
 
@@ -159,7 +169,9 @@ class TestComputeSpatialErrorMap:
         # Grid cell: col=1, row=1
         assert np.isclose(error_map[1, 1], 1.0)
 
-    def test_empty_cells_contain_nan(self, simple_reprojection_errors, simple_detections):
+    def test_empty_cells_contain_nan(
+        self, simple_reprojection_errors, simple_detections
+    ):
         """Test that cells with no observations contain NaN."""
         error_map = compute_spatial_error_map(
             reprojection_errors=simple_reprojection_errors,
@@ -221,10 +233,16 @@ class TestComputeDepthStratifiedErrors:
         assert df["num_observations"].sum() == 4
 
     def test_empty_detections(
-        self, calibration_result, board_poses, simple_reprojection_errors, board_geometry
+        self,
+        calibration_result,
+        board_poses,
+        simple_reprojection_errors,
+        board_geometry,
     ):
         """Test that empty detections return empty DataFrame with correct columns."""
-        empty_detections = DetectionResult(frames={}, camera_names=["cam0"], total_frames=0)
+        empty_detections = DetectionResult(
+            frames={}, camera_names=["cam0"], total_frames=0
+        )
 
         df = compute_depth_stratified_errors(
             calibration=calibration_result,
@@ -280,7 +298,9 @@ class TestGenerateRecommendations:
             residuals=np.zeros((10, 2)),
             num_observations=10,
         )
-        recon = DistanceErrors(mean=0.0005, std=0.0002, max_error=0.001, num_comparisons=20)
+        recon = DistanceErrors(
+            mean=0.0005, std=0.0002, max_error=0.001, num_comparisons=20
+        )
         depth_errors = pd.DataFrame(
             {
                 "depth_min": [0.5, 1.0],
@@ -306,7 +326,9 @@ class TestGenerateRecommendations:
             residuals=np.zeros((10, 2)),
             num_observations=10,
         )
-        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
+        recon = DistanceErrors(
+            mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20
+        )
         depth_errors = pd.DataFrame(
             {
                 "depth_min": [0.5],
@@ -331,7 +353,9 @@ class TestGenerateRecommendations:
             residuals=np.zeros((10, 2)),
             num_observations=10,
         )
-        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
+        recon = DistanceErrors(
+            mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20
+        )
         depth_errors = pd.DataFrame(
             {
                 "depth_min": [0.5, 1.0, 1.5, 2.0],
@@ -356,7 +380,9 @@ class TestGenerateRecommendations:
             residuals=np.zeros((10, 2)),
             num_observations=10,
         )
-        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
+        recon = DistanceErrors(
+            mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20
+        )
         depth_errors = pd.DataFrame(
             {
                 "depth_min": [0.5],
@@ -381,7 +407,9 @@ class TestGenerateRecommendations:
             residuals=np.zeros((10, 2)),
             num_observations=10,
         )
-        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
+        recon = DistanceErrors(
+            mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20
+        )
         depth_errors = pd.DataFrame(
             {
                 "depth_min": [0.5],
@@ -414,7 +442,9 @@ class TestGenerateRecommendations:
             residuals=np.zeros((10, 2)),
             num_observations=10,
         )
-        recon = DistanceErrors(mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20)
+        recon = DistanceErrors(
+            mean=0.001, std=0.0005, max_error=0.002, num_comparisons=20
+        )
         depth_errors = pd.DataFrame(
             {
                 "depth_min": [0.5],
@@ -484,12 +514,17 @@ class TestGenerateDiagnosticReport:
         """Test that spatial error maps are generated for all cameras."""
         # Add second camera
         K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-        intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+        intrinsics = CameraIntrinsics(
+            K=K, dist_coeffs=np.zeros(5), image_size=(640, 480)
+        )
         R = np.eye(3)
         t = np.array([0.1, 0.0, 0.5])
         extrinsics = CameraExtrinsics(R=R, t=t)
         cam1 = CameraCalibration(
-            name="cam1", intrinsics=intrinsics, extrinsics=extrinsics, interface_distance=0.5
+            name="cam1",
+            intrinsics=intrinsics,
+            extrinsics=extrinsics,
+            interface_distance=0.5,
         )
 
         # Build calibration with two cameras
@@ -568,7 +603,11 @@ class TestSaveDiagnosticReport:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = save_diagnostic_report(
-                report, calibration_result, simple_detections, Path(tmpdir), save_images=True
+                report,
+                calibration_result,
+                simple_detections,
+                Path(tmpdir),
+                save_images=True,
             )
 
             # Check JSON file
@@ -614,7 +653,11 @@ class TestSaveDiagnosticReport:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = save_diagnostic_report(
-                report, calibration_result, simple_detections, Path(tmpdir), save_images=False
+                report,
+                calibration_result,
+                simple_detections,
+                Path(tmpdir),
+                save_images=False,
             )
 
             # Should have JSON and CSV
@@ -657,7 +700,11 @@ class TestSaveDiagnosticReport:
             assert not nested_dir.exists()
 
             result = save_diagnostic_report(
-                report, calibration_result, simple_detections, nested_dir, save_images=False
+                report,
+                calibration_result,
+                simple_detections,
+                nested_dir,
+                save_images=False,
             )
 
             # Directory should be created
@@ -688,7 +735,9 @@ class TestPlotCameraRig:
         cameras = {}
         for i in range(3):
             K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            intrinsics = CameraIntrinsics(
+                K=K, dist_coeffs=np.zeros(5), image_size=(640, 480)
+            )
             R = np.eye(3)
             t = np.array([i * 0.1, 0.0, 0.0])  # Cameras spaced along X
             extrinsics = CameraExtrinsics(R=R, t=t)
@@ -752,7 +801,9 @@ class TestPlotCameraRig:
             y = radius * np.sin(angle_rad)
 
             K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            intrinsics = CameraIntrinsics(
+                K=K, dist_coeffs=np.zeros(5), image_size=(640, 480)
+            )
             R = np.eye(3)
             # Camera center C = -R^T @ t. With R=I, C = -t
             t = np.array([-x, -y, -height])  # Note: t = -C when R=I
@@ -798,11 +849,13 @@ class TestPlotCameraRig:
         # Find the scatter collection (PathCollection)
         scatter_collection = None
         for collection in top_down_ax.collections:
-            if hasattr(collection, 'get_offsets'):
+            if hasattr(collection, "get_offsets"):
                 scatter_collection = collection
                 break
 
-        assert scatter_collection is not None, "Could not find scatter plot in top-down axes"
+        assert scatter_collection is not None, (
+            "Could not find scatter plot in top-down axes"
+        )
 
         # Get plotted positions (X, Y in plot coordinates)
         # Note: Z is negated in the plot, but top-down (elev=90) projects only X and Y
@@ -820,7 +873,7 @@ class TestPlotCameraRig:
         expected_angles = np.array([angle for _, _, _, angle in expected_order])
 
         # Sort expected angles and verify plotted angles match
-        expected_order_indices = np.argsort(expected_angles)
+        _expected_order_indices = np.argsort(expected_angles)
 
         # The plotted angular ordering should match the expected CCW ordering
         # We don't need exact angle match, just that the order is preserved
@@ -829,7 +882,9 @@ class TestPlotCameraRig:
         angle_diffs = np.diff(plotted_sorted_angles)
 
         # Handle wraparound: if any diff is very negative, it's crossing the -pi/pi boundary
-        angle_diffs = np.where(angle_diffs < -np.pi, angle_diffs + 2*np.pi, angle_diffs)
+        angle_diffs = np.where(
+            angle_diffs < -np.pi, angle_diffs + 2 * np.pi, angle_diffs
+        )
 
         # All diffs should be positive (or close to the expected 60 degrees = pi/3)
         assert np.all(angle_diffs > 0), (
@@ -879,16 +934,24 @@ class TestPlotReprojectionQuiver:
 
         # Create calibration with two cameras
         K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-        intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+        intrinsics = CameraIntrinsics(
+            K=K, dist_coeffs=np.zeros(5), image_size=(640, 480)
+        )
         R = np.eye(3)
         t = np.array([0.0, 0.0, 0.5])
         extrinsics = CameraExtrinsics(R=R, t=t)
 
         cam0 = CameraCalibration(
-            name="cam0", intrinsics=intrinsics, extrinsics=extrinsics, interface_distance=0.5
+            name="cam0",
+            intrinsics=intrinsics,
+            extrinsics=extrinsics,
+            interface_distance=0.5,
         )
         cam1 = CameraCalibration(
-            name="cam1", intrinsics=intrinsics, extrinsics=extrinsics, interface_distance=0.5
+            name="cam1",
+            intrinsics=intrinsics,
+            extrinsics=extrinsics,
+            interface_distance=0.5,
         )
 
         cameras = {"cam0": cam0, "cam1": cam1}
@@ -969,7 +1032,11 @@ class TestSaveDiagnosticReportWithNewPlots:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = save_diagnostic_report(
-                report, calibration_result, simple_detections, Path(tmpdir), save_images=True
+                report,
+                calibration_result,
+                simple_detections,
+                Path(tmpdir),
+                save_images=True,
             )
 
             # Check rig plot
@@ -1012,7 +1079,11 @@ class TestSaveDiagnosticReportWithNewPlots:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = save_diagnostic_report(
-                report, calibration_result, simple_detections, Path(tmpdir), save_images=False
+                report,
+                calibration_result,
+                simple_detections,
+                Path(tmpdir),
+                save_images=False,
             )
 
             # Should have JSON and CSV
@@ -1029,7 +1100,12 @@ class TestSaveDiagnosticReportWithNewPlots:
             assert len(png_files) == 0
 
     def test_multiple_cameras_all_get_quiver_plots(
-        self, board_config, simple_detections, board_poses, simple_reprojection_errors, board_geometry
+        self,
+        board_config,
+        simple_detections,
+        board_poses,
+        simple_reprojection_errors,
+        board_geometry,
     ):
         """Test that all cameras get quiver plots."""
         # Create calibration with 3 cameras
@@ -1037,7 +1113,9 @@ class TestSaveDiagnosticReportWithNewPlots:
         per_camera_rms = {}
         for i in range(3):
             K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            intrinsics = CameraIntrinsics(
+                K=K, dist_coeffs=np.zeros(5), image_size=(640, 480)
+            )
             R = np.eye(3)
             t = np.array([i * 0.1, 0.0, 0.0])
             extrinsics = CameraExtrinsics(R=R, t=t)
@@ -1107,7 +1185,9 @@ class TestComputeCameraHeights:
         cameras = {}
         for i in range(3):
             K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            intrinsics = CameraIntrinsics(
+                K=K, dist_coeffs=np.zeros(5), image_size=(640, 480)
+            )
             R = np.eye(3)
             t = np.array([i * 0.1, 0.0, 0.0])  # Different X positions, same Z=0
             extrinsics = CameraExtrinsics(R=R, t=t)
@@ -1159,7 +1239,9 @@ class TestComputeCameraHeights:
 
         for i in range(3):
             K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-            intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+            intrinsics = CameraIntrinsics(
+                K=K, dist_coeffs=np.zeros(5), image_size=(640, 480)
+            )
             R = np.eye(3)
             # Camera center C = -R^T @ t. With R=I, C = -t
             # Set C_z to 0.1 * i, so t_z = -0.1 * i
@@ -1208,13 +1290,17 @@ class TestComputeCameraHeights:
         assert len(result["per_camera_height"]) == 3
 
         # Verify individual heights
-        for i, (cam_name, h_c) in enumerate(sorted(result["per_camera_height"].items())):
+        for i, (cam_name, h_c) in enumerate(
+            sorted(result["per_camera_height"].items())
+        ):
             assert np.isclose(h_c, expected_heights[i])
 
     def test_single_camera(self, board_config):
         """Test single camera edge case."""
         K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
-        intrinsics = CameraIntrinsics(K=K, dist_coeffs=np.zeros(5), image_size=(640, 480))
+        intrinsics = CameraIntrinsics(
+            K=K, dist_coeffs=np.zeros(5), image_size=(640, 480)
+        )
         R = np.eye(3)
         t = np.array([0.0, 0.0, 0.0])
         extrinsics = CameraExtrinsics(R=R, t=t)

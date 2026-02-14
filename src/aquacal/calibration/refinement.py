@@ -183,7 +183,10 @@ def joint_refinement(
             normal_fixed=normal_fixed,
         )
         jac = make_sparse_jacobian_func(
-            compute_residuals, cost_args, jac_sparsity, (lower, upper),
+            compute_residuals,
+            cost_args,
+            jac_sparsity,
+            (lower, upper),
         )
 
     # Run optimization

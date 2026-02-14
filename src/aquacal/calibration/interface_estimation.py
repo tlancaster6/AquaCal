@@ -88,9 +88,14 @@ def _compute_initial_board_poses(
         det = frame_det.detections[best_cam]
 
         result = refractive_solve_pnp(
-            intrinsics[best_cam], det.corners_2d, det.corner_ids, board,
+            intrinsics[best_cam],
+            det.corners_2d,
+            det.corner_ids,
+            board,
             interface_distances.get(best_cam, 0.15),
-            interface_normal, n_air, n_water,
+            interface_normal,
+            n_air,
+            n_water,
         )
         if result is None:
             continue
@@ -191,19 +196,22 @@ def optimize_interface(
 
     # Set default interface distances
     if initial_interface_distances is None:
-        initial_interface_distances = {
-            cam: 0.15 for cam in initial_extrinsics.keys()
-        }
+        initial_interface_distances = {cam: 0.15 for cam in initial_extrinsics.keys()}
 
     # Create ordered lists for consistent parameter packing
     camera_order = sorted(initial_extrinsics.keys())
 
     # Compute initial board poses
     initial_board_poses = _compute_initial_board_poses(
-        detections, intrinsics, initial_extrinsics, board, min_corners,
+        detections,
+        intrinsics,
+        initial_extrinsics,
+        board,
+        min_corners,
         interface_distances=initial_interface_distances,
         interface_normal=interface_normal,
-        n_air=n_air, n_water=n_water,
+        n_air=n_air,
+        n_water=n_water,
     )
 
     # Filter to frames with valid board poses
@@ -233,7 +241,10 @@ def optimize_interface(
 
     # Build bounds
     lower, upper = build_bounds(
-        camera_order, frame_order, reference_camera, normal_fixed=normal_fixed,
+        camera_order,
+        frame_order,
+        reference_camera,
+        normal_fixed=normal_fixed,
     )
 
     # Reference extrinsics (fixed during optimization)
@@ -268,7 +279,10 @@ def optimize_interface(
             normal_fixed=normal_fixed,
         )
         jac = make_sparse_jacobian_func(
-            compute_residuals, cost_args, jac_sparsity, (lower, upper),
+            compute_residuals,
+            cost_args,
+            jac_sparsity,
+            (lower, upper),
         )
 
     # Run optimization
@@ -347,8 +361,14 @@ def _multi_frame_pnp_init(
     pnp_results = []
     for frame_idx, corner_ids, corners_2d in selected_frames:
         pnp_result = refractive_solve_pnp(
-            intrinsics, corners_2d, corner_ids, board,
-            water_z, interface_normal, n_air, n_water,
+            intrinsics,
+            corners_2d,
+            corner_ids,
+            board,
+            water_z,
+            interface_normal,
+            n_air,
+            n_water,
         )
 
         if pnp_result is None:
@@ -426,7 +446,10 @@ def register_auxiliary_camera(
     min_corners: int = 4,
     refine_intrinsics: bool = False,
     verbose: int = 0,
-) -> tuple[CameraExtrinsics, float, float] | tuple[CameraExtrinsics, float, float, CameraIntrinsics]:
+) -> (
+    tuple[CameraExtrinsics, float, float]
+    | tuple[CameraExtrinsics, float, float, CameraIntrinsics]
+):
     """Register a single auxiliary camera against fixed board poses.
 
     Estimates the camera's extrinsics by minimizing refractive reprojection
@@ -491,8 +514,14 @@ def register_auxiliary_camera(
 
     # --- Step 2: Initial guess via multi-frame refractive PnP ---
     pnp_result = _multi_frame_pnp_init(
-        obs_frames, board_poses, intrinsics, board,
-        water_z, interface_normal, n_air, n_water,
+        obs_frames,
+        board_poses,
+        intrinsics,
+        board,
+        water_z,
+        interface_normal,
+        n_air,
+        n_water,
     )
 
     if pnp_result is None:
@@ -506,11 +535,18 @@ def register_auxiliary_camera(
     # --- Step 3: Build parameter vector ---
     if refine_intrinsics:
         # [rvec(3), tvec(3), fx, fy, cx, cy] = 10 params
-        x0 = np.concatenate([
-            initial_rvec,
-            initial_tvec,
-            [intrinsics.K[0, 0], intrinsics.K[1, 1], intrinsics.K[0, 2], intrinsics.K[1, 2]],
-        ])
+        x0 = np.concatenate(
+            [
+                initial_rvec,
+                initial_tvec,
+                [
+                    intrinsics.K[0, 0],
+                    intrinsics.K[1, 1],
+                    intrinsics.K[0, 2],
+                    intrinsics.K[1, 2],
+                ],
+            ]
+        )
     else:
         # [rvec(3), tvec(3)] = 6 params (extrinsics only)
         x0 = np.concatenate([initial_rvec, initial_tvec])
@@ -572,8 +608,8 @@ def register_auxiliary_camera(
         # Add bounds for fx, fy, cx, cy
         fx0, fy0 = intrinsics.K[0, 0], intrinsics.K[1, 1]
         w, h = intrinsics.image_size
-        lower = np.array([-np.inf]*6 + [0.5*fx0, 0.5*fy0, 0.0, 0.0])
-        upper = np.array([np.inf]*6 + [2.0*fx0, 2.0*fy0, float(w), float(h)])
+        lower = np.array([-np.inf] * 6 + [0.5 * fx0, 0.5 * fy0, 0.0, 0.0])
+        upper = np.array([np.inf] * 6 + [2.0 * fx0, 2.0 * fy0, float(w), float(h)])
     else:
         # All unbounded for 6-param extrinsics
         lower = np.full(6, -np.inf)

@@ -28,6 +28,7 @@ from aquacal.validation.reprojection import (
 )
 
 import sys
+
 sys.path.insert(0, ".")
 from tests.synthetic.ground_truth import generate_synthetic_detections
 
@@ -172,7 +173,9 @@ class TestReprojectionErrors:
         )
 
         # Compute reprojection errors
-        errors = compute_reprojection_errors(calibration_result, detections, board_poses)
+        errors = compute_reprojection_errors(
+            calibration_result, detections, board_poses
+        )
 
         # Should be very close to zero
         assert errors.rms < 1e-6
@@ -204,7 +207,9 @@ class TestReprojectionErrors:
         )
 
         # Compute reprojection errors
-        errors = compute_reprojection_errors(calibration_result, detections, board_poses)
+        errors = compute_reprojection_errors(
+            calibration_result, detections, board_poses
+        )
 
         # RMS should be approximately equal to noise_std
         # Allow for some statistical variation (within 30%)
@@ -231,7 +236,9 @@ class TestReprojectionErrors:
             min_corners=4,
         )
 
-        errors = compute_reprojection_errors(calibration_result, detections, board_poses)
+        errors = compute_reprojection_errors(
+            calibration_result, detections, board_poses
+        )
 
         # All cameras should have entries
         assert len(errors.per_camera) == 3
@@ -263,7 +270,9 @@ class TestReprojectionErrors:
             min_corners=4,
         )
 
-        errors = compute_reprojection_errors(calibration_result, detections, board_poses)
+        errors = compute_reprojection_errors(
+            calibration_result, detections, board_poses
+        )
 
         # All frames should have entries
         assert len(errors.per_frame) == 5
@@ -294,7 +303,9 @@ class TestReprojectionErrors:
             min_corners=4,
         )
 
-        errors = compute_reprojection_errors(calibration_result, detections, board_poses)
+        errors = compute_reprojection_errors(
+            calibration_result, detections, board_poses
+        )
 
         # Residuals should be (N, 2)
         assert errors.residuals.ndim == 2
@@ -360,7 +371,9 @@ class TestReprojectionErrors:
         board_pose = BoardPose(
             frame_idx=0,
             rvec=np.array([0.0, 0.0, 0.0], dtype=np.float64),
-            tvec=np.array([0.0, 0.0, 0.16], dtype=np.float64),  # Very close to interface
+            tvec=np.array(
+                [0.0, 0.0, 0.16], dtype=np.float64
+            ),  # Very close to interface
         )
 
         # Generate detections - some corners may fail to project
@@ -396,7 +409,9 @@ class TestReprojectionErrors:
 
         # Should not crash
         with pytest.warns(UserWarning, match="No residuals to compute RMS"):
-            errors = compute_reprojection_errors(calibration_result, detections, board_poses)
+            errors = compute_reprojection_errors(
+                calibration_result, detections, board_poses
+            )
 
         # Should have zero observations
         assert errors.num_observations == 0

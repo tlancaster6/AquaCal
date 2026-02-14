@@ -164,7 +164,9 @@ class TestGenerateCameraIntrinsics:
     def test_custom_fov(self):
         """Custom FOV should produce correct focal length."""
         # 90 degree horizontal FOV with 1000 pixel width
-        intr = generate_camera_intrinsics(image_size=(1000, 500), fov_horizontal_deg=90.0)
+        intr = generate_camera_intrinsics(
+            image_size=(1000, 500), fov_horizontal_deg=90.0
+        )
 
         # At 90 deg FOV: fx = width / (2 * tan(45)) = 1000 / 2 = 500
         np.testing.assert_allclose(intr.K[0, 0], 500.0, rtol=1e-6)
@@ -497,8 +499,12 @@ class TestComputeCalibrationErrors:
 
         errors = compute_calibration_errors(result, scenario_ideal)
 
-        np.testing.assert_allclose(errors["focal_length_error_percent"], 0.0, atol=1e-10)
+        np.testing.assert_allclose(
+            errors["focal_length_error_percent"], 0.0, atol=1e-10
+        )
         np.testing.assert_allclose(errors["principal_point_error_px"], 0.0, atol=1e-10)
         np.testing.assert_allclose(errors["rotation_error_deg"], 0.0, atol=1e-10)
         np.testing.assert_allclose(errors["translation_error_mm"], 0.0, atol=1e-10)
-        np.testing.assert_allclose(errors["interface_distance_error_mm"], 0.0, atol=1e-10)
+        np.testing.assert_allclose(
+            errors["interface_distance_error_mm"], 0.0, atol=1e-10
+        )

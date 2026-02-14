@@ -143,7 +143,7 @@ class TestVideoSetGetFrame:
         """get_frame auto-opens if not already open."""
         vs = VideoSet(test_videos)
         assert not vs.is_open
-        frames = vs.get_frame(0)
+        _frames = vs.get_frame(0)
         assert vs.is_open
         vs.close()
 

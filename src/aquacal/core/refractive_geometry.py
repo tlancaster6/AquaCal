@@ -14,9 +14,7 @@ from aquacal.core.interface_model import Interface, ray_plane_intersection
 
 
 def snells_law_3d(
-    incident_direction: Vec3,
-    surface_normal: Vec3,
-    n_ratio: float
+    incident_direction: Vec3, surface_normal: Vec3, n_ratio: float
 ) -> Vec3 | None:
     """
     Apply Snell's law in 3D to compute refracted ray direction.
@@ -70,9 +68,7 @@ def snells_law_3d(
 
 
 def trace_ray_air_to_water(
-    camera: Camera,
-    interface: Interface,
-    pixel: Vec2
+    camera: Camera, interface: Interface, pixel: Vec2
 ) -> tuple[Vec3, Vec3] | tuple[None, None]:
     """
     Trace ray from camera through air-water interface.
@@ -107,9 +103,7 @@ def trace_ray_air_to_water(
 
     # Refract at interface (air to water)
     refracted = snells_law_3d(
-        ray_direction,
-        interface.normal,
-        interface.n_ratio_air_to_water
+        ray_direction, interface.normal, interface.n_ratio_air_to_water
     )
 
     if refracted is None:  # TIR (shouldn't happen for air->water at normal incidence)
@@ -119,9 +113,7 @@ def trace_ray_air_to_water(
 
 
 def refractive_back_project(
-    camera: Camera,
-    interface: Interface,
-    pixel: Vec2
+    camera: Camera, interface: Interface, pixel: Vec2
 ) -> tuple[Vec3, Vec3] | tuple[None, None]:
     """
     Back-project pixel to ray in water.
@@ -145,9 +137,7 @@ def refractive_back_project(
 
 
 def _refractive_project_brent(
-    camera: Camera,
-    interface: Interface,
-    point_3d: Vec3
+    camera: Camera, interface: Interface, point_3d: Vec3
 ) -> Vec2 | None:
     """
     Project 3D underwater point to 2D pixel through refractive interface (Brent-search).
@@ -177,7 +167,7 @@ def _refractive_project_brent(
         return None
 
     # Check if point is (nearly) on optical axis - use direct projection
-    xy_dist = np.sqrt((Q[0] - C[0])**2 + (Q[1] - C[1])**2)
+    xy_dist = np.sqrt((Q[0] - C[0]) ** 2 + (Q[1] - C[1]) ** 2)
     if xy_dist < 1e-8:
         # Point is directly below camera - ray goes straight through
         P = np.array([C[0], C[1], z_int], dtype=np.float64)
@@ -193,8 +183,9 @@ def _refractive_project_brent(
 
     def get_interface_point(t: float) -> Vec3:
         """Get interface point at distance t from camera in XY plane."""
-        return np.array([C[0] + t * dir_xy[0], C[1] + t * dir_xy[1], z_int],
-                        dtype=np.float64)
+        return np.array(
+            [C[0] + t * dir_xy[0], C[1] + t * dir_xy[1], z_int], dtype=np.float64
+        )
 
     def compute_refracted_ray(P: Vec3) -> Vec3 | None:
         """Compute refracted ray direction in air from water point Q through P."""
@@ -530,11 +521,7 @@ def _refractive_project_newton_batch(
 
 def _is_flat_interface(normal: Vec3) -> bool:
     """Check if interface normal is approximately [0, 0, -1] (flat horizontal)."""
-    return (
-        abs(normal[0]) < 1e-6
-        and abs(normal[1]) < 1e-6
-        and abs(normal[2] + 1) < 1e-6
-    )
+    return abs(normal[0]) < 1e-6 and abs(normal[1]) < 1e-6 and abs(normal[2] + 1) < 1e-6
 
 
 def refractive_project(

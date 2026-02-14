@@ -100,19 +100,21 @@ def calibrate_synthetic(
     if refine_intrinsics:
         print("Stage 4: Intrinsic refinement...")
         stage3_result = (opt_extrinsics, opt_distances, opt_poses, rms)
-        opt_extrinsics, opt_distances, opt_poses, opt_intrinsics, rms = joint_refinement(
-            stage3_result=stage3_result,
-            detections=detections,
-            intrinsics=scenario.intrinsics,
-            board=board,
-            reference_camera=reference_camera,
-            refine_intrinsics=True,
-            interface_normal=interface_normal,
-            n_air=1.0,
-            n_water=n_water,
-            loss="huber",
-            loss_scale=1.0,
-            min_corners=4,
+        opt_extrinsics, opt_distances, opt_poses, opt_intrinsics, rms = (
+            joint_refinement(
+                stage3_result=stage3_result,
+                detections=detections,
+                intrinsics=scenario.intrinsics,
+                board=board,
+                reference_camera=reference_camera,
+                refine_intrinsics=True,
+                interface_normal=interface_normal,
+                n_air=1.0,
+                n_water=n_water,
+                loss="huber",
+                loss_scale=1.0,
+                min_corners=4,
+            )
         )
     else:
         # Use ground truth intrinsics
@@ -272,7 +274,9 @@ if __name__ == "__main__":
         scenario, n_water=1.333, refine_intrinsics=True
     )
     errors_refractive = compute_per_camera_errors(result_refractive, scenario)
-    print(f"Reprojection RMS: {result_refractive.diagnostics.reprojection_error_rms:.4f} px")
+    print(
+        f"Reprojection RMS: {result_refractive.diagnostics.reprojection_error_rms:.4f} px"
+    )
 
     # Print per-camera errors
     print("\nPer-camera errors (refractive):")
@@ -291,7 +295,9 @@ if __name__ == "__main__":
         scenario, n_water=1.0, refine_intrinsics=True
     )
     errors_nonrefractive = compute_per_camera_errors(result_nonrefractive, scenario)
-    print(f"Reprojection RMS: {result_nonrefractive.diagnostics.reprojection_error_rms:.4f} px")
+    print(
+        f"Reprojection RMS: {result_nonrefractive.diagnostics.reprojection_error_rms:.4f} px"
+    )
 
     # Print per-camera errors
     print("\nPer-camera errors (non-refractive):")

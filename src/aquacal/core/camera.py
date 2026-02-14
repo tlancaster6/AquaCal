@@ -92,9 +92,7 @@ class Camera:
         """
         return self.R @ point_world + self.t
 
-    def project(
-        self, point_world: Vec3, apply_distortion: bool = True
-    ) -> Vec2 | None:
+    def project(self, point_world: Vec3, apply_distortion: bool = True) -> Vec2 | None:
         """
         Project 3D world point to 2D pixel coordinates.
 
@@ -152,9 +150,7 @@ class Camera:
             # cv2.undistortPoints returns normalized coordinates
             # Ensure input is float64 and properly shaped
             pixel_input = np.asarray(pixel, dtype=np.float64).reshape(1, 1, 2)
-            pts_undist = cv2.undistortPoints(
-                pixel_input, self.K, self.dist_coeffs
-            )
+            pts_undist = cv2.undistortPoints(pixel_input, self.K, self.dist_coeffs)
             # pts_undist is in normalized camera coordinates (x/z, y/z)
             x_norm, y_norm = pts_undist.reshape(2)
         else:
@@ -205,9 +201,7 @@ class FisheyeCamera(Camera):
         extrinsics: CameraExtrinsics dataclass
     """
 
-    def project(
-        self, point_world: Vec3, apply_distortion: bool = True
-    ) -> Vec2 | None:
+    def project(self, point_world: Vec3, apply_distortion: bool = True) -> Vec2 | None:
         """
         Project 3D world point to 2D pixel using fisheye model.
 
@@ -254,9 +248,7 @@ class FisheyeCamera(Camera):
         if undistort:
             pixel_input = np.asarray(pixel, dtype=np.float64).reshape(1, 1, 2)
             D = self.dist_coeffs.reshape(4, 1)
-            pts_undist = cv2.fisheye.undistortPoints(
-                pixel_input, K=self.K, D=D
-            )
+            pts_undist = cv2.fisheye.undistortPoints(pixel_input, K=self.K, D=D)
             x_norm, y_norm = pts_undist.reshape(2)
         else:
             pixel_h = np.array([pixel[0], pixel[1], 1.0])

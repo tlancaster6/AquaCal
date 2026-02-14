@@ -533,7 +533,11 @@ def make_sparse_jacobian_func(
             bounds=bounds,
         )
         if use_dense:
-            return J_sparse.toarray() if hasattr(J_sparse, "toarray") else np.asarray(J_sparse)
+            return (
+                J_sparse.toarray()
+                if hasattr(J_sparse, "toarray")
+                else np.asarray(J_sparse)
+            )
         return J_sparse
 
     return jac_func

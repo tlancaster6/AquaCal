@@ -124,6 +124,7 @@ class TestUndistortPoints:
 
 # --- FisheyeCamera Tests ---
 
+
 @pytest.fixture
 def fisheye_intrinsics():
     """Fisheye intrinsics with zero distortion for predictable testing."""
@@ -240,7 +241,9 @@ class TestCreateCamera:
     def test_returns_camera_for_pinhole(self):
         """create_camera() returns Camera for non-fisheye intrinsics."""
         intrinsics = CameraIntrinsics(
-            K=np.eye(3), dist_coeffs=np.zeros(5), image_size=(640, 480),
+            K=np.eye(3),
+            dist_coeffs=np.zeros(5),
+            image_size=(640, 480),
         )
         extrinsics = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
         cam = create_camera("test", intrinsics, extrinsics)
@@ -249,7 +252,9 @@ class TestCreateCamera:
     def test_returns_fisheye_for_fisheye(self):
         """create_camera() returns FisheyeCamera for fisheye intrinsics."""
         intrinsics = CameraIntrinsics(
-            K=np.eye(3), dist_coeffs=np.zeros(4), image_size=(640, 480),
+            K=np.eye(3),
+            dist_coeffs=np.zeros(4),
+            image_size=(640, 480),
             is_fisheye=True,
         )
         extrinsics = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
@@ -259,7 +264,9 @@ class TestCreateCamera:
     def test_fisheye_is_subclass_of_camera(self):
         """FisheyeCamera is a Camera (isinstance check)."""
         intrinsics = CameraIntrinsics(
-            K=np.eye(3), dist_coeffs=np.zeros(4), image_size=(640, 480),
+            K=np.eye(3),
+            dist_coeffs=np.zeros(4),
+            image_size=(640, 480),
             is_fisheye=True,
         )
         extrinsics = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))

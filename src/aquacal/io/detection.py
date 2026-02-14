@@ -17,7 +17,7 @@ def detect_charuco(
     image: NDArray[np.uint8],
     board: BoardGeometry,
     camera_matrix: NDArray[np.float64] | None = None,
-    dist_coeffs: NDArray[np.float64] | None = None
+    dist_coeffs: NDArray[np.float64] | None = None,
 ) -> Detection | None:
     """
     Detect ChArUco corners in a single image.
@@ -63,7 +63,9 @@ def detect_charuco(
 
     # Detect ChArUco corners
     # Returns: (charuco_corners, charuco_ids, marker_corners, marker_ids)
-    charuco_corners, charuco_ids, marker_corners, marker_ids = detector.detectBoard(gray)
+    charuco_corners, charuco_ids, marker_corners, marker_ids = detector.detectBoard(
+        gray
+    )
 
     # Check if any ChArUco corners found
     if charuco_ids is None or len(charuco_ids) == 0:
@@ -74,18 +76,18 @@ def detect_charuco(
     corner_ids = charuco_ids.flatten()
 
     return Detection(
-        corner_ids=corner_ids.astype(np.int32),
-        corners_2d=corners_2d.astype(np.float64)
+        corner_ids=corner_ids.astype(np.int32), corners_2d=corners_2d.astype(np.float64)
     )
 
 
 def detect_all_frames(
     video_paths: dict[str, str] | VideoSet,
     board: BoardGeometry,
-    intrinsics: dict[str, tuple[NDArray[np.float64], NDArray[np.float64]]] | None = None,
+    intrinsics: dict[str, tuple[NDArray[np.float64], NDArray[np.float64]]]
+    | None = None,
     min_corners: int = 4,
     frame_step: int = 1,
-    progress_callback: Callable[[int, int], None] | None = None
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> DetectionResult:
     """
     Detect ChArUco corners in all frames of synchronized videos.
@@ -155,8 +157,7 @@ def detect_all_frames(
             # Only store frame if at least one camera detected the board
             if frame_detections:
                 frames[frame_idx] = FrameDetections(
-                    frame_idx=frame_idx,
-                    detections=frame_detections
+                    frame_idx=frame_idx, detections=frame_detections
                 )
 
             # Progress callback
@@ -164,9 +165,7 @@ def detect_all_frames(
                 progress_callback(processed_count, total_to_process)
 
         return DetectionResult(
-            frames=frames,
-            camera_names=camera_names,
-            total_frames=total_frames
+            frames=frames, camera_names=camera_names, total_frames=total_frames
         )
 
     finally:

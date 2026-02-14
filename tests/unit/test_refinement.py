@@ -16,6 +16,7 @@ from aquacal.calibration.refinement import joint_refinement
 from aquacal.calibration._optim_common import pack_params, unpack_params
 
 import sys
+
 sys.path.insert(0, ".")
 from tests.synthetic.ground_truth import generate_synthetic_detections
 
@@ -354,8 +355,16 @@ class TestJointRefinement:
         for cam in intrinsics:
             assert intr_opt[cam] is not None
             # Verify intrinsics are within reasonable bounds
-            assert 0.5 * intrinsics[cam].K[0, 0] <= intr_opt[cam].K[0, 0] <= 2.0 * intrinsics[cam].K[0, 0]
-            assert 0.5 * intrinsics[cam].K[1, 1] <= intr_opt[cam].K[1, 1] <= 2.0 * intrinsics[cam].K[1, 1]
+            assert (
+                0.5 * intrinsics[cam].K[0, 0]
+                <= intr_opt[cam].K[0, 0]
+                <= 2.0 * intrinsics[cam].K[0, 0]
+            )
+            assert (
+                0.5 * intrinsics[cam].K[1, 1]
+                <= intr_opt[cam].K[1, 1]
+                <= 2.0 * intrinsics[cam].K[1, 1]
+            )
 
     def test_reference_camera_unchanged(
         self,
@@ -394,9 +403,7 @@ class TestJointRefinement:
 
     def test_raises_for_invalid_reference(self, board, intrinsics, stage3_result):
         """Raises ValueError for invalid reference camera."""
-        detections = DetectionResult(
-            frames={}, camera_names=["cam0"], total_frames=0
-        )
+        detections = DetectionResult(frames={}, camera_names=["cam0"], total_frames=0)
 
         with pytest.raises(ValueError, match="reference"):
             joint_refinement(

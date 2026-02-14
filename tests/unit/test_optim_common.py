@@ -154,7 +154,9 @@ class TestMakeSparseJacobianFunc:
         J_sparse = jac_func_sparse(params, A)
 
         # Convert sparse to dense for comparison
-        J_sparse_dense = J_sparse.toarray() if hasattr(J_sparse, 'toarray') else J_sparse
+        J_sparse_dense = (
+            J_sparse.toarray() if hasattr(J_sparse, "toarray") else J_sparse
+        )
 
         # Both should match the true Jacobian (A) within FD tolerance
         # For a linear function, 2-point FD is exact up to floating-point precision

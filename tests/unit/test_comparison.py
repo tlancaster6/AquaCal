@@ -603,7 +603,7 @@ class TestWriteComparisonReport:
         output_dir = tmp_path / "nested" / "comparison_output"
         assert not output_dir.exists()
 
-        paths = write_comparison_report(
+        _paths = write_comparison_report(
             comp, [result1, result2], output_dir, save_plots=False
         )
 
@@ -1011,7 +1011,9 @@ class TestWriteComparisonReportDepth:
 
         # Verify values are in millimeters
         # dbe1 has signed_mean[0] = 0.001 m = 1.0 mm
-        run1_bin0 = csv_df[(csv_df["label"] == "run1") & (csv_df["bin_center_z"] == 0.45)]
+        run1_bin0 = csv_df[
+            (csv_df["label"] == "run1") & (csv_df["bin_center_z"] == 0.45)
+        ]
         assert len(run1_bin0) == 1
         assert np.isclose(run1_bin0.iloc[0]["signed_mean_mm"], 1.0, atol=1e-6)
 
