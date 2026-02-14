@@ -10,35 +10,35 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 ## Current Position
 
 Phase: 2 of 6 (CI/CD Automation)
-Plan: 2 of 3
+Plan: 3 of 3
 Status: In progress
-Last activity: 2026-02-14 — Completed 02-02: GitHub Actions test workflows
+Last activity: 2026-02-14 — Completed 02-03: Docs and release automation
 
-Progress: [████░░░░░░] 25%
+Progress: [█████░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 146 seconds
-- Total execution time: 0.20 hours
+- Total plans completed: 6
+- Average duration: 157 seconds
+- Total execution time: 0.26 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 3 | 514s | 171s |
-| 02 | 2 | 237s | 119s |
+| 02 | 3 | 434s | 145s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 02 | 03 | 197s | 3 | 8 |
 | 02 | 02 | 157s | 2 | 2 |
 | 02 | 01 | 80s | 2 | 2 |
 | 01 | 03 | 5 min | 2 | 0 |
 | 01 | 02 | 107s | 2 | 4 |
-| 01 | 01 | 8 min | 2 | 6 |
 
 ## Accumulated Context
 
@@ -61,6 +61,11 @@ Recent decisions affecting current work:
 - [Phase 02-ci-cd-automation]: Pre-commit enforced in CI to catch contributors who skip local hooks
 - [Phase 02-ci-cd-automation]: Slow tests separated to manual trigger to maintain fast PR feedback
 - [Phase 02-ci-cd-automation]: Coverage upload graceful (fail_ci_if_error: false) until Codecov configured
+- [Phase 02-ci-cd-automation]: Use Trusted Publishing (OIDC) for PyPI to avoid API tokens
+- [Phase 02-ci-cd-automation]: Test gate before publish even though main should be green
+- [Phase 02-ci-cd-automation]: Minimal Sphinx scaffolding now, full docs in Phase 5
+- [Phase 02-ci-cd-automation]: Conventional commits for semantic versioning (feat→minor, fix→patch)
+- [Phase 02-ci-cd-automation]: python-semantic-release automates version bumping and tag creation
 
 ### Pending Todos
 
@@ -87,5 +92,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-14 (plan execution)
-Stopped at: Completed 02-02-PLAN.md (GitHub Actions test workflows)
+Stopped at: Completed 02-03-PLAN.md (Docs and release automation)
 Resume file: None
