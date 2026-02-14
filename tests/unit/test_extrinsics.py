@@ -1,31 +1,31 @@
 """Unit tests for extrinsic calibration module."""
 
-import pytest
 import numpy as np
+import pytest
 
+from aquacal.calibration.extrinsics import (
+    Observation,
+    PoseGraph,
+    _average_rotations,
+    build_pose_graph,
+    estimate_board_pose,
+    estimate_extrinsics,
+    refractive_solve_pnp,
+)
 from aquacal.config.schema import (
     BoardConfig,
     CameraExtrinsics,
     CameraIntrinsics,
-    Detection,
-    FrameDetections,
-    DetectionResult,
     ConnectivityError,
+    Detection,
+    DetectionResult,
+    FrameDetections,
 )
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
 from aquacal.core.refractive_geometry import refractive_project
-from aquacal.calibration.extrinsics import (
-    Observation,
-    PoseGraph,
-    _average_rotations,
-    estimate_board_pose,
-    refractive_solve_pnp,
-    build_pose_graph,
-    estimate_extrinsics,
-)
-from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
+from aquacal.utils.transforms import matrix_to_rvec, rvec_to_matrix
 
 
 @pytest.fixture

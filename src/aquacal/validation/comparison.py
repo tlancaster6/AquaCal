@@ -1,14 +1,23 @@
 """Cross-run calibration comparison."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 
 from aquacal.config.schema import CalibrationResult
 from aquacal.utils.transforms import matrix_to_rvec
+
+if TYPE_CHECKING:
+    from aquacal.validation.reconstruction import (
+        DepthBinnedErrors,
+        SpatialErrorGrid,
+        SpatialMeasurements,
+    )
 
 
 @dataclass
@@ -390,7 +399,6 @@ def write_comparison_report(
         # XY error heatmaps (if spatial_data provided)
         if spatial_data is not None:
             from aquacal.validation.reconstruction import (
-                SpatialMeasurements,
                 bin_by_depth,
                 compute_xy_error_grids,
             )
@@ -428,8 +436,6 @@ def write_comparison_report(
 
     # Depth binned errors CSV (if depth_data provided, regardless of save_plots)
     if depth_data is not None:
-        from aquacal.validation.reconstruction import DepthBinnedErrors
-
         depth_binned_csv = output_dir / "depth_binned_errors.csv"
         # Stack all runs into one CSV
         rows = []
@@ -712,7 +718,6 @@ def plot_xy_error_heatmaps(grids: dict[str, "SpatialErrorGrid"]):
     from matplotlib.colors import TwoSlopeNorm
 
     # Import locally to avoid circular dependency
-    from aquacal.validation.reconstruction import SpatialErrorGrid
 
     if not grids:
         raise ValueError("No grids provided for heatmap")
@@ -724,8 +729,8 @@ def plot_xy_error_heatmaps(grids: dict[str, "SpatialErrorGrid"]):
     # Get grid dimensions from first grid (all should be the same)
     first_grid = grids[sorted_labels[0]]
     n_depth_bins = first_grid.grids.shape[0]
-    n_y = first_grid.grids.shape[1]
-    n_x = first_grid.grids.shape[2]
+    _n_y = first_grid.grids.shape[1]
+    _n_x = first_grid.grids.shape[2]
 
     # Identify depth bins with at least one run having measurements
     valid_depth_bins = []
@@ -793,7 +798,7 @@ def plot_xy_error_heatmaps(grids: dict[str, "SpatialErrorGrid"]):
             norm = TwoSlopeNorm(vmin=vmin_mm, vcenter=0, vmax=vmax_mm)
 
             # Plot heatmap (origin="upper" to match Y-down convention)
-            im = ax.imshow(
+            _im = ax.imshow(
                 error_grid_mm,
                 cmap="RdBu_r",
                 norm=norm,
@@ -864,7 +869,6 @@ def plot_depth_error_comparison(depth_data: dict[str, "DepthBinnedErrors"]):
     import numpy as np
 
     # Import DepthBinnedErrors locally to avoid circular import
-    from aquacal.validation.reconstruction import DepthBinnedErrors
 
     fig, ax = plt.subplots(figsize=(10, 6))
 

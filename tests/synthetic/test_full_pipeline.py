@@ -6,7 +6,6 @@ import pytest
 from aquacal.calibration.extrinsics import build_pose_graph, estimate_extrinsics
 from aquacal.calibration.interface_estimation import optimize_interface
 from aquacal.config.schema import (
-    BoardConfig,
     CalibrationMetadata,
     CalibrationResult,
     CameraCalibration,

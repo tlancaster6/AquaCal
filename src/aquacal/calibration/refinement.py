@@ -8,23 +8,23 @@ all parameters from Stage 3, with the option to also refine camera intrinsics
 import numpy as np
 from scipy.optimize import least_squares
 
+from aquacal.calibration._optim_common import (
+    build_bounds,
+    build_jacobian_sparsity,
+    compute_residuals,
+    make_sparse_jacobian_func,
+    pack_params,
+    unpack_params,
+)
 from aquacal.config.schema import (
-    CameraIntrinsics,
-    CameraExtrinsics,
     BoardPose,
-    DetectionResult,
+    CameraExtrinsics,
+    CameraIntrinsics,
     ConvergenceError,
+    DetectionResult,
     Vec3,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.calibration._optim_common import (
-    pack_params,
-    unpack_params,
-    build_jacobian_sparsity,
-    build_bounds,
-    compute_residuals,
-    make_sparse_jacobian_func,
-)
 
 
 def joint_refinement(

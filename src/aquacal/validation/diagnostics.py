@@ -1,21 +1,27 @@
 """Detailed error analysis and diagnostic reporting."""
 
+from __future__ import annotations
+
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
 from aquacal.config.schema import (
+    BoardPose,
     CalibrationResult,
     DetectionResult,
-    BoardPose,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.validation.reprojection import ReprojectionErrors
 from aquacal.validation.reconstruction import DistanceErrors
+from aquacal.validation.reprojection import ReprojectionErrors
+
+if TYPE_CHECKING:
+    import matplotlib.pyplot as plt
 
 
 @dataclass
@@ -354,7 +360,7 @@ def generate_recommendations(
     if camera_heights is not None:
         mean_height = camera_heights["mean_height"]
         height_spread = camera_heights["height_spread"]
-        water_z = camera_heights["water_z"]
+        _water_z = camera_heights["water_z"]
 
         recs.append(
             f"Camera heights above water: mean {mean_height * 1000:.1f} mm, spread {height_spread * 1000:.1f} mm"
@@ -462,7 +468,6 @@ def plot_camera_rig(
         matplotlib Figure with three subplots (perspective, top-down, side view)
     """
     import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
 
     # Collect camera positions and interface z-coordinates
     camera_positions = []
@@ -675,7 +680,7 @@ def plot_reprojection_quiver(
     )
 
     # Add colorbar
-    cbar = plt.colorbar(quiver, ax=ax, label="Residual Magnitude (pixels)")
+    _cbar = plt.colorbar(quiver, ax=ax, label="Residual Magnitude (pixels)")
 
     # Set axes
     ax.set_xlim(0, width)
@@ -684,7 +689,7 @@ def plot_reprojection_quiver(
     ax.set_ylabel("v (pixels)")
 
     # Compute RMS for this camera
-    rms = calibration.cameras[camera_name].intrinsics.image_size
+    _rms = calibration.cameras[camera_name].intrinsics.image_size
     if camera_name in reprojection_errors.per_camera:
         rms_val = reprojection_errors.per_camera[camera_name]
         ax.set_title(f"{camera_name} - RMS: {rms_val:.3f} px")
@@ -793,11 +798,11 @@ def save_diagnostic_report(
             img_path = output_dir / f"spatial_error_{cam_name}.png"
 
             fig, ax = plt.subplots(figsize=(8, 6))
-            im = ax.imshow(error_map, cmap="hot", interpolation="nearest")
+            _im = ax.imshow(error_map, cmap="hot", interpolation="nearest")
             ax.set_title(f"Spatial Error Map: {cam_name}")
             ax.set_xlabel("Image X (binned)")
             ax.set_ylabel("Image Y (binned)")
-            plt.colorbar(im, ax=ax, label="Mean Error (pixels)")
+            plt.colorbar(_im, ax=ax, label="Mean Error (pixels)")
 
             fig.savefig(img_path, dpi=100, bbox_inches="tight")
             plt.close(fig)

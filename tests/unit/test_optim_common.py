@@ -2,7 +2,6 @@
 
 import numpy as np
 import scipy.sparse
-import pytest
 
 from aquacal.calibration._optim_common import make_sparse_jacobian_func
 

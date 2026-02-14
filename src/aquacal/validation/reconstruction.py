@@ -1,8 +1,8 @@
 """3D reconstruction metrics using known ChArUco geometry."""
 
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -11,8 +11,8 @@ from numpy.typing import NDArray
 from aquacal.config.schema import (
     CalibrationResult,
     DetectionResult,
-    Vec3,
     Vec2,
+    Vec3,
 )
 from aquacal.core.board import BoardGeometry
 from aquacal.triangulation.triangulate import triangulate_point

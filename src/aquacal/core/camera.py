@@ -1,10 +1,10 @@
 """Camera model and projection operations (without refraction)."""
 
-import numpy as np
 import cv2
+import numpy as np
 from numpy.typing import NDArray
 
-from aquacal.config.schema import CameraIntrinsics, CameraExtrinsics, Vec3, Vec2, Mat3
+from aquacal.config.schema import CameraExtrinsics, CameraIntrinsics, Mat3, Vec2, Vec3
 
 
 class Camera:

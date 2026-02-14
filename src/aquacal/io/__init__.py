@@ -13,6 +13,6 @@ __all__ = [
 ]
 
 # Imports will be added as modules are implemented:
+from aquacal.io.detection import detect_all_frames, detect_charuco
+from aquacal.io.serialization import load_calibration, save_calibration
 from aquacal.io.video import VideoSet
-from aquacal.io.detection import detect_charuco, detect_all_frames
-from aquacal.io.serialization import save_calibration, load_calibration

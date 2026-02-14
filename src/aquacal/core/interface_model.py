@@ -1,7 +1,6 @@
 """Refractive interface (water surface) model."""
 
 import numpy as np
-from numpy.typing import NDArray
 
 from aquacal.config.schema import Vec3
 

@@ -13,30 +13,30 @@ import pytest
 
 from aquacal.config.schema import (
     BoardConfig,
+    BoardPose,
+    CalibrationMetadata,
     CalibrationResult,
     CameraCalibration,
-    CameraIntrinsics,
     CameraExtrinsics,
-    InterfaceParams,
-    DiagnosticsData,
-    CalibrationMetadata,
-    DetectionResult,
-    FrameDetections,
+    CameraIntrinsics,
     Detection,
-    BoardPose,
+    DetectionResult,
+    DiagnosticsData,
+    FrameDetections,
+    InterfaceParams,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.validation.reprojection import ReprojectionErrors
-from aquacal.validation.reconstruction import DistanceErrors
 from aquacal.validation.diagnostics import (
     DiagnosticReport,
-    compute_spatial_error_map,
-    compute_depth_stratified_errors,
     compute_camera_heights,
-    generate_recommendations,
+    compute_depth_stratified_errors,
+    compute_spatial_error_map,
     generate_diagnostic_report,
+    generate_recommendations,
     save_diagnostic_report,
 )
+from aquacal.validation.reconstruction import DistanceErrors
+from aquacal.validation.reprojection import ReprojectionErrors
 
 
 @pytest.fixture

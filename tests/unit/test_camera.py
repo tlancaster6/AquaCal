@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from aquacal.config.schema import CameraIntrinsics, CameraExtrinsics
+from aquacal.config.schema import CameraExtrinsics, CameraIntrinsics
 from aquacal.core.camera import Camera, FisheyeCamera, create_camera, undistort_points
 
 

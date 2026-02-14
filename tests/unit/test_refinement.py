@@ -1,21 +1,21 @@
 """Unit tests for Stage 4 joint refinement."""
 
-import pytest
-import numpy as np
+import sys
 
+import numpy as np
+import pytest
+
+from aquacal.calibration._optim_common import pack_params, unpack_params
+from aquacal.calibration.refinement import joint_refinement
 from aquacal.config.schema import (
     BoardConfig,
-    CameraIntrinsics,
-    CameraExtrinsics,
     BoardPose,
-    DetectionResult,
+    CameraExtrinsics,
+    CameraIntrinsics,
     ConvergenceError,
+    DetectionResult,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.calibration.refinement import joint_refinement
-from aquacal.calibration._optim_common import pack_params, unpack_params
-
-import sys
 
 sys.path.insert(0, ".")
 from tests.synthetic.ground_truth import generate_synthetic_detections

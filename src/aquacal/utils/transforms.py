@@ -1,8 +1,8 @@
 """Rotation and coordinate transform utilities."""
 
+import cv2
 import numpy as np
 from numpy.typing import NDArray
-import cv2
 
 # Local type aliases (matches schema.py but no import needed)
 Vec3 = NDArray[np.float64]

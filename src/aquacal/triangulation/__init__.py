@@ -10,7 +10,7 @@ __all__ = [
 
 # Imports
 from aquacal.triangulation.triangulate import (
+    point_to_ray_distance,
     triangulate_point,
     triangulate_rays,
-    point_to_ray_distance,
 )

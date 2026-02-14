@@ -1,18 +1,19 @@
 """Tests for intrinsic calibration."""
 
-import pytest
-import cv2
-import numpy as np
 from pathlib import Path
 
-from aquacal.config.schema import BoardConfig, CameraIntrinsics
-from aquacal.core.board import BoardGeometry
+import cv2
+import numpy as np
+import pytest
+
 from aquacal.calibration.intrinsics import (
-    calibrate_intrinsics_single,
-    calibrate_intrinsics_all,
     _select_calibration_frames,
+    calibrate_intrinsics_all,
+    calibrate_intrinsics_single,
     validate_intrinsics,
 )
+from aquacal.config.schema import BoardConfig, CameraIntrinsics
+from aquacal.core.board import BoardGeometry
 
 
 @pytest.fixture

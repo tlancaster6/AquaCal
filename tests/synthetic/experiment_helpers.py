@@ -4,29 +4,27 @@ Provides calibration and evaluation utilities used by all three experiments.
 """
 
 from __future__ import annotations
+
 import sys
 from pathlib import Path
-import numpy as np
-from numpy.typing import NDArray
 
-from aquacal.config.schema import (
-    BoardPose,
-    CalibrationResult,
-    CameraCalibration,
-    CameraExtrinsics,
-    CameraIntrinsics,
-    DetectionResult,
-    InterfaceParams,
-    DiagnosticsData,
-    CalibrationMetadata,
-)
-from aquacal.core.board import BoardGeometry
+import numpy as np
+
 from aquacal.calibration.extrinsics import build_pose_graph, estimate_extrinsics
 from aquacal.calibration.interface_estimation import optimize_interface
 from aquacal.calibration.refinement import joint_refinement
+from aquacal.config.schema import (
+    CalibrationMetadata,
+    CalibrationResult,
+    CameraCalibration,
+    DetectionResult,
+    DiagnosticsData,
+    InterfaceParams,
+)
+from aquacal.core.board import BoardGeometry
 from aquacal.validation.reconstruction import (
-    compute_3d_distance_errors,
     DistanceErrors,
+    compute_3d_distance_errors,
 )
 
 # Add project root to path for imports when running as script
@@ -34,7 +32,7 @@ _project_root = Path(__file__).parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from tests.synthetic.ground_truth import (
+from tests.synthetic.ground_truth import (  # noqa: E402
     SyntheticScenario,
     generate_synthetic_detections,
 )

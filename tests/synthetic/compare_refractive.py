@@ -5,21 +5,21 @@ Usage:
     python tests/synthetic/compare_refractive.py --output-dir results/ --experiment 1,2 --seed 123
 """
 
-import sys
-from pathlib import Path
 import argparse
+import sys
 import time
+from pathlib import Path
 
 # Add project root to path for imports
 _project_root = Path(__file__).parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from tests.synthetic.experiments import (
+from tests.synthetic.experiments import (  # noqa: E402
+    assemble_summary,
     run_experiment_1,
     run_experiment_2,
     run_experiment_3,
-    assemble_summary,
 )
 
 

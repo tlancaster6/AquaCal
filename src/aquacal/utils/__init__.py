@@ -1,11 +1,11 @@
 """Utility modules."""
 
 from aquacal.utils.transforms import (
-    rvec_to_matrix,
-    matrix_to_rvec,
+    camera_center,
     compose_poses,
     invert_pose,
-    camera_center,
+    matrix_to_rvec,
+    rvec_to_matrix,
 )
 
 # Public API - will be populated as modules are implemented

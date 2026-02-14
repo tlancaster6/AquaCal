@@ -3,15 +3,15 @@
 import numpy as np
 import pytest
 
-from aquacal.config.schema import CameraIntrinsics, CameraExtrinsics
+from aquacal.config.schema import CameraExtrinsics, CameraIntrinsics
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
 from aquacal.core.refractive_geometry import (
-    snells_law_3d,
-    trace_ray_air_to_water,
     refractive_back_project,
     refractive_project,
     refractive_project_batch,
+    snells_law_3d,
+    trace_ray_air_to_water,
 )
 
 

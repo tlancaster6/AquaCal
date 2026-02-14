@@ -1,25 +1,25 @@
 """Tests for refractive triangulation."""
 
-import pytest
 import numpy as np
+import pytest
 
 from aquacal.config.schema import (
     BoardConfig,
-    CameraIntrinsics,
-    CameraExtrinsics,
-    CameraCalibration,
-    CalibrationResult,
-    InterfaceParams,
-    DiagnosticsData,
     CalibrationMetadata,
+    CalibrationResult,
+    CameraCalibration,
+    CameraExtrinsics,
+    CameraIntrinsics,
+    DiagnosticsData,
+    InterfaceParams,
 )
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
 from aquacal.core.refractive_geometry import refractive_project
 from aquacal.triangulation.triangulate import (
     point_to_ray_distance,
-    triangulate_rays,
     triangulate_point,
+    triangulate_rays,
 )
 
 

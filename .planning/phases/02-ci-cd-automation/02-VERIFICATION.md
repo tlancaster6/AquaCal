@@ -81,7 +81,7 @@ Key quality indicators:
 
 **Test:** Push a commit or open a PR to main branch
 
-**Expected:** 
+**Expected:**
 - GitHub Actions runs test.yml
 - Matrix spawns 6 jobs (2 OS × 3 Python versions)
 - Pre-commit job runs in parallel
@@ -104,7 +104,7 @@ Key quality indicators:
 
 #### 3. Semantic Release Flow
 
-**Test:** 
+**Test:**
 1. Merge commit to main with message "feat: add new feature"
 2. Observe GitHub Actions runs release.yml
 3. semantic-release creates new version tag

@@ -1,33 +1,31 @@
 """Tests for reprojection error computation."""
 
-import pytest
+import sys
+
 import numpy as np
+import pytest
 
 from aquacal.config.schema import (
     BoardConfig,
     BoardPose,
-    CameraIntrinsics,
-    CameraExtrinsics,
-    CameraCalibration,
-    CalibrationResult,
-    InterfaceParams,
-    DiagnosticsData,
     CalibrationMetadata,
+    CalibrationResult,
+    CameraCalibration,
+    CameraExtrinsics,
+    CameraIntrinsics,
     Detection,
-    FrameDetections,
     DetectionResult,
+    DiagnosticsData,
+    InterfaceParams,
 )
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
 from aquacal.core.refractive_geometry import refractive_project
 from aquacal.validation.reprojection import (
-    compute_reprojection_errors,
     compute_reprojection_error_single,
-    ReprojectionErrors,
+    compute_reprojection_errors,
 )
-
-import sys
 
 sys.path.insert(0, ".")
 from tests.synthetic.ground_truth import generate_synthetic_detections

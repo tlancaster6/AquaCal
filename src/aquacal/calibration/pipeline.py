@@ -13,6 +13,14 @@ import cv2
 import numpy as np
 import yaml
 
+from aquacal.calibration.extrinsics import build_pose_graph, estimate_extrinsics
+from aquacal.calibration.interface_estimation import (
+    _compute_initial_board_poses,
+    optimize_interface,
+    register_auxiliary_camera,
+)
+from aquacal.calibration.intrinsics import calibrate_intrinsics_all
+from aquacal.calibration.refinement import joint_refinement
 from aquacal.config.schema import (
     BoardConfig,
     BoardPose,
@@ -28,23 +36,15 @@ from aquacal.config.schema import (
     InterfaceParams,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.calibration.intrinsics import calibrate_intrinsics_all
-from aquacal.calibration.extrinsics import build_pose_graph, estimate_extrinsics
-from aquacal.calibration.interface_estimation import (
-    optimize_interface,
-    register_auxiliary_camera,
-    _compute_initial_board_poses,
-)
-from aquacal.calibration.refinement import joint_refinement
 from aquacal.io.detection import detect_all_frames
 from aquacal.io.serialization import save_calibration
-from aquacal.validation.reprojection import compute_reprojection_errors
-from aquacal.validation.reconstruction import compute_3d_distance_errors
+from aquacal.utils.transforms import matrix_to_rvec
 from aquacal.validation.diagnostics import (
     generate_diagnostic_report,
     save_diagnostic_report,
 )
-from aquacal.utils.transforms import matrix_to_rvec
+from aquacal.validation.reconstruction import compute_3d_distance_errors
+from aquacal.validation.reprojection import compute_reprojection_errors
 
 
 def load_config(config_path: str | Path) -> CalibrationConfig:
@@ -518,7 +518,7 @@ def run_calibration_from_config(
         n_air=config.n_air,
         n_water=config.n_water,
         progress_callback=lambda cam, cur, total: print(
-            f"  Averaging poses..."
+            "  Averaging poses..."
             if cam == "_averaging"
             else f"  Located {cam} ({cur}/{total})"
         ),
@@ -562,7 +562,7 @@ def run_calibration_from_config(
 
     # Save pre-optimization calibration
     save_calibration(initial_result, config.output_dir / "calibration_initial.json")
-    print(f"  Saved calibration_initial.json")
+    print("  Saved calibration_initial.json")
 
     # Save initial camera rig visualization (pre-optimization)
     try:
@@ -570,6 +570,7 @@ def run_calibration_from_config(
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+
         from aquacal.validation.diagnostics import plot_camera_rig
 
         fig = plot_camera_rig(
@@ -582,7 +583,7 @@ def run_calibration_from_config(
             bbox_inches="tight",
         )
         plt.close(fig)
-        print(f"  Saved camera_rig_initial.png")
+        print("  Saved camera_rig_initial.png")
     except Exception as e:
         print(f"  Warning: Could not save camera_rig_initial.png: {e}")
 

@@ -1,38 +1,35 @@
 """Tests for 3D reconstruction validation metrics."""
 
-import pytest
 import numpy as np
+import pytest
 
 from aquacal.config.schema import (
     BoardConfig,
-    CameraIntrinsics,
-    CameraExtrinsics,
-    CameraCalibration,
-    CalibrationResult,
-    InterfaceParams,
-    DiagnosticsData,
     CalibrationMetadata,
+    CalibrationResult,
+    CameraCalibration,
+    CameraExtrinsics,
+    CameraIntrinsics,
     Detection,
-    FrameDetections,
     DetectionResult,
+    DiagnosticsData,
+    FrameDetections,
+    InterfaceParams,
 )
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
 from aquacal.core.refractive_geometry import refractive_project
 from aquacal.validation.reconstruction import (
-    triangulate_charuco_corners,
+    SpatialMeasurements,
+    bin_by_depth,
     compute_3d_distance_errors,
     compute_board_planarity_error,
-    get_adjacent_corner_pairs,
-    DistanceErrors,
-    SpatialMeasurements,
-    DepthBinnedErrors,
-    SpatialErrorGrid,
-    bin_by_depth,
     compute_xy_error_grids,
-    save_spatial_measurements,
+    get_adjacent_corner_pairs,
     load_spatial_measurements,
+    save_spatial_measurements,
+    triangulate_charuco_corners,
 )
 
 

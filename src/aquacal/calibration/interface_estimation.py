@@ -8,30 +8,30 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import least_squares
 
+from aquacal.calibration._optim_common import (
+    build_bounds,
+    build_jacobian_sparsity,
+    compute_residuals,
+    make_sparse_jacobian_func,
+    pack_params,
+    unpack_params,
+)
+from aquacal.calibration.extrinsics import _average_rotations, refractive_solve_pnp
 from aquacal.config.schema import (
-    CameraIntrinsics,
-    CameraExtrinsics,
     BoardPose,
+    CameraExtrinsics,
+    CameraIntrinsics,
+    ConvergenceError,
     DetectionResult,
     InsufficientDataError,
-    ConvergenceError,
     Vec3,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.calibration._optim_common import (
-    pack_params,
-    unpack_params,
-    build_jacobian_sparsity,
-    build_bounds,
-    compute_residuals,
-    make_sparse_jacobian_func,
-)
-from aquacal.calibration.extrinsics import refractive_solve_pnp, _average_rotations
 from aquacal.utils.transforms import (
-    rvec_to_matrix,
-    matrix_to_rvec,
     compose_poses,
     invert_pose,
+    matrix_to_rvec,
+    rvec_to_matrix,
 )
 
 

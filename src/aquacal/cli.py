@@ -5,13 +5,13 @@ import re
 import sys
 from pathlib import Path
 
-from aquacal.calibration.pipeline import run_calibration, load_config
+from aquacal.calibration.pipeline import load_config, run_calibration
 from aquacal.config.schema import CalibrationError
 from aquacal.io.serialization import load_calibration
 from aquacal.validation.comparison import compare_calibrations, write_comparison_report
 from aquacal.validation.reconstruction import (
-    load_spatial_measurements,
     bin_by_depth,
+    load_spatial_measurements,
 )
 
 
@@ -172,7 +172,7 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
 
     # Run calibration
     try:
-        result = run_calibration(config_path, verbose=args.verbose)
+        _result = run_calibration(config_path, verbose=args.verbose)
         return 0
     except CalibrationError as e:
         print(f"Calibration failed: {e}", file=sys.stderr)
@@ -422,7 +422,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
                 spatial = load_spatial_measurements(spatial_file)
                 spatial_data[label] = spatial
                 depth_data[label] = bin_by_depth(spatial)
-            except Exception as e:
+            except Exception:
                 # Silently skip if spatial data can't be loaded
                 pass
 

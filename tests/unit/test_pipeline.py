@@ -1,21 +1,21 @@
 """Unit tests for calibration pipeline orchestration."""
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch, call
 import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 import yaml
 
 from aquacal.calibration.pipeline import (
-    load_config,
-    split_detections,
-    run_calibration,
-    run_calibration_from_config,
     _build_calibration_result,
     _compute_config_hash,
     _save_board_reference_images,
+    load_config,
+    run_calibration,
+    run_calibration_from_config,
+    split_detections,
 )
 from aquacal.config.schema import (
     BoardConfig,
@@ -23,7 +23,6 @@ from aquacal.config.schema import (
     CalibrationConfig,
     CalibrationMetadata,
     CalibrationResult,
-    CameraCalibration,
     CameraExtrinsics,
     CameraIntrinsics,
     Detection,
@@ -32,7 +31,6 @@ from aquacal.config.schema import (
     FrameDetections,
     InterfaceParams,
 )
-
 
 # --- Fixtures ---
 

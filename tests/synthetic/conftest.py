@@ -1,7 +1,8 @@
 """Pytest fixtures for synthetic pipeline tests."""
 
 import pytest
-from .ground_truth import create_scenario, SyntheticScenario
+
+from .ground_truth import SyntheticScenario, create_scenario
 
 
 @pytest.fixture(scope="class")

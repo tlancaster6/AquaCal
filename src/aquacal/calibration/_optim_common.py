@@ -10,9 +10,9 @@ from numpy.typing import NDArray
 from scipy.optimize._numdiff import approx_derivative, group_columns
 
 from aquacal.config.schema import (
-    CameraIntrinsics,
-    CameraExtrinsics,
     BoardPose,
+    CameraExtrinsics,
+    CameraIntrinsics,
     DetectionResult,
     Vec3,
 )
@@ -20,7 +20,7 @@ from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
 from aquacal.core.refractive_geometry import refractive_project
-from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
+from aquacal.utils.transforms import matrix_to_rvec, rvec_to_matrix
 
 
 def pack_params(

@@ -1,10 +1,11 @@
 """Synthetic ground truth generation for full pipeline testing."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 import numpy as np
 from numpy.typing import NDArray
-import cv2
 
 from aquacal.config.schema import (
     BoardConfig,

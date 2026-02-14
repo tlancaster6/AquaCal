@@ -9,10 +9,10 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from aquacal.config.schema import CameraIntrinsics, BoardConfig
+from aquacal.config.schema import CameraIntrinsics
 from aquacal.core.board import BoardGeometry
-from aquacal.io.video import VideoSet
 from aquacal.io.detection import detect_charuco
+from aquacal.io.video import VideoSet
 
 
 def validate_intrinsics(

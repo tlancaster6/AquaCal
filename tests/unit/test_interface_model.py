@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from aquacal.core.interface_model import Interface, ray_plane_intersection
 
 

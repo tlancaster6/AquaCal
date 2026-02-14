@@ -1,18 +1,19 @@
 """Unit tests for ChArUco detection."""
 
-import pytest
+from pathlib import Path
+
 import cv2
 import numpy as np
-from pathlib import Path
+import pytest
 
 from aquacal.config.schema import (
     BoardConfig,
     Detection,
-    FrameDetections,
     DetectionResult,
+    FrameDetections,
 )
 from aquacal.core.board import BoardGeometry
-from aquacal.io.detection import detect_charuco, detect_all_frames
+from aquacal.io.detection import detect_all_frames, detect_charuco
 from aquacal.io.video import VideoSet
 
 

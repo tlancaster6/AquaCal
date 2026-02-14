@@ -4,11 +4,11 @@ from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera, undistort_points
 from aquacal.core.interface_model import Interface, ray_plane_intersection
 from aquacal.core.refractive_geometry import (
-    snells_law_3d,
-    trace_ray_air_to_water,
+    refractive_back_project,
     refractive_project,
     refractive_project_batch,
-    refractive_back_project,
+    snells_law_3d,
+    trace_ray_air_to_water,
 )
 
 __all__ = [

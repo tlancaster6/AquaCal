@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from aquacal.config.schema import Detection, FrameDetections, DetectionResult
+from aquacal.config.schema import Detection, DetectionResult, FrameDetections
 from aquacal.core.board import BoardGeometry
 from aquacal.io.video import VideoSet
 

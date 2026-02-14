@@ -1,35 +1,34 @@
 """Tests for validation.comparison module."""
 
+import cv2
 import numpy as np
 import pandas as pd
 import pytest
-import cv2
-from pathlib import Path
 
 from aquacal.config.schema import (
+    BoardConfig,
+    CalibrationMetadata,
     CalibrationResult,
     CameraCalibration,
-    CameraIntrinsics,
     CameraExtrinsics,
-    InterfaceParams,
-    BoardConfig,
+    CameraIntrinsics,
     DiagnosticsData,
-    CalibrationMetadata,
+    InterfaceParams,
 )
 from aquacal.validation.comparison import (
-    compare_calibrations,
     ComparisonResult,
-    write_comparison_report,
-    plot_rms_bar_chart,
-    plot_position_overlay,
-    plot_z_position_dumbbell,
+    compare_calibrations,
     plot_depth_error_comparison,
+    plot_position_overlay,
+    plot_rms_bar_chart,
     plot_xy_error_heatmaps,
+    plot_z_position_dumbbell,
+    write_comparison_report,
 )
 from aquacal.validation.reconstruction import (
     DepthBinnedErrors,
-    SpatialMeasurements,
     SpatialErrorGrid,
+    SpatialMeasurements,
 )
 
 
@@ -1233,7 +1232,6 @@ class TestXYErrorHeatmaps:
         2. The PNG file is created and non-empty
         3. constrained_layout properly spaces colorbar, suptitle, and subplots
         """
-        import tempfile
         import matplotlib.pyplot as plt
 
         # Create 2 runs x 3 depth bins of spatial data

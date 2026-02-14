@@ -1,33 +1,32 @@
 """Tests for interface estimation (Stage 3 optimization)."""
 
-import pytest
+import sys
+
 import numpy as np
-from aquacal.config.schema import (
-    BoardConfig,
-    CameraIntrinsics,
-    CameraExtrinsics,
-    BoardPose,
-    DetectionResult,
-    InsufficientDataError,
-    ConvergenceError,
-)
-from aquacal.core.board import BoardGeometry
-from aquacal.calibration.interface_estimation import (
-    optimize_interface,
-    _compute_initial_board_poses,
-    register_auxiliary_camera,
-    _multi_frame_pnp_init,
-)
+import pytest
+
 from aquacal.calibration._optim_common import (
+    build_bounds,
+    build_jacobian_sparsity,
     pack_params,
     unpack_params,
-    build_jacobian_sparsity,
-    build_bounds,
-    compute_residuals,
 )
-from aquacal.utils.transforms import rvec_to_matrix, matrix_to_rvec
-
-import sys
+from aquacal.calibration.interface_estimation import (
+    _compute_initial_board_poses,
+    _multi_frame_pnp_init,
+    optimize_interface,
+    register_auxiliary_camera,
+)
+from aquacal.config.schema import (
+    BoardConfig,
+    BoardPose,
+    CameraExtrinsics,
+    CameraIntrinsics,
+    DetectionResult,
+    InsufficientDataError,
+)
+from aquacal.core.board import BoardGeometry
+from aquacal.utils.transforms import matrix_to_rvec, rvec_to_matrix
 
 sys.path.insert(0, ".")
 from tests.synthetic.ground_truth import generate_synthetic_detections

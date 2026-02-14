@@ -1,16 +1,16 @@
 """Reprojection error computation for calibration validation."""
 
-from dataclasses import dataclass
 import warnings
+from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import NDArray
 
 from aquacal.config.schema import (
-    CalibrationResult,
-    DetectionResult,
     BoardPose,
+    CalibrationResult,
     Detection,
+    DetectionResult,
 )
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera

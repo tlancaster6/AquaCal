@@ -1,23 +1,24 @@
 """Unit tests for CLI entry point."""
 
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import numpy as np
 import pytest
 import yaml
-import numpy as np
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
-from aquacal.cli import create_parser, cmd_calibrate, cmd_init, cmd_compare, main
-from aquacal.io.serialization import save_calibration
+from aquacal.cli import cmd_calibrate, cmd_compare, cmd_init, create_parser, main
 from aquacal.config.schema import (
+    BoardConfig,
+    CalibrationMetadata,
     CalibrationResult,
     CameraCalibration,
-    CameraIntrinsics,
     CameraExtrinsics,
-    InterfaceParams,
-    BoardConfig,
+    CameraIntrinsics,
     DiagnosticsData,
-    CalibrationMetadata,
+    InterfaceParams,
 )
+from aquacal.io.serialization import save_calibration
 
 
 def _make_dummy_calibration_result(

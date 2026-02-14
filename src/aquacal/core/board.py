@@ -1,8 +1,8 @@
 """ChArUco board geometry and utilities."""
 
+import cv2
 import numpy as np
 from numpy.typing import NDArray
-import cv2
 
 from aquacal.config.schema import BoardConfig, Vec3
 

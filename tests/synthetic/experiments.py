@@ -5,23 +5,27 @@ Three experiments comparing refractive (n_water=1.333) vs non-refractive
 """
 
 from __future__ import annotations
+
+import csv
 import sys
 from pathlib import Path
-import numpy as np
-from numpy.typing import NDArray
+
 import matplotlib.pyplot as plt
-import csv
+import numpy as np
 
 # Add project root to path for imports when running as script
 _project_root = Path(__file__).parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from tests.synthetic.ground_truth import create_scenario, SyntheticScenario
-from tests.synthetic.experiment_helpers import (
+from tests.synthetic.experiment_helpers import (  # noqa: E402
     calibrate_synthetic,
     compute_per_camera_errors,
     evaluate_reconstruction,
+)
+from tests.synthetic.ground_truth import (  # noqa: E402
+    SyntheticScenario,
+    create_scenario,
 )
 
 # Consistent color palette
@@ -407,14 +411,14 @@ def run_experiment_2(output_dir: str | Path, seed: int = 42) -> dict:
     Returns:
         Dict with results per depth and model
     """
-    from aquacal.core.board import BoardGeometry
     from aquacal.config.schema import BoardConfig
+    from aquacal.core.board import BoardGeometry
     from tests.synthetic.ground_truth import (
+        SyntheticScenario,
+        generate_dense_xy_grid,
         generate_real_rig_array,
         generate_real_rig_trajectory,
-        generate_dense_xy_grid,
         generate_synthetic_detections,
-        SyntheticScenario,
     )
 
     output_dir = Path(output_dir)
@@ -903,14 +907,14 @@ def run_experiment_3(output_dir: str | Path, seed: int = 42) -> dict:
     Returns:
         Dict with results per depth and model
     """
-    from aquacal.core.board import BoardGeometry
     from aquacal.config.schema import BoardConfig
+    from aquacal.core.board import BoardGeometry
     from tests.synthetic.ground_truth import (
+        SyntheticScenario,
+        generate_dense_xy_grid,
         generate_real_rig_array,
         generate_real_rig_trajectory,
-        generate_dense_xy_grid,
         generate_synthetic_detections,
-        SyntheticScenario,
     )
 
     output_dir = Path(output_dir)
@@ -967,14 +971,14 @@ def run_experiment_3(output_dir: str | Path, seed: int = 42) -> dict:
         )
 
         # Calibrate refractive model
-        print(f"    Calibrating refractive model...")
+        print("    Calibrating refractive model...")
         result_refractive, _ = calibrate_synthetic(
             calib_scenario, n_water=1.333, refine_intrinsics=True
         )
         errors_refr = compute_per_camera_errors(result_refractive, calib_scenario)
 
         # Calibrate non-refractive model
-        print(f"    Calibrating non-refractive model...")
+        print("    Calibrating non-refractive model...")
         result_nonrefractive, _ = calibrate_synthetic(
             calib_scenario, n_water=1.0, refine_intrinsics=True
         )
@@ -1511,14 +1515,14 @@ if __name__ == "__main__":
         results = run_experiment_1(tmpdir, seed=42)
 
         print("\n--- Results Summary ---")
-        print(f"Refractive model:")
+        print("Refractive model:")
         for cam, errs in sorted(results["errors_refractive"].items()):
             print(
                 f"  {cam}: focal={errs['focal_length_error_pct']:6.2f}%, "
                 f"z={errs['z_position_error_mm']:6.2f}mm"
             )
 
-        print(f"\nNon-refractive model:")
+        print("\nNon-refractive model:")
         for cam, errs in sorted(results["errors_nonrefractive"].items()):
             print(
                 f"  {cam}: focal={errs['focal_length_error_pct']:6.2f}%, "

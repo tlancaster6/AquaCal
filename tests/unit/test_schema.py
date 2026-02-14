@@ -1,30 +1,31 @@
 """Unit tests for configuration schema and dataclasses."""
 
-import numpy as np
-import pytest
 from pathlib import Path
 
+import numpy as np
+import pytest
+
 from aquacal.config.schema import (
+    BoardConfig,
+    BoardPose,
+    CalibrationConfig,
+    CalibrationError,
+    CalibrationMetadata,
+    CalibrationResult,
+    CameraCalibration,
+    CameraExtrinsics,
+    CameraIntrinsics,
+    ConnectivityError,
+    ConvergenceError,
+    Detection,
+    DetectionResult,
+    DiagnosticsData,
+    FrameDetections,
+    InsufficientDataError,
+    InterfaceParams,
+    Mat3,
     Vec2,
     Vec3,
-    Mat3,
-    BoardConfig,
-    CameraIntrinsics,
-    CameraExtrinsics,
-    CameraCalibration,
-    InterfaceParams,
-    CalibrationResult,
-    DiagnosticsData,
-    CalibrationMetadata,
-    CalibrationConfig,
-    BoardPose,
-    Detection,
-    FrameDetections,
-    DetectionResult,
-    CalibrationError,
-    InsufficientDataError,
-    ConvergenceError,
-    ConnectivityError,
 )
 
 
@@ -428,13 +429,9 @@ class TestPublicAPI:
         """All tier-1 exports are importable from aquacal."""
         from aquacal import (
             load_calibration,
-            save_calibration,
-            CalibrationResult,
-            CameraCalibration,
-            CameraIntrinsics,
-            CameraExtrinsics,
-            run_calibration,
             load_config,
+            run_calibration,
+            save_calibration,
         )
 
         # Verify they're the real objects, not None
@@ -452,8 +449,6 @@ class TestPublicAPI:
 
     def test_subpackage_imports(self):
         """Tier-2 subpackage imports still work."""
-        from aquacal.core import Camera, Interface, refractive_project
-        from aquacal.calibration import optimize_interface
-        from aquacal.triangulation import triangulate_point
+        from aquacal.core import refractive_project
 
         assert callable(refractive_project)

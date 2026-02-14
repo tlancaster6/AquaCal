@@ -1,9 +1,8 @@
 """Refractive triangulation for 3D reconstruction."""
 
 import numpy as np
-from numpy.typing import NDArray
 
-from aquacal.config.schema import CalibrationResult, Vec3, Vec2
+from aquacal.config.schema import CalibrationResult, Vec2, Vec3
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
 from aquacal.core.refractive_geometry import refractive_back_project

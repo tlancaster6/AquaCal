@@ -1,8 +1,8 @@
 """Validation and diagnostics modules."""
 
 from aquacal.validation.comparison import (
-    compare_calibrations,
     ComparisonResult,
+    compare_calibrations,
     write_comparison_report,
 )
 

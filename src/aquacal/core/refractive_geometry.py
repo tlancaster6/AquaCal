@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import brentq
 
-from aquacal.config.schema import Vec3, Vec2
+from aquacal.config.schema import Vec2, Vec3
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface, ray_plane_intersection
 
