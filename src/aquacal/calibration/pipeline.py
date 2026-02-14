@@ -807,8 +807,15 @@ def run_calibration_from_config(config: CalibrationConfig, verbose: bool = False
 
     # 3D reconstruction errors (primary cameras only)
     primary_3d = compute_3d_distance_errors(
-        primary_result, val_detections, board
+        primary_result, val_detections, board, include_spatial=True
     )
+
+    # Save spatial measurements if available
+    if primary_3d.spatial is not None and len(primary_3d.spatial.positions) > 0:
+        from aquacal.validation.reconstruction import save_spatial_measurements
+
+        spatial_csv_path = config.output_dir / "spatial_measurements.csv"
+        save_spatial_measurements(primary_3d.spatial, spatial_csv_path)
 
     # Print primary camera metrics
     if np.isnan(primary_reproj.rms):

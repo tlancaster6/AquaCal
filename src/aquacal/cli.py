@@ -7,6 +7,12 @@ from pathlib import Path
 
 from aquacal.calibration.pipeline import run_calibration, load_config
 from aquacal.config.schema import CalibrationError
+from aquacal.io.serialization import load_calibration
+from aquacal.validation.comparison import compare_calibrations, write_comparison_report
+from aquacal.validation.reconstruction import (
+    load_spatial_measurements,
+    bin_by_depth,
+)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -95,6 +101,32 @@ def create_parser() -> argparse.ArgumentParser:
         help="Regex with one capture group to extract camera name from filename stem (default: '(.+)')",
     )
     init_parser.set_defaults(func=cmd_init)
+
+    # compare subcommand
+    cmp_parser = subparsers.add_parser(
+        "compare",
+        help="Compare multiple calibration runs",
+        description="Load calibration results from N directories and compare quality metrics and parameters.",
+    )
+    cmp_parser.add_argument(
+        "directories",
+        nargs="+",
+        type=Path,
+        help="N directories containing calibration.json files (minimum 2)",
+    )
+    cmp_parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=Path,
+        default=Path("comparison_output"),
+        help="Output directory for comparison results (default: comparison_output)",
+    )
+    cmp_parser.add_argument(
+        "--no-plots",
+        action="store_true",
+        help="Skip PNG plot generation",
+    )
+    cmp_parser.set_defaults(func=cmd_compare)
 
     return parser
 
@@ -267,6 +299,145 @@ def cmd_init(args: argparse.Namespace) -> int:
     # Print success message
     print(f"Config file created: {output_path}")
     print(f"  {len(camera_names)} camera(s): {', '.join(camera_names)}")
+
+    return 0
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    """
+    Execute compare command to compare multiple calibration runs.
+
+    Args:
+        args: Parsed arguments with directories, output_dir, no_plots
+
+    Returns:
+        Exit code: 0 for success, 1 for file/directory errors, 2 for comparison errors
+    """
+    directories = args.directories
+    output_dir = args.output_dir
+    save_plots = not args.no_plots
+
+    # Validate minimum 2 directories
+    if len(directories) < 2:
+        print(f"Error: Need at least 2 directories to compare, got {len(directories)}", file=sys.stderr)
+        return 1
+
+    # Check all directories exist
+    for directory in directories:
+        if not directory.exists():
+            print(f"Error: Directory not found: {directory}", file=sys.stderr)
+            return 1
+        if not directory.is_dir():
+            print(f"Error: Path is not a directory: {directory}", file=sys.stderr)
+            return 1
+
+    # Check all directories contain calibration.json
+    for directory in directories:
+        calib_file = directory / "calibration.json"
+        if not calib_file.exists():
+            print(f"Error: calibration.json not found in {directory}", file=sys.stderr)
+            return 1
+
+    # Derive labels from directory basenames
+    raw_labels = [d.name for d in directories]
+
+    # Disambiguate duplicates by appending _2, _3, etc.
+    label_counts = {}
+    labels = []
+    for raw_label in raw_labels:
+        if raw_label not in label_counts:
+            label_counts[raw_label] = 0
+            labels.append(raw_label)
+        else:
+            label_counts[raw_label] += 1
+            labels.append(f"{raw_label}_{label_counts[raw_label] + 1}")
+
+    # Now we need to go back and fix any labels that had duplicates
+    # Count occurrences of each raw label
+    raw_label_freq = {}
+    for raw_label in raw_labels:
+        raw_label_freq[raw_label] = raw_label_freq.get(raw_label, 0) + 1
+
+    # Rebuild labels with proper disambiguation
+    labels = []
+    label_indices = {}
+    for i, raw_label in enumerate(raw_labels):
+        if raw_label_freq[raw_label] == 1:
+            labels.append(raw_label)
+        else:
+            # This label appears multiple times, need to disambiguate
+            if raw_label not in label_indices:
+                label_indices[raw_label] = 1
+            else:
+                label_indices[raw_label] += 1
+            labels.append(f"{raw_label}_{label_indices[raw_label]}")
+
+    # Load calibration results
+    results = []
+    try:
+        for directory in directories:
+            calib_file = directory / "calibration.json"
+            result = load_calibration(calib_file)
+            results.append(result)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: Failed to load calibration: {e}", file=sys.stderr)
+        return 1
+
+    # Compare calibrations
+    try:
+        comparison = compare_calibrations(results, labels)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+
+    # Load spatial measurements for depth analysis (if available)
+    spatial_data = {}
+    depth_data = {}
+    for directory, label in zip(directories, labels):
+        spatial_file = directory / "spatial_measurements.csv"
+        if spatial_file.exists():
+            try:
+                spatial = load_spatial_measurements(spatial_file)
+                spatial_data[label] = spatial
+                depth_data[label] = bin_by_depth(spatial)
+            except Exception as e:
+                # Silently skip if spatial data can't be loaded
+                pass
+
+    # Write comparison report
+    try:
+        written_files = write_comparison_report(
+            comparison,
+            results,
+            output_dir,
+            save_plots=save_plots,
+            depth_data=depth_data if depth_data else None,
+            spatial_data=spatial_data if spatial_data else None,
+        )
+    except Exception as e:
+        print(f"Error: Failed to write comparison report: {e}", file=sys.stderr)
+        return 1
+
+    # Print summary
+    print(f"Comparing {len(results)} calibration runs...")
+    loaded_info = ", ".join([f"{label} ({len(result.cameras)} cameras)" for label, result in zip(labels, results)])
+    print(f"Loaded: {loaded_info}\n")
+
+    print(f"Results written to {output_dir}/")
+    for file_type in [
+        "metrics_csv",
+        "per_camera_csv",
+        "parameter_diffs_csv",
+        "rms_bar_chart",
+        "position_overlay",
+        "z_position_dumbbell",
+        "depth_error_plot",
+        "depth_binned_csv",
+        "xy_error_heatmaps",
+    ]:
+        if file_type in written_files:
+            file_path = written_files[file_type]
+            print(f"  {file_path.name}")
 
     return 0
 

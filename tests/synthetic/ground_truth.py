@@ -403,6 +403,57 @@ def generate_real_rig_trajectory(
     return poses
 
 
+def generate_dense_xy_grid(
+    depth: float,
+    n_grid: int = 7,
+    xy_extent: float = 0.5,
+    tilt_deg: float = 3.0,
+    frame_offset: int = 0,
+    seed: int = 42,
+) -> list[BoardPose]:
+    """
+    Generate board poses at a regular XY grid at a fixed depth.
+
+    Used for dense spatial coverage in reconstruction evaluation and heatmaps.
+    Each grid position has a small random tilt and random in-plane rotation.
+
+    Args:
+        depth: Z coordinate for all board poses (meters)
+        n_grid: Number of grid positions per axis (total poses = n_grid^2)
+        xy_extent: Grid spans from -xy_extent to +xy_extent in X and Y (meters)
+        tilt_deg: Maximum random tilt from horizontal (degrees)
+        frame_offset: Starting frame index (default 0)
+        seed: Random seed for reproducible tilts and rotations
+
+    Returns:
+        List of n_grid^2 BoardPose objects with frame indices starting from frame_offset
+    """
+    rng = np.random.default_rng(seed)
+
+    # Generate grid positions
+    x_values = np.linspace(-xy_extent, xy_extent, n_grid)
+    y_values = np.linspace(-xy_extent, xy_extent, n_grid)
+
+    poses: list[BoardPose] = []
+    frame_idx = frame_offset
+
+    for x in x_values:
+        for y in y_values:
+            tvec = np.array([x, y, depth], dtype=np.float64)
+
+            # Small random tilt + random in-plane rotation
+            max_tilt = np.deg2rad(tilt_deg)
+            rx = rng.uniform(-max_tilt, max_tilt)
+            ry = rng.uniform(-max_tilt, max_tilt)
+            rz = rng.uniform(-np.pi, np.pi)
+            rvec = np.array([rx, ry, rz], dtype=np.float64)
+
+            poses.append(BoardPose(frame_idx=frame_idx, rvec=rvec, tvec=tvec))
+            frame_idx += 1
+
+    return poses
+
+
 def generate_synthetic_detections(
     intrinsics: dict[str, CameraIntrinsics],
     extrinsics: dict[str, CameraExtrinsics],

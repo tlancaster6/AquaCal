@@ -2,10 +2,96 @@
 
 import pytest
 import yaml
+import numpy as np
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from aquacal.cli import create_parser, cmd_calibrate, cmd_init, main
+from aquacal.cli import create_parser, cmd_calibrate, cmd_init, cmd_compare, main
+from aquacal.io.serialization import save_calibration
+from aquacal.config.schema import (
+    CalibrationResult,
+    CameraCalibration,
+    CameraIntrinsics,
+    CameraExtrinsics,
+    InterfaceParams,
+    BoardConfig,
+    DiagnosticsData,
+    CalibrationMetadata,
+)
+
+
+def _make_dummy_calibration_result(
+    camera_names: list[str],
+    camera_positions: dict[str, np.ndarray] | None = None,
+    water_z: float = 0.5,
+    reprojection_rms: float = 0.5,
+    reproj_per_camera: dict[str, float] | None = None,
+    num_frames_used: int = 50,
+) -> CalibrationResult:
+    """Helper to create a minimal CalibrationResult for testing."""
+    if camera_positions is None:
+        camera_positions = {name: np.array([0.0, 0.0, 0.0]) for name in camera_names}
+
+    if reproj_per_camera is None:
+        reproj_per_camera = {name: reprojection_rms for name in camera_names}
+
+    cameras = {}
+    for name in camera_names:
+        # Create intrinsics (simple pinhole)
+        K = np.array([[800.0, 0.0, 640.0], [0.0, 800.0, 480.0], [0.0, 0.0, 1.0]])
+        dist_coeffs = np.zeros(5)
+        intrinsics = CameraIntrinsics(
+            K=K, dist_coeffs=dist_coeffs, image_size=(1280, 960)
+        )
+
+        # Create extrinsics
+        C = camera_positions.get(name, np.array([0.0, 0.0, 0.0]))
+        R = np.eye(3)
+        t = -R @ C
+        extrinsics = CameraExtrinsics(R=R, t=t)
+
+        cameras[name] = CameraCalibration(
+            name=name,
+            intrinsics=intrinsics,
+            extrinsics=extrinsics,
+            interface_distance=water_z,
+            is_auxiliary=False,
+        )
+
+    interface = InterfaceParams(
+        normal=np.array([0.0, 0.0, -1.0]), n_air=1.0, n_water=1.333
+    )
+
+    board = BoardConfig(
+        squares_x=7,
+        squares_y=5,
+        square_size=0.05,
+        marker_size=0.04,
+        dictionary="DICT_4X4_50",
+    )
+
+    diagnostics = DiagnosticsData(
+        reprojection_error_rms=reprojection_rms,
+        reprojection_error_per_camera=reproj_per_camera,
+        validation_3d_error_mean=0.01,
+        validation_3d_error_std=0.005,
+    )
+
+    metadata = CalibrationMetadata(
+        calibration_date="2024-01-01",
+        software_version="1.0.0",
+        config_hash="abc123",
+        num_frames_used=num_frames_used,
+        num_frames_holdout=10,
+    )
+
+    return CalibrationResult(
+        cameras=cameras,
+        interface=interface,
+        board=board,
+        diagnostics=diagnostics,
+        metadata=metadata,
+    )
 
 
 class TestCreateParser:
@@ -25,6 +111,26 @@ class TestCreateParser:
         assert args.verbose is True
         assert args.output_dir == Path("/output")
         assert args.dry_run is True
+
+    def test_compare_subcommand_exists(self):
+        parser = create_parser()
+        # Parse valid compare command
+        args = parser.parse_args(["compare", "/dir1", "/dir2"])
+        assert args.command == "compare"
+        assert args.directories == [Path("/dir1"), Path("/dir2")]
+        assert args.output_dir == Path("comparison_output")
+        assert args.no_plots is False
+
+    def test_compare_options(self):
+        parser = create_parser()
+        args = parser.parse_args([
+            "compare", "/dir1", "/dir2", "/dir3",
+            "-o", "/custom_output", "--no-plots"
+        ])
+        assert args.command == "compare"
+        assert args.directories == [Path("/dir1"), Path("/dir2"), Path("/dir3")]
+        assert args.output_dir == Path("/custom_output")
+        assert args.no_plots is True
 
 
 class TestCmdCalibrate:
@@ -416,6 +522,183 @@ class TestCmdInit:
         # Check that commented-out fields are present in raw text
         raw_text = output_file.read_text()
         assert "refine_intrinsics" in raw_text
+
+
+class TestCmdCompare:
+    def test_compare_basic(self, tmp_path, capsys):
+        """Test basic compare with 2 valid directories."""
+        # Create 2 directories with calibration.json
+        dir1 = tmp_path / "run_1"
+        dir2 = tmp_path / "run_2"
+        dir1.mkdir()
+        dir2.mkdir()
+
+        # Create calibration results with different camera positions
+        result1 = _make_dummy_calibration_result(
+            camera_names=["cam0", "cam1"],
+            camera_positions={
+                "cam0": np.array([0.0, 0.0, 0.0]),
+                "cam1": np.array([0.5, 0.0, 0.0]),
+            },
+        )
+        result2 = _make_dummy_calibration_result(
+            camera_names=["cam0", "cam1"],
+            camera_positions={
+                "cam0": np.array([0.01, 0.0, 0.0]),
+                "cam1": np.array([0.51, 0.0, 0.0]),
+            },
+        )
+
+        # Save to calibration.json
+        save_calibration(result1, dir1 / "calibration.json")
+        save_calibration(result2, dir2 / "calibration.json")
+
+        # Run compare command
+        parser = create_parser()
+        output_dir = tmp_path / "comparison_output"
+        args = parser.parse_args([
+            "compare", str(dir1), str(dir2),
+            "-o", str(output_dir),
+        ])
+
+        exit_code = cmd_compare(args)
+
+        # Verify success
+        assert exit_code == 0
+
+        # Verify output files were created
+        assert (output_dir / "metrics_summary.csv").exists()
+        assert (output_dir / "per_camera_metrics.csv").exists()
+        assert (output_dir / "parameter_diffs.csv").exists()
+        assert (output_dir / "rms_bar_chart.png").exists()
+        assert (output_dir / "position_overlay.png").exists()
+
+        # Verify summary output
+        captured = capsys.readouterr()
+        assert "Comparing 2 calibration runs" in captured.out
+        assert "run_1" in captured.out
+        assert "run_2" in captured.out
+        assert "2 cameras" in captured.out
+
+    def test_compare_missing_directory(self, tmp_path, capsys):
+        """Test compare fails gracefully when directory doesn't exist."""
+        dir1 = tmp_path / "exists"
+        dir2 = tmp_path / "missing"
+        dir1.mkdir()
+
+        parser = create_parser()
+        args = parser.parse_args(["compare", str(dir1), str(dir2)])
+
+        exit_code = cmd_compare(args)
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "not found" in captured.err.lower()
+
+    def test_compare_missing_calibration_json(self, tmp_path, capsys):
+        """Test compare fails when calibration.json is missing."""
+        dir1 = tmp_path / "run_1"
+        dir2 = tmp_path / "run_2"
+        dir1.mkdir()
+        dir2.mkdir()
+
+        # Create calibration.json in dir1 only
+        result1 = _make_dummy_calibration_result(camera_names=["cam0"])
+        save_calibration(result1, dir1 / "calibration.json")
+
+        parser = create_parser()
+        args = parser.parse_args(["compare", str(dir1), str(dir2)])
+
+        exit_code = cmd_compare(args)
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "calibration.json" in captured.err.lower()
+
+    def test_compare_single_directory_error(self, tmp_path, capsys):
+        """Test compare fails when only 1 directory provided."""
+        dir1 = tmp_path / "run_1"
+        dir1.mkdir()
+
+        parser = create_parser()
+        args = parser.parse_args(["compare", str(dir1)])
+
+        exit_code = cmd_compare(args)
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert "at least 2" in captured.err.lower()
+
+    def test_compare_no_plots_flag(self, tmp_path, capsys):
+        """Test --no-plots flag skips PNG generation."""
+        dir1 = tmp_path / "run_1"
+        dir2 = tmp_path / "run_2"
+        dir1.mkdir()
+        dir2.mkdir()
+
+        result1 = _make_dummy_calibration_result(camera_names=["cam0"])
+        result2 = _make_dummy_calibration_result(camera_names=["cam0"])
+
+        save_calibration(result1, dir1 / "calibration.json")
+        save_calibration(result2, dir2 / "calibration.json")
+
+        parser = create_parser()
+        output_dir = tmp_path / "comparison_output"
+        args = parser.parse_args([
+            "compare", str(dir1), str(dir2),
+            "-o", str(output_dir),
+            "--no-plots",
+        ])
+
+        exit_code = cmd_compare(args)
+
+        assert exit_code == 0
+
+        # Verify CSV files exist but PNG files don't
+        assert (output_dir / "metrics_summary.csv").exists()
+        assert (output_dir / "per_camera_metrics.csv").exists()
+        assert (output_dir / "parameter_diffs.csv").exists()
+        assert not (output_dir / "rms_bar_chart.png").exists()
+        assert not (output_dir / "position_overlay.png").exists()
+
+    def test_compare_duplicate_labels(self, tmp_path, capsys):
+        """Test that duplicate basename labels are disambiguated."""
+        # Create subdirectories with same name but different parents
+        parent1 = tmp_path / "exp1"
+        parent2 = tmp_path / "exp2"
+        parent1.mkdir()
+        parent2.mkdir()
+
+        # Create same-named subdirectories
+        dir1 = parent1 / "trial"
+        dir2 = parent2 / "trial"
+        dir1.mkdir()
+        dir2.mkdir()
+
+        result1 = _make_dummy_calibration_result(camera_names=["cam0"])
+        result2 = _make_dummy_calibration_result(camera_names=["cam0"])
+
+        save_calibration(result1, dir1 / "calibration.json")
+        save_calibration(result2, dir2 / "calibration.json")
+
+        parser = create_parser()
+        output_dir = tmp_path / "comparison_output"
+        args = parser.parse_args([
+            "compare", str(dir1), str(dir2),
+            "-o", str(output_dir),
+        ])
+
+        # Should succeed without crashing
+        exit_code = cmd_compare(args)
+
+        assert exit_code == 0
+
+        # Verify output files were created (demonstrates deduplication worked)
+        assert (output_dir / "metrics_summary.csv").exists()
+
+        captured = capsys.readouterr()
+        # Labels should be disambiguated (trial_1 and trial_2)
+        assert "trial" in captured.out
 
 
 class TestMain:

@@ -26,6 +26,13 @@ from aquacal.validation.reconstruction import (
     compute_board_planarity_error,
     get_adjacent_corner_pairs,
     DistanceErrors,
+    SpatialMeasurements,
+    DepthBinnedErrors,
+    SpatialErrorGrid,
+    bin_by_depth,
+    compute_xy_error_grids,
+    save_spatial_measurements,
+    load_spatial_measurements,
 )
 
 
@@ -676,3 +683,562 @@ def test_compute_board_planarity_error_insufficient():
     error = compute_board_planarity_error(corners_3)
     assert error is not None
     assert error < 1e-10
+
+
+def test_spatial_measurements_basic(
+    board_config, board_geometry, interface_params, camera_intrinsics
+):
+    """Test that include_spatial=True populates spatial measurements correctly."""
+    # Create two cameras
+    cam1 = create_camera_calibration(
+        "cam1",
+        camera_intrinsics,
+        R=np.eye(3),
+        t=np.array([0.0, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+    cam2 = create_camera_calibration(
+        "cam2",
+        camera_intrinsics,
+        R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
+        t=np.array([0.2, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+
+    calibration = create_calibration_result(
+        cameras={"cam1": cam1, "cam2": cam2},
+        interface=interface_params,
+        board=board_config,
+    )
+
+    # Create perfect detections (corners 0,1,2,3 are in first row, so 3 adjacent pairs)
+    corner_ids = [0, 1, 2, 3]
+    corner_positions_3d = {}
+    for cid in corner_ids:
+        board_pos = board_geometry.corner_positions[cid]
+        corner_positions_3d[cid] = board_pos + np.array([0.0, 0.0, 0.6])
+
+    detections = create_synthetic_detections(
+        calibration, board_geometry, corner_ids, corner_positions_3d, frame_idx=0
+    )
+
+    # Compute errors with spatial data
+    errors = compute_3d_distance_errors(
+        calibration, detections, board_geometry, include_spatial=True
+    )
+
+    # Verify spatial field is populated
+    assert errors.spatial is not None
+    assert isinstance(errors.spatial, SpatialMeasurements)
+
+    # 4 corners in first row = 3 adjacent pairs: (0,1), (1,2), (2,3)
+    assert errors.spatial.positions.shape == (3, 3)
+    assert errors.spatial.signed_errors.shape == (3,)
+    assert errors.spatial.frame_indices.shape == (3,)
+
+    # All signed errors should be near zero for perfect data
+    assert np.all(np.abs(errors.spatial.signed_errors) < 0.001)
+
+    # Verify midpoints are reasonable (all should be near Z=0.6)
+    for i in range(3):
+        assert abs(errors.spatial.positions[i, 2] - 0.6) < 0.001
+
+
+def test_spatial_measurements_midpoint_values(
+    board_config, board_geometry, interface_params, camera_intrinsics
+):
+    """Test that midpoints are the arithmetic mean of corner positions."""
+    cam1 = create_camera_calibration(
+        "cam1",
+        camera_intrinsics,
+        R=np.eye(3),
+        t=np.array([0.0, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+    cam2 = create_camera_calibration(
+        "cam2",
+        camera_intrinsics,
+        R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
+        t=np.array([0.2, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+
+    calibration = create_calibration_result(
+        cameras={"cam1": cam1, "cam2": cam2},
+        interface=interface_params,
+        board=board_config,
+    )
+
+    # Use known corner positions at regular intervals
+    corner_ids = [0, 1, 2]
+    corner_positions_3d = {
+        0: np.array([0.0, 0.0, 0.6]),
+        1: np.array([0.04, 0.0, 0.6]),
+        2: np.array([0.08, 0.0, 0.6]),
+    }
+
+    detections = create_synthetic_detections(
+        calibration, board_geometry, corner_ids, corner_positions_3d, frame_idx=0
+    )
+
+    errors = compute_3d_distance_errors(
+        calibration, detections, board_geometry, include_spatial=True
+    )
+
+    # Triangulate the corners to get actual 3D positions
+    triangulated = triangulate_charuco_corners(calibration, detections, frame_idx=0)
+
+    # Verify midpoints for pairs (0,1) and (1,2)
+    # The pairs are ordered by get_adjacent_corner_pairs, which returns (0,1), (1,2) for this setup
+    expected_midpoint_01 = (triangulated[0] + triangulated[1]) / 2.0
+    expected_midpoint_12 = (triangulated[1] + triangulated[2]) / 2.0
+
+    # The spatial measurements are collected in order
+    assert np.allclose(errors.spatial.positions[0], expected_midpoint_01, atol=0.001)
+    assert np.allclose(errors.spatial.positions[1], expected_midpoint_12, atol=0.001)
+
+
+def test_spatial_measurements_frame_indices(
+    board_config, board_geometry, interface_params, camera_intrinsics
+):
+    """Test that frame_indices are correctly recorded for multiple frames."""
+    cam1 = create_camera_calibration(
+        "cam1",
+        camera_intrinsics,
+        R=np.eye(3),
+        t=np.array([0.0, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+    cam2 = create_camera_calibration(
+        "cam2",
+        camera_intrinsics,
+        R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
+        t=np.array([0.2, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+
+    calibration = create_calibration_result(
+        cameras={"cam1": cam1, "cam2": cam2},
+        interface=interface_params,
+        board=board_config,
+    )
+
+    # Create detections for multiple frames (corners 0,1,2 give 2 adjacent pairs)
+    corner_ids = [0, 1, 2]
+    all_frames = {}
+
+    for frame_idx in range(3):
+        corner_positions_3d = {}
+        for cid in corner_ids:
+            board_pos = board_geometry.corner_positions[cid]
+            corner_positions_3d[cid] = board_pos + np.array(
+                [0.0, 0.0, 0.6 + frame_idx * 0.1]
+            )
+
+        frame_det = create_synthetic_detections(
+            calibration, board_geometry, corner_ids, corner_positions_3d, frame_idx
+        )
+        all_frames[frame_idx] = frame_det.frames[frame_idx]
+
+    detections = DetectionResult(
+        frames=all_frames,
+        camera_names=["cam1", "cam2"],
+        total_frames=3,
+    )
+
+    errors = compute_3d_distance_errors(
+        calibration, detections, board_geometry, include_spatial=True
+    )
+
+    # 3 corners = 2 adjacent pairs per frame, 3 frames = 6 total measurements
+    assert errors.spatial.positions.shape == (6, 3)
+    assert errors.spatial.signed_errors.shape == (6,)
+    assert errors.spatial.frame_indices.shape == (6,)
+
+    # Verify frame indices are correct
+    # First 2 measurements from frame 0, next 2 from frame 1, last 2 from frame 2
+    expected_frames = [0, 0, 1, 1, 2, 2]
+    assert np.array_equal(errors.spatial.frame_indices, expected_frames)
+
+
+def test_spatial_measurements_disabled_by_default(
+    board_config, board_geometry, interface_params, camera_intrinsics
+):
+    """Test that spatial field is None when include_spatial is not set."""
+    cam1 = create_camera_calibration(
+        "cam1",
+        camera_intrinsics,
+        R=np.eye(3),
+        t=np.array([0.0, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+    cam2 = create_camera_calibration(
+        "cam2",
+        camera_intrinsics,
+        R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
+        t=np.array([0.2, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+
+    calibration = create_calibration_result(
+        cameras={"cam1": cam1, "cam2": cam2},
+        interface=interface_params,
+        board=board_config,
+    )
+
+    corner_ids = [0, 1, 2, 3]
+    corner_positions_3d = {}
+    for cid in corner_ids:
+        board_pos = board_geometry.corner_positions[cid]
+        corner_positions_3d[cid] = board_pos + np.array([0.0, 0.0, 0.6])
+
+    detections = create_synthetic_detections(
+        calibration, board_geometry, corner_ids, corner_positions_3d, frame_idx=0
+    )
+
+    # Call without include_spatial (default False)
+    errors = compute_3d_distance_errors(calibration, detections, board_geometry)
+
+    # Verify spatial field is None
+    assert errors.spatial is None
+
+
+def test_spatial_measurements_empty_data(
+    board_config, board_geometry, interface_params, camera_intrinsics
+):
+    """Test that empty detections with include_spatial=True return empty arrays."""
+    cam1 = create_camera_calibration(
+        "cam1",
+        camera_intrinsics,
+        R=np.eye(3),
+        t=np.array([0.0, 0.0, 0.5]),
+        interface_distance=0.3,
+    )
+
+    calibration = create_calibration_result(
+        cameras={"cam1": cam1},
+        interface=interface_params,
+        board=board_config,
+    )
+
+    detections = DetectionResult(frames={}, camera_names=["cam1"], total_frames=0)
+
+    with pytest.warns(UserWarning, match="No valid 3D distance comparisons"):
+        errors = compute_3d_distance_errors(
+            calibration, detections, board_geometry, include_spatial=True
+        )
+
+    # Verify spatial field has empty arrays with correct shapes
+    assert errors.spatial is not None
+    assert errors.spatial.positions.shape == (0, 3)
+    assert errors.spatial.signed_errors.shape == (0,)
+    assert errors.spatial.frame_indices.shape == (0,)
+
+
+class TestBinByDepth:
+    """Test bin_by_depth function."""
+
+    def test_basic_binning(self):
+        """Test basic binning with 20 measurements spanning Z=[0.4, 0.8]."""
+        # Create synthetic spatial measurements
+        np.random.seed(42)
+        n_measurements = 20
+        positions = np.random.uniform(
+            low=[0.0, 0.0, 0.4], high=[0.1, 0.1, 0.8], size=(n_measurements, 3)
+        )
+        signed_errors = np.random.uniform(-0.001, 0.001, size=n_measurements)
+        frame_indices = np.zeros(n_measurements, dtype=np.int32)
+
+        spatial = SpatialMeasurements(
+            positions=positions,
+            signed_errors=signed_errors,
+            frame_indices=frame_indices,
+        )
+
+        # Bin into 4 bins
+        binned = bin_by_depth(spatial, n_bins=4)
+
+        # Verify shapes
+        assert binned.bin_edges.shape == (5,)
+        assert binned.bin_centers.shape == (4,)
+        assert binned.signed_means.shape == (4,)
+        assert binned.signed_stds.shape == (4,)
+        assert binned.counts.shape == (4,)
+
+        # Verify total count
+        assert binned.counts.sum() == 20
+
+        # Verify bin edges span the data
+        z_min = positions[:, 2].min()
+        z_max = positions[:, 2].max()
+        assert np.isclose(binned.bin_edges[0], z_min, atol=1e-10)
+        assert np.isclose(binned.bin_edges[-1], z_max, atol=1e-10)
+
+    def test_signed_mean_correctness(self):
+        """Test that signed mean is computed correctly."""
+        # Create measurements with known values
+        positions = np.array([[0.0, 0.0, 0.5], [0.0, 0.0, 0.5]])
+        signed_errors = np.array([0.001, -0.001])
+        frame_indices = np.array([0, 0], dtype=np.int32)
+
+        spatial = SpatialMeasurements(
+            positions=positions,
+            signed_errors=signed_errors,
+            frame_indices=frame_indices,
+        )
+
+        # Single bin should contain all measurements
+        binned = bin_by_depth(spatial, n_bins=1)
+
+        # Mean should be zero
+        assert np.isclose(binned.signed_means[0], 0.0, atol=1e-10)
+        assert binned.counts[0] == 2
+
+    def test_empty_bins(self):
+        """Test that empty bins have NaN for signed_means and signed_stds."""
+        # Create measurements that leave some bins empty
+        # Put all measurements in the first half of the range
+        positions = np.array(
+            [
+                [0.0, 0.0, 0.4],
+                [0.0, 0.0, 0.41],
+                [0.0, 0.0, 0.42],
+                [0.0, 0.0, 0.43],
+            ]
+        )
+        signed_errors = np.array([0.001, 0.002, 0.003, 0.004])
+        frame_indices = np.array([0, 0, 0, 0], dtype=np.int32)
+
+        spatial = SpatialMeasurements(
+            positions=positions,
+            signed_errors=signed_errors,
+            frame_indices=frame_indices,
+        )
+
+        # Use 10 bins - most will be empty since all data is clustered
+        binned = bin_by_depth(spatial, n_bins=10)
+
+        # Should have some bins with zero counts
+        assert np.any(binned.counts == 0)
+
+        # Empty bins should have NaN for signed_means and signed_stds
+        empty_bins = binned.counts == 0
+        assert np.all(np.isnan(binned.signed_means[empty_bins]))
+        assert np.all(np.isnan(binned.signed_stds[empty_bins]))
+
+        # Non-empty bins should not have NaN
+        non_empty_bins = binned.counts > 0
+        assert np.all(~np.isnan(binned.signed_means[non_empty_bins]))
+        assert np.all(~np.isnan(binned.signed_stds[non_empty_bins]))
+
+    def test_empty_spatial_raises(self):
+        """Test that empty spatial measurements raise ValueError."""
+        spatial = SpatialMeasurements(
+            positions=np.empty((0, 3), dtype=np.float64),
+            signed_errors=np.empty((0,), dtype=np.float64),
+            frame_indices=np.empty((0,), dtype=np.int32),
+        )
+
+        with pytest.raises(ValueError, match="Cannot bin empty"):
+            bin_by_depth(spatial)
+
+
+class TestSpatialIO:
+    """Test save and load functions for SpatialMeasurements."""
+
+    def test_roundtrip(self, tmp_path):
+        """Test save and load roundtrip."""
+        # Create spatial measurements
+        positions = np.array([[0.1, 0.2, 0.4], [0.3, 0.4, 0.5]])
+        signed_errors = np.array([0.001, -0.002])
+        frame_indices = np.array([0, 1], dtype=np.int32)
+
+        spatial = SpatialMeasurements(
+            positions=positions,
+            signed_errors=signed_errors,
+            frame_indices=frame_indices,
+        )
+
+        # Save
+        csv_path = tmp_path / "spatial.csv"
+        save_spatial_measurements(spatial, csv_path)
+
+        # Verify file exists
+        assert csv_path.exists()
+
+        # Load
+        loaded = load_spatial_measurements(csv_path)
+
+        # Verify data matches
+        assert np.allclose(loaded.positions, positions)
+        assert np.allclose(loaded.signed_errors, signed_errors)
+        assert np.array_equal(loaded.frame_indices, frame_indices)
+
+    def test_load_missing_file(self, tmp_path):
+        """Test that loading a missing file raises FileNotFoundError."""
+        missing_path = tmp_path / "missing.csv"
+
+        with pytest.raises(FileNotFoundError):
+            load_spatial_measurements(missing_path)
+
+
+class TestComputeXYErrorGrids:
+    """Test compute_xy_error_grids function."""
+
+    def test_basic_gridding(self):
+        """Test basic gridding with 50 measurements across depth and XY space."""
+        # Create synthetic spatial measurements
+        np.random.seed(42)
+        n_measurements = 50
+        positions = np.random.uniform(
+            low=[-0.1, -0.1, 0.4], high=[0.1, 0.1, 0.8], size=(n_measurements, 3)
+        )
+        signed_errors = np.random.uniform(-0.001, 0.001, size=n_measurements)
+        frame_indices = np.zeros(n_measurements, dtype=np.int32)
+
+        spatial = SpatialMeasurements(
+            positions=positions,
+            signed_errors=signed_errors,
+            frame_indices=frame_indices,
+        )
+
+        # Create depth bin edges (2 bins)
+        depth_bin_edges = np.array([0.4, 0.6, 0.8])
+
+        # Compute XY error grids (4x4 XY grid)
+        grid = compute_xy_error_grids(
+            spatial, depth_bin_edges=depth_bin_edges, xy_grid_size=(4, 4)
+        )
+
+        # Verify output shapes
+        assert grid.grids.shape == (2, 4, 4)  # (2 depth bins, 4 Y bins, 4 X bins)
+        assert grid.counts.shape == (2, 4, 4)
+        assert grid.x_edges.shape == (5,)  # 4 bins + 1
+        assert grid.y_edges.shape == (5,)  # 4 bins + 1
+        assert grid.depth_bin_edges.shape == (3,)  # 2 bins + 1
+
+        # Verify total count matches
+        assert grid.counts.sum() == 50
+
+    def test_known_values(self):
+        """Test that grid computes correct mean when all measurements fall in one cell."""
+        # Create measurements all at the same XY location but different depths
+        positions = np.array(
+            [
+                [0.0, 0.0, 0.5],
+                [0.0, 0.0, 0.51],
+                [0.0, 0.0, 0.52],
+            ]
+        )
+        signed_errors = np.array([0.001, 0.002, 0.003])
+        frame_indices = np.array([0, 0, 0], dtype=np.int32)
+
+        spatial = SpatialMeasurements(
+            positions=positions,
+            signed_errors=signed_errors,
+            frame_indices=frame_indices,
+        )
+
+        # Single depth bin containing all measurements
+        depth_bin_edges = np.array([0.4, 0.6])
+
+        # Small XY grid (2x2)
+        grid = compute_xy_error_grids(
+            spatial, depth_bin_edges=depth_bin_edges, xy_grid_size=(2, 2)
+        )
+
+        # All measurements should fall in the same depth bin (0) and same XY cell
+        # Find the non-NaN cell
+        non_nan_mask = ~np.isnan(grid.grids[0])
+        assert np.sum(non_nan_mask) == 1, "Should have exactly one non-NaN cell"
+
+        # Verify the mean is correct
+        yi, xi = np.where(non_nan_mask)
+        assert grid.counts[0, yi[0], xi[0]] == 3
+        expected_mean = np.mean(signed_errors)
+        assert np.isclose(grid.grids[0, yi[0], xi[0]], expected_mean, atol=1e-10)
+
+    def test_empty_cells_are_nan(self):
+        """Test that empty cells have NaN in grids and 0 in counts."""
+        # Create measurements that only occupy some cells
+        # Place 4 measurements in corners of XY space
+        positions = np.array(
+            [
+                [-0.1, -0.1, 0.5],
+                [0.1, -0.1, 0.5],
+                [-0.1, 0.1, 0.5],
+                [0.1, 0.1, 0.5],
+            ]
+        )
+        signed_errors = np.array([0.001, 0.002, 0.003, 0.004])
+        frame_indices = np.array([0, 0, 0, 0], dtype=np.int32)
+
+        spatial = SpatialMeasurements(
+            positions=positions,
+            signed_errors=signed_errors,
+            frame_indices=frame_indices,
+        )
+
+        # Single depth bin
+        depth_bin_edges = np.array([0.4, 0.6])
+
+        # 3x3 grid - center cells should be empty
+        grid = compute_xy_error_grids(
+            spatial, depth_bin_edges=depth_bin_edges, xy_grid_size=(3, 3)
+        )
+
+        # Verify there are empty cells
+        empty_cells = grid.counts[0] == 0
+        assert np.any(empty_cells), "Should have some empty cells"
+
+        # Empty cells should have NaN in grids
+        assert np.all(np.isnan(grid.grids[0][empty_cells]))
+
+        # Non-empty cells should not have NaN
+        non_empty_cells = grid.counts[0] > 0
+        assert np.all(~np.isnan(grid.grids[0][non_empty_cells]))
+
+    def test_custom_xy_range(self):
+        """Test that custom XY range is respected."""
+        # Create measurements
+        positions = np.array([[0.0, 0.0, 0.5]])
+        signed_errors = np.array([0.001])
+        frame_indices = np.array([0], dtype=np.int32)
+
+        spatial = SpatialMeasurements(
+            positions=positions,
+            signed_errors=signed_errors,
+            frame_indices=frame_indices,
+        )
+
+        # Single depth bin
+        depth_bin_edges = np.array([0.4, 0.6])
+
+        # Custom XY range
+        custom_xy_range = ((-0.5, 0.5), (-0.3, 0.3))
+
+        grid = compute_xy_error_grids(
+            spatial,
+            depth_bin_edges=depth_bin_edges,
+            xy_grid_size=(4, 4),
+            xy_range=custom_xy_range,
+        )
+
+        # Verify edges match custom range
+        assert np.isclose(grid.x_edges[0], -0.5, atol=1e-10)
+        assert np.isclose(grid.x_edges[-1], 0.5, atol=1e-10)
+        assert np.isclose(grid.y_edges[0], -0.3, atol=1e-10)
+        assert np.isclose(grid.y_edges[-1], 0.3, atol=1e-10)
+
+    def test_empty_spatial_raises(self):
+        """Test that empty spatial measurements raise ValueError."""
+        spatial = SpatialMeasurements(
+            positions=np.empty((0, 3), dtype=np.float64),
+            signed_errors=np.empty((0,), dtype=np.float64),
+            frame_indices=np.empty((0,), dtype=np.int32),
+        )
+
+        depth_bin_edges = np.array([0.4, 0.6])
+
+        with pytest.raises(ValueError, match="Cannot compute XY grids for empty"):
+            compute_xy_error_grids(spatial, depth_bin_edges=depth_bin_edges)
