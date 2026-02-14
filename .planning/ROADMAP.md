@@ -34,9 +34,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Migrate dev/ docs to .planning/ and clean .claude/ directory
-- [ ] 01-02-PLAN.md -- Complete pyproject.toml metadata, create CHANGELOG.md and CONTRIBUTING.md
-- [ ] 01-03-PLAN.md -- Build package and validate installation
+- [x] 01-01-PLAN.md -- Migrate dev/ docs to .planning/ and clean .claude/ directory
+- [x] 01-02-PLAN.md -- Complete pyproject.toml metadata, create CHANGELOG.md and CONTRIBUTING.md
+- [x] 01-03-PLAN.md -- Build package and validate installation
 
 ### Phase 2: CI/CD Automation
 **Goal**: Automated testing across Python versions and platforms with GitHub Actions workflows for tests, docs, and PyPI publishing
@@ -68,10 +68,12 @@ Plans:
   5. README includes badges for build status, coverage, PyPI version, license, DOI
   6. CONTRIBUTING.md provides development setup instructions and PR guidelines
   7. CODE_OF_CONDUCT.md exists using PSF Code of Conduct
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN: TBD
+- [ ] 03-01-PLAN.md -- Community files (CODE_OF_CONDUCT, LICENSE update, CITATION.cff, GitHub templates)
+- [ ] 03-02-PLAN.md -- README overhaul, CHANGELOG v1.0.0, CONTRIBUTING update
+- [ ] 03-03-PLAN.md -- Zenodo metadata, TestPyPI validation, and release trigger
 
 ### Phase 4: Example Data
 **Goal**: Researchers have access to both synthetic calibration datasets with known ground truth and real-world example data
