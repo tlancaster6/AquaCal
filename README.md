@@ -1,61 +1,77 @@
 # AquaCal
 
-Refractive multi-camera calibration library for arrays of cameras in air viewing an underwater volume through the water surface. AquaCal jointly optimizes camera intrinsics, extrinsics, per-camera interface distances, and board poses to achieve accurate 3D reconstruction in refractive multi-camera systems. Designed for researchers and engineers working with multi-camera underwater imaging setups.
+![Build](https://img.shields.io/github/actions/workflow/status/tlancaster6/AquaCal/test.yml?branch=main&label=build) ![Coverage](https://img.shields.io/codecov/c/github/tlancaster6/AquaCal?label=coverage) ![PyPI](https://img.shields.io/pypi/v/aquacal) ![Python](https://img.shields.io/pypi/pyversions/aquacal) ![License](https://img.shields.io/github/license/tlancaster6/AquaCal) ![DOI](https://img.shields.io/badge/DOI-pending-lightgrey)
+
+Refractive multi-camera calibration library for arrays of cameras in air viewing an underwater volume through the water surface. AquaCal jointly optimizes camera intrinsics, extrinsics, per-camera interface distances, and board poses to achieve accurate 3D reconstruction in refractive multi-camera systems.
+
+## Features
+
+- **Snell's law refractive projection** for accurate modeling through flat air-water interfaces
+- **Multi-camera support** with BFS-based pose graph initialization
+- **Four-stage pipeline**: intrinsics, extrinsics, joint refractive bundle adjustment, optional intrinsic refinement
+- **Sparse Jacobian optimization** with column grouping for scalable bundle adjustment
+- **CLI and Python API** for flexible integration (`aquacal calibrate` or programmatic use)
 
 ## Installation
 
 AquaCal requires Python 3.10 or later.
 
-Install from source:
+Install from PyPI:
 
 ```bash
-pip install .
+pip install aquacal
 ```
 
-For development (includes pytest, mypy, black):
+For development (includes pytest, ruff):
 
 ```bash
-pip install .[dev]
+git clone https://github.com/tlancaster6/AquaCal.git
+cd AquaCal
+pip install -e ".[dev]"
 ```
 
 ## Quick Start
 
-1. **Prepare calibration videos**: Record two sets of videos with all cameras:
-   - In-air videos: Move a ChArUco board in front of the cameras above water
-   - Underwater videos: Move the same (or different) board underwater
+### CLI Workflow
 
-2. **Create a configuration file** (`config.yaml`). See also aquacal init in the CLI reference section below for semi-automated config file generation:
+1. Generate a configuration file:
 
-```yaml
-board:
-  squares_x: 7
-  squares_y: 5
-  square_size: 0.03
-  marker_size: 0.022
-
-cameras: [cam0, cam1, cam2]
-
-paths:
-  intrinsic_videos:
-    cam0: videos/cam0_inair.mp4
-    cam1: videos/cam1_inair.mp4
-    cam2: videos/cam2_inair.mp4
-  extrinsic_videos:
-    cam0: videos/cam0_underwater.mp4
-    cam1: videos/cam1_underwater.mp4
-    cam2: videos/cam2_underwater.mp4
-  output_dir: output/
+```bash
+aquacal init --intrinsic-dir videos/intrinsic/ --extrinsic-dir videos/extrinsic/
 ```
 
-3. **Run calibration**:
+2. Edit `config.yaml` to add board dimensions (the generated file includes TODO placeholders).
+
+3. Run calibration:
 
 ```bash
 aquacal calibrate config.yaml
 ```
 
-4. **Find results** in the output directory:
-   - `calibration.json`: Camera parameters, interface distances, and diagnostics
-   - Additional validation plots and per-frame error reports (if enabled)
+### Python API
+
+After calibration, load and use results programmatically:
+
+```python
+import numpy as np
+from aquacal import load_calibration
+
+# Load a completed calibration
+result = load_calibration("output/calibration.json")
+
+# Project a 3D underwater point into a camera's image
+pixel = result.project("cam0", np.array([0.1, 0.05, 0.4]))
+
+# Back-project a pixel to a 3D ray in water
+origin, direction = result.back_project("cam0", np.array([800.0, 600.0]))
+
+# Access raw calibration data
+cam = result.cameras["cam0"]
+print(cam.intrinsics.K)                    # 3x3 intrinsic matrix
+print(cam.extrinsics.R, cam.extrinsics.t)  # Rotation and translation
+print(cam.interface_distance)              # Camera-to-water distance (m)
+print(result.diagnostics.reprojection_error_rms)  # Overall RMS error (px)
+```
 
 ## CLI Reference
 
@@ -233,8 +249,6 @@ A random fraction of detected frames (default 20%) is held out from optimization
 - **Reprojection error**: RMS pixel distance between detected and predicted corner positions (per-camera and overall).
 - **3D reconstruction error**: Adjacent ChArUco corners are triangulated from multi-camera observations and compared to the known board geometry (square size), providing a metric in physical units (mm).
 
-For details on coordinate conventions (world frame, camera frame, interface normal direction), see [`docs/COORDINATES.md`](dev/docs/COORDINATES.md).
-
 ## Output
 
 After successful calibration, the output directory contains:
@@ -253,29 +267,6 @@ After successful calibration, the output directory contains:
 The calibration can be loaded and used in downstream applications for 3D reconstruction of underwater scenes.
 
 ## Using Results in Python
-
-After calibration, load and use results programmatically:
-
-```python
-import numpy as np
-from aquacal import load_calibration
-
-# Load a completed calibration
-result = load_calibration("output/calibration.json")
-
-# Project a 3D underwater point into a camera's image
-pixel = result.project("cam0", np.array([0.1, 0.05, 0.4]))
-
-# Back-project a pixel to a 3D ray in water
-origin, direction = result.back_project("cam0", np.array([800.0, 600.0]))
-
-# Access raw calibration data
-cam = result.cameras["cam0"]
-print(cam.intrinsics.K)                    # 3x3 intrinsic matrix
-print(cam.extrinsics.R, cam.extrinsics.t)  # Rotation and translation
-print(cam.interface_distance)              # Camera-to-water distance (m)
-print(result.diagnostics.reprojection_error_rms)  # Overall RMS error (px)
-```
 
 ### Top-level imports
 
@@ -301,3 +292,27 @@ from aquacal.core import Camera, Interface, refractive_project
 from aquacal.calibration import optimize_interface
 from aquacal.triangulation import triangulate_point
 ```
+
+## How to Cite
+
+If you use AquaCal in your research, we would appreciate a citation:
+
+```bibtex
+@software{aquacal,
+  title = {AquaCal: Refractive Multi-Camera Calibration},
+  author = {Lancaster, Tucker},
+  year = {2026},
+  url = {https://github.com/tlancaster6/AquaCal},
+  version = {1.0.0}
+}
+```
+
+See [CITATION.cff](CITATION.cff) for the canonical citation metadata. A DOI via Zenodo will be available after the first release.
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on code style, testing, and submitting changes.
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
