@@ -31,10 +31,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Package metadata (description, classifiers, URLs) displays correctly on PyPI test instance
   4. CHANGELOG.md exists following Keep a Changelog format with v1.0.0 preparation section
   5. Deprecation policy is documented in CONTRIBUTING.md
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN: TBD
+- [ ] 01-01-PLAN.md -- Migrate dev/ docs to .planning/ and clean .claude/ directory
+- [ ] 01-02-PLAN.md -- Complete pyproject.toml metadata, create CHANGELOG.md and CONTRIBUTING.md
+- [ ] 01-03-PLAN.md -- Build package and validate installation
 
 ### Phase 2: Example Data
 **Goal**: Researchers have access to both synthetic calibration datasets with known ground truth and real-world example data
@@ -117,11 +119,11 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Cleanup | 0/TBD | Not started | - |
+| 1. Foundation and Cleanup | 0/3 | Planning complete | - |
 | 2. Example Data | 0/TBD | Not started | - |
 | 3. Documentation Site | 0/TBD | Not started | - |
 | 4. Interactive Tutorials | 0/TBD | Not started | - |
