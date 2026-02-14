@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation and Cleanup** - Package infrastructure and repository cleanup
 - [x] **Phase 2: CI/CD Automation** - Multi-platform testing and release workflows
-- [ ] **Phase 3: Public Release** - PyPI v1.0.0 and community files
+- [x] **Phase 3: Public Release** - PyPI v1.0.0 and community files
 - [ ] **Phase 4: Example Data** - Synthetic and real calibration datasets
 - [ ] **Phase 5: Documentation Site** - Sphinx API reference and user guide
 - [ ] **Phase 6: Interactive Tutorials** - Jupyter notebooks demonstrating workflows
@@ -67,13 +67,13 @@ Plans:
   4. Zenodo DOI is minted for v1.0.0 release with citation metadata
   5. README includes badges for build status, coverage, PyPI version, license, DOI
   6. CONTRIBUTING.md provides development setup instructions and PR guidelines
-  7. CODE_OF_CONDUCT.md exists using PSF Code of Conduct
+  7. CODE_OF_CONDUCT.md exists using Contributor Covenant
 **Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Community files (CODE_OF_CONDUCT, LICENSE update, CITATION.cff, GitHub templates)
-- [ ] 03-02-PLAN.md -- README overhaul, CHANGELOG v1.0.0, CONTRIBUTING update
-- [ ] 03-03-PLAN.md -- Zenodo metadata, TestPyPI validation, and release trigger
+- [x] 03-01-PLAN.md -- Community files (CODE_OF_CONDUCT, LICENSE update, CITATION.cff, GitHub templates)
+- [x] 03-02-PLAN.md -- README overhaul, CHANGELOG v1.0.0, CONTRIBUTING update
+- [x] 03-03-PLAN.md -- Zenodo metadata, TestPyPI validation, and release trigger
 
 ### Phase 4: Example Data
 **Goal**: Researchers have access to both synthetic calibration datasets with known ground truth and real-world example data
@@ -130,7 +130,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 |-------|----------------|--------|-----------|
 | 1. Foundation and Cleanup | 3/3 | Complete | 2026-02-14 |
 | 2. CI/CD Automation | 3/3 | Complete | 2026-02-14 |
-| 3. Public Release | 0/TBD | Not started | - |
+| 3. Public Release | 3/3 | Complete | 2026-02-14 |
 | 4. Example Data | 0/TBD | Not started | - |
 | 5. Documentation Site | 0/TBD | Not started | - |
 | 6. Interactive Tutorials | 0/TBD | Not started | - |

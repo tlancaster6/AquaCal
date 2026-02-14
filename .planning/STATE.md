@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-14)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Phase 3 - Public Release
+**Current focus:** Phase 3 complete — ready for Phase 4
 
 ## Current Position
 
-Phase: 3 of 6 (Public Release)
-Plan: 2 of 3
-Status: In progress
-Last activity: 2026-02-14 — Completed 03-02: Documentation Overhaul for Public Release
+Phase: 3 of 6 (Public Release) — COMPLETE
+Plan: 3 of 3
+Status: Complete
+Last activity: 2026-02-14 — Published AquaCal v1.0.2 to PyPI, all CI green
 
-Progress: [███░░░░░░░] 33%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 160 seconds
-- Total execution time: 0.31 hours
+- Total plans completed: 9
+- Average duration: 155 seconds
+- Total execution time: 0.39 hours
 
 **By Phase:**
 
@@ -29,17 +29,17 @@ Progress: [███░░░░░░░] 33%
 |-------|-------|-------|----------|
 | 01 | 3 | 514s | 171s |
 | 02 | 3 | 434s | 145s |
-| 03 | 1 | 175s | 175s |
+| 03 | 3 | 470s | 157s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 03 | 03 | 299s | 2 | 1 |
 | 03 | 02 | 175s | 2 | 3 |
+| 03 | 01 | 120s | 2 | 6 |
 | 02 | 03 | 197s | 3 | 8 |
 | 02 | 02 | 157s | 2 | 2 |
-| 02 | 01 | 80s | 2 | 2 |
-| 01 | 03 | 5 min | 2 | 0 |
 
 ## Accumulated Context
 
@@ -70,20 +70,15 @@ Recent decisions affecting current work:
 - [Phase 03-public-release]: Badge ordering (Build|Coverage|PyPI|Python|License|DOI) for first impression quality signals
 - [Phase 03-public-release]: DOI badge placeholder until Zenodo mints DOI post-release
 - [Phase 03-public-release]: Non-binding citation request appropriate for open-source research software
+- [Phase 03-public-release]: RELEASE_TOKEN PAT needed for semantic-release to trigger publish workflow
+- [Phase 03-public-release]: TestPyPI stage with manual approval gate before real PyPI publish
+- [Phase 03-public-release]: Codecov enabled and configured for coverage reporting
 
 ### Pending Todos
 
-None yet.
+- Update DOI badge in README once Zenodo mints DOI
 
 ### Blockers/Concerns
-
-**Phase 2 (CI/CD Automation):**
-- Trusted Publishing setup on PyPI (OIDC configuration)
-- Codecov account and integration
-
-**Phase 3 (Public Release):**
-- License decision must be made before PyPI release
-- Cross-platform installation validated (Windows automated, user confirmed Linux/macOS compatible)
 
 **Phase 4 (Example Data):**
 - Real calibration dataset availability and size constraints (<50MB)
@@ -96,5 +91,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-14 (phase execution)
-Stopped at: Completed 03-02-PLAN.md
+Stopped at: Phase 3 complete, verified. Ready for Phase 4 planning.
 Resume file: None
