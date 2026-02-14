@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aquacal"
 version = "0.1.0"
-description = "Refractive multi-camera calibration library for underwater multi-camera arrays"
+description = "Refractive multi-camera calibration for underwater arrays with Snell's law modeling"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -15,8 +15,11 @@ authors = [
 keywords = ["calibration", "multi-camera", "underwater", "refraction", "computer-vision", "charuco"]
 
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Image Processing",
     "Topic :: Scientific/Engineering :: Image Recognition",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -43,7 +46,11 @@ dev = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/tlancaster6/AquaCal"
+Documentation = "https://aquacal.readthedocs.io"
 Repository = "https://github.com/tlancaster6/AquaCal"
+Issues = "https://github.com/tlancaster6/AquaCal/issues"
+Changelog = "https://github.com/tlancaster6/AquaCal/blob/main/CHANGELOG.md"
 
 [project.scripts]
 aquacal = "aquacal.cli:main"

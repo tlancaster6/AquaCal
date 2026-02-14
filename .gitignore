@@ -212,6 +212,5 @@ __marimo__/
 .idea/
 
 .claude/
-dev/
 tmp/
 CLAUDE.md
