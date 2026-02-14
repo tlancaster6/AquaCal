@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-14)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Phase 2 - CI/CD Automation
+**Current focus:** Phase 3 - Public Release
 
 ## Current Position
 
-Phase: 2 of 6 (CI/CD Automation)
-Plan: 3 of 3
-Status: In progress
-Last activity: 2026-02-14 — Completed 02-03: Docs and release automation
+Phase: 3 of 6 (Public Release)
+Plan: 0 of TBD
+Status: Not started
+Last activity: 2026-02-14 — Completed Phase 2: CI/CD Automation (all 3 plans, verified)
 
-Progress: [█████░░░░░] 30%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -91,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-14 (plan execution)
-Stopped at: Completed 02-03-PLAN.md (Docs and release automation)
+Last session: 2026-02-14 (phase execution)
+Stopped at: Phase 2 complete, verified. Ready for Phase 3 planning.
 Resume file: None

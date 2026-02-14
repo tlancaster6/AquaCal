@@ -13,7 +13,7 @@ Transform AquaCal from a working calibration library into a pip-installable PyPI
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation and Cleanup** - Package infrastructure and repository cleanup
-- [ ] **Phase 2: CI/CD Automation** - Multi-platform testing and release workflows
+- [x] **Phase 2: CI/CD Automation** - Multi-platform testing and release workflows
 - [ ] **Phase 3: Public Release** - PyPI v1.0.0 and community files
 - [ ] **Phase 4: Example Data** - Synthetic and real calibration datasets
 - [ ] **Phase 5: Documentation Site** - Sphinx API reference and user guide
@@ -127,7 +127,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Cleanup | 3/3 | Complete | 2026-02-14 |
-| 2. CI/CD Automation | 0/3 | Not started | - |
+| 2. CI/CD Automation | 3/3 | Complete | 2026-02-14 |
 | 3. Public Release | 0/TBD | Not started | - |
 | 4. Example Data | 0/TBD | Not started | - |
 | 5. Documentation Site | 0/TBD | Not started | - |
