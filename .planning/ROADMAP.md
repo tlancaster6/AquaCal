@@ -52,9 +52,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Pre-commit config and pyproject.toml updates (ruff, coverage, dev deps)
-- [ ] 02-02-PLAN.md -- Test workflows (test.yml with matrix + pre-commit CI, slow-tests.yml)
-- [ ] 02-03-PLAN.md -- Docs workflow (docs.yml + Sphinx scaffolding) and publish workflow (publish.yml)
+- [x] 02-01-PLAN.md -- Pre-commit config and pyproject.toml updates (ruff, coverage, dev deps)
+- [x] 02-02-PLAN.md -- Test workflows (test.yml with matrix + pre-commit CI, slow-tests.yml)
+- [x] 02-03-PLAN.md -- Docs workflow (docs.yml + Sphinx scaffolding) and publish workflow (publish.yml)
 
 ### Phase 3: Public Release
 **Goal**: AquaCal v1.0.0 is live on PyPI with community files, README badges, and Zenodo DOI
