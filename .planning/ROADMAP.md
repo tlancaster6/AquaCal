@@ -46,12 +46,14 @@ Plans:
   1. GitHub Actions workflow runs pytest on push/PR across Python 3.10, 3.11, 3.12 on Linux and Windows
   2. GitHub Actions workflow builds Sphinx documentation on PR to catch doc build errors before merge
   3. GitHub Actions workflow publishes to PyPI on git tag via Trusted Publishing (OIDC, no API tokens)
-  4. Pre-commit configuration exists with ruff (linter/formatter) and mypy (type checking)
+  4. Pre-commit configuration exists with ruff (linter/formatter) -- mypy skipped per user decision
   5. Codecov integration reports test coverage on pull requests
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN: TBD
+- [ ] 02-01-PLAN.md -- Pre-commit config and pyproject.toml updates (ruff, coverage, dev deps)
+- [ ] 02-02-PLAN.md -- Test workflows (test.yml with matrix + pre-commit CI, slow-tests.yml)
+- [ ] 02-03-PLAN.md -- Docs workflow (docs.yml + Sphinx scaffolding) and publish workflow (publish.yml)
 
 ### Phase 3: Public Release
 **Goal**: AquaCal v1.0.0 is live on PyPI with community files, README badges, and Zenodo DOI
@@ -124,7 +126,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Cleanup | 3/3 | Complete | 2026-02-14 |
-| 2. CI/CD Automation | 0/TBD | Not started | - |
+| 2. CI/CD Automation | 0/3 | Not started | - |
 | 3. Public Release | 0/TBD | Not started | - |
 | 4. Example Data | 0/TBD | Not started | - |
 | 5. Documentation Site | 0/TBD | Not started | - |
