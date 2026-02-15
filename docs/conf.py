@@ -23,11 +23,17 @@ extensions = [
     "myst_parser",
     "sphinx_copybutton",
     "sphinx_design",
+    "nbsphinx",
 ]
 
 # Templates and static files
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
+
+# nbsphinx configuration
+nbsphinx_execute = "never"  # Use committed outputs, don't re-execute
+nbsphinx_allow_errors = False
+nbsphinx_requirejs_path = ""  # Avoid RequireJS conflicts
 
 # HTML output
 html_theme = "furo"

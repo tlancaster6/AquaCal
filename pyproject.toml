@@ -36,6 +36,7 @@ dependencies = [
     "pandas",
     "requests",
     "tqdm",
+    "natsort>=8.4.0",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +53,7 @@ docs = [
     "myst-parser",
     "sphinx-copybutton",
     "sphinx-design",
+    "nbsphinx>=0.9.8",
 ]
 
 [project.urls]
