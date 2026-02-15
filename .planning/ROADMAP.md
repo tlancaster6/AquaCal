@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.2 MVP** — Phases 1-6 (shipped 2026-02-15)
-- 🚧 **v1.4 QA & Polish** — Phases 7-13 (in progress)
+- 🚧 **v1.4 QA & Polish** — Phases 7-12 (in progress)
 
 ## Phases
 
@@ -25,7 +25,7 @@ See `.planning/milestones/v1.2-ROADMAP.md` for full details.
 
 **Milestone Goal:** Human-in-the-loop QA of CLI workflows, documentation audit and polish, visual enhancements, and shipping pending infrastructure todos.
 
-#### Phase 7: Infrastructure Check
+#### Phase 7: Infrastructure Check ✓ (completed 2026-02-15)
 **Goal**: Quickly validate whether pending infrastructure todos are already resolved
 **Depends on**: Phase 6
 **Requirements**: INFRA-01
@@ -37,7 +37,7 @@ See `.planning/milestones/v1.2-ROADMAP.md` for full details.
 **Plans**: 1 plan
 
 Plans:
-- [ ] 07-01-PLAN.md � Audit infrastructure status (RTD, DOI, RELEASE_TOKEN)
+- [x] 07-01-PLAN.md — Audit infrastructure status (RTD, DOI, RELEASE_TOKEN)
 
 #### Phase 8: CLI QA Execution
 **Goal**: User validates all CLI workflows work correctly with real rig data
@@ -109,24 +109,10 @@ Plans:
 Plans:
 - [ ] 12-01: TBD
 
-#### Phase 13: Infrastructure Completion
-**Goal**: All pending infrastructure work is shipped
-**Depends on**: Phase 12
-**Requirements**: INFRA-02, INFRA-03, INFRA-04
-**Success Criteria** (what must be TRUE):
-  1. Read the Docs deployment is configured and documentation builds successfully (if work was needed)
-  2. Zenodo DOI badge is live in README with correct DOI (if work was needed)
-  3. RELEASE_TOKEN PAT is configured and semantic-release can trigger publish workflow (if work was needed)
-  4. All v1.4 infrastructure todos are resolved or explicitly deferred
-**Plans**: TBD
-
-Plans:
-- [ ] 13-01: TBD
-
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12 → 13
+Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -136,10 +122,9 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12 → 13
 | 4. Example Data | v1.2 | 3/3 | Complete | 2026-02-14 |
 | 5. Documentation Site | v1.2 | 4/4 | Complete | 2026-02-14 |
 | 6. Interactive Tutorials | v1.2 | 4/4 | Complete | 2026-02-15 |
-| 7. Infrastructure Check | v1.4 | 0/1 | Planned | - |
+| 7. Infrastructure Check | v1.4 | 1/1 | Complete | 2026-02-15 |
 | 8. CLI QA Execution | v1.4 | 0/TBD | Not started | - |
 | 9. Bug Triage | v1.4 | 0/TBD | Not started | - |
 | 10. Documentation Audit | v1.4 | 0/TBD | Not started | - |
 | 11. Documentation Visuals | v1.4 | 0/TBD | Not started | - |
 | 12. Tutorial Verification | v1.4 | 0/TBD | Not started | - |
-| 13. Infrastructure Completion | v1.4 | 0/TBD | Not started | - |
