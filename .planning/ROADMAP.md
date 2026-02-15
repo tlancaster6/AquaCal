@@ -34,10 +34,10 @@ See `.planning/milestones/v1.2-ROADMAP.md` for full details.
   2. User knows current status of Zenodo DOI badge
   3. User knows current status of RELEASE_TOKEN configuration
   4. User has clear action list of what infrastructure work remains
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 07-01: TBD
+- [ ] 07-01-PLAN.md � Audit infrastructure status (RTD, DOI, RELEASE_TOKEN)
 
 #### Phase 8: CLI QA Execution
 **Goal**: User validates all CLI workflows work correctly with real rig data
@@ -136,7 +136,7 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12 → 13
 | 4. Example Data | v1.2 | 3/3 | Complete | 2026-02-14 |
 | 5. Documentation Site | v1.2 | 4/4 | Complete | 2026-02-14 |
 | 6. Interactive Tutorials | v1.2 | 4/4 | Complete | 2026-02-15 |
-| 7. Infrastructure Check | v1.4 | 0/TBD | Not started | - |
+| 7. Infrastructure Check | v1.4 | 0/1 | Planned | - |
 | 8. CLI QA Execution | v1.4 | 0/TBD | Not started | - |
 | 9. Bug Triage | v1.4 | 0/TBD | Not started | - |
 | 10. Documentation Audit | v1.4 | 0/TBD | Not started | - |
