@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 ## Current Position
 
 Phase: 6 of 6 (Interactive Tutorials)
-Plan: 1 of 4
+Plan: 3 of 4
 Status: In Progress
-Last activity: 2026-02-15 — Completed 06-01: FrameSet protocol and ImageSet implementation
+Last activity: 2026-02-15 — Completed 06-03: Full pipeline tutorial notebook
 
-Progress: [██████████░░] 80% (16/20 plans)
+Progress: [███████████░] 85% (17/20 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
-- Average duration: 335 seconds
-- Total execution time: 1.49 hours
+- Total plans completed: 17
+- Average duration: 320 seconds
+- Total execution time: 1.51 hours
 
 **By Phase:**
 
@@ -32,17 +32,17 @@ Progress: [██████████░░] 80% (16/20 plans)
 | 03 | 3 | 470s | 157s |
 | 04 | 3 | 1471s | 490s |
 | 05 | 4 | 2367s | 592s |
-| 06 | 1 | 463s | 463s |
+| 06 | 2 | 714s | 357s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 06 | 03 | 251s | 1 | 2 |
 | 06 | 01 | 463s | 1 | 6 |
 | 05 | 04 | 272s | 1 | 1 |
 | 05 | 03 | 970s | 3 | 13 |
 | 05 | 02 | 802s | 2 | 10 |
-| 05 | 01 | 323s | 2 | 13 |
 
 ## Accumulated Context
 
@@ -90,6 +90,9 @@ Recent decisions affecting current work:
 - [Phase 06-01]: Natural sort ordering via natsort library (industry standard)
 - [Phase 06-01]: Auto-detection based on Path.is_dir() vs Path.is_file()
 - [Phase 06-01]: FrameSet as Protocol (not ABC) for structural subtyping
+- [Phase 06-03]: Pre-execute notebooks and commit outputs for reproducible docs builds
+- [Phase 06-03]: Exclude *.ipynb from ruff linting (JSON structure incompatible with Python linter)
+- [Phase 06-03]: Default to synthetic data source for fast, no-download tutorial experience
 
 ### Pending Todos
 
@@ -104,5 +107,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-15 (phase execution)
-Stopped at: Completed 06-01-PLAN.md (FrameSet Protocol + ImageSet + Auto-Detection)
+Stopped at: Completed 06-03-PLAN.md (Full Pipeline Tutorial Notebook)
 Resume file: None
