@@ -2,7 +2,7 @@
 
 ## What This Is
 
-AquaCal is a Python library for calibrating multi-camera arrays that view underwater scenes through a flat water surface. It models Snell's law refraction at the air-water interface to jointly optimize camera extrinsics, water surface position, and calibration board poses. Target audience is the underwater computer vision research community.
+AquaCal is a Python library for calibrating multi-camera arrays that view underwater scenes through a flat water surface. It models Snell's law refraction at the air-water interface to jointly optimize camera extrinsics, water surface position, and calibration board poses. Available on PyPI with Sphinx documentation, example datasets, and Jupyter tutorials.
 
 ## Core Value
 
@@ -11,8 +11,6 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 ## Requirements
 
 ### Validated
-
-<!-- Inferred from existing codebase -->
 
 - ✓ Four-stage calibration pipeline (intrinsics, extrinsics init, joint optimization, optional refinement) — existing
 - ✓ Refractive projection through flat air-water interface using Snell's law — existing
@@ -29,16 +27,17 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 - ✓ JSON serialization of calibration results — existing
 - ✓ YAML-based configuration — existing
 - ✓ Public API: run_calibration(), load/save_calibration(), core types — existing
+- ✓ Clean pip-installable package on PyPI — v1.0
+- ✓ Getting started tutorial (end-to-end: collect images to calibration result) — v1.0
+- ✓ Theory/math background documentation (refractive geometry, coordinate conventions, optimizer) — v1.0
+- ✓ Example datasets (real calibration data + synthetic) — v1.0
+- ✓ Jupyter notebook examples demonstrating the pipeline — v1.0
+- ✓ Cleanup of legacy development artifacts — v1.0
+- ✓ CI/CD pipeline (GitHub Actions for tests, linting, publishing) — v1.0
 
 ### Active
 
-- [ ] Clean pip-installable package on PyPI
-- [ ] Getting started tutorial (end-to-end: collect images to calibration result)
-- [ ] Theory/math background documentation (refractive geometry, coordinate conventions, optimizer)
-- [ ] Example datasets (real calibration data + synthetic)
-- [ ] Jupyter notebook examples demonstrating the pipeline
-- [ ] Cleanup of legacy development artifacts (old agent configs, task files)
-- [ ] CI/CD pipeline (GitHub Actions for tests, linting, publishing)
+(None — planning next milestone)
 
 ### Out of Scope
 
@@ -47,34 +46,42 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 - Real-time calibration or streaming — batch processing only
 - Non-flat interface models (curved surfaces, waves) — flat plane approximation is the scope
 - Support for non-ChArUco calibration targets — ChArUco only for now
+- Conda-forge recipe — defer until PyPI adoption validates demand
+- Docker container — defer until reproducibility requests arrive
+- Multi-language bindings — Python-only for now
 
 ## Context
 
-AquaCal is a mature codebase with a working four-stage pipeline, comprehensive validation, and diagnostics. The core calibration engine is solid — this milestone is about packaging and presentation for the research community.
+Shipped v1.0 with ~39,900 LOC Python.
+Tech stack: NumPy, SciPy, OpenCV, Matplotlib, Pandas, PyYAML, Sphinx (Furo), GitHub Actions.
+Published on PyPI as `aquacal` v1.0.2. Sphinx docs with theory pages, API reference, and Jupyter tutorials.
+Zenodo DOI pending webhook setup.
 
-The existing `pyproject.toml` already defines the package structure with setuptools, entry points, and dependency declarations. The public API (`__init__.py` exports) is considered stable.
-
-Key technical context:
-- Z-down world frame, OpenCV camera convention
-- Global `water_z` parameter (not per-camera interface distances)
-- Sparse Jacobian with column grouping for optimization efficiency
-- No CI/CD exists yet — no automated testing or publishing pipeline
+Known issues:
+- Read the Docs deployment not yet configured (docs build locally)
+- Zenodo DOI badge placeholder until webhook is set up
+- RELEASE_TOKEN PAT needed for semantic-release to trigger publish workflow
 
 ## Constraints
 
-- **Python compatibility**: 3.10, 3.11, 3.12 — already declared in pyproject.toml
-- **Dependencies**: Must remain lightweight (NumPy, SciPy, OpenCV, Matplotlib, Pandas, PyYAML)
-- **License**: TBD — needs decision before public release
-- **Example data size**: Real datasets must be small enough for reasonable download (or hosted externally)
+- **Python compatibility**: 3.10, 3.11, 3.12
+- **Dependencies**: Lightweight (NumPy, SciPy, OpenCV, Matplotlib, Pandas, PyYAML)
+- **License**: MIT
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| PyPI + GitHub distribution | Standard for research Python libraries | — Pending |
-| Real + synthetic example data | Real data builds trust, synthetic demonstrates correctness | — Pending |
-| Jupyter notebooks for examples | Interactive, visual — ideal for research audience | — Pending |
-| License choice | Needed before public release | — Pending |
+| PyPI + GitHub distribution | Standard for research Python libraries | ✓ Good — v1.0.2 live on PyPI |
+| Real + synthetic example data | Real data builds trust, synthetic demonstrates correctness | ✓ Good — both available |
+| Jupyter notebooks for examples | Interactive, visual — ideal for research audience | ✓ Good — 3 notebooks shipped |
+| MIT license | Maximizes adoption in research community | ✓ Good |
+| Ruff over Black/mypy | Faster, all-in-one linting and formatting | ✓ Good |
+| Trusted Publishing (OIDC) | No API tokens needed for PyPI | ✓ Good |
+| python-semantic-release | Automates version bumping from conventional commits | ✓ Good |
+| Sphinx + Furo theme | Clean, modern docs with MyST Markdown | ✓ Good |
+| FrameSet Protocol | Structural subtyping for image/video input flexibility | ✓ Good |
+| Pre-execute notebooks | Reproducible docs builds without runtime dependencies | ✓ Good |
 
 ---
-*Last updated: 2026-02-14 after initialization*
+*Last updated: 2026-02-15 after v1.0 milestone*
