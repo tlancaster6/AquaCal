@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation and Cleanup** - Package infrastructure and repository cleanup
 - [x] **Phase 2: CI/CD Automation** - Multi-platform testing and release workflows
 - [x] **Phase 3: Public Release** - PyPI v1.0.0 and community files
-- [ ] **Phase 4: Example Data** - Synthetic and real calibration datasets
+- [x] **Phase 4: Example Data** - Synthetic and real calibration datasets
 - [ ] **Phase 5: Documentation Site** - Sphinx API reference and user guide
 - [ ] **Phase 6: Interactive Tutorials** - Jupyter notebooks demonstrating workflows
 
@@ -87,9 +87,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Synthetic data API: generate_synthetic_rig() with presets and image rendering
-- [ ] 04-02-PLAN.md -- Dataset loading infrastructure: load_example(), download/cache, in-package small preset
-- [ ] 04-03-PLAN.md -- Real dataset preparation and Zenodo upload
+- [x] 04-01-PLAN.md -- Synthetic data API: generate_synthetic_rig() with presets and image rendering
+- [x] 04-02-PLAN.md -- Dataset loading infrastructure: load_example(), download/cache, in-package small preset
+- [x] 04-03-PLAN.md -- Real dataset preparation and Zenodo upload
 
 ### Phase 5: Documentation Site
 **Goal**: Comprehensive documentation site with auto-generated API reference and user guide hosted on Read the Docs
@@ -133,6 +133,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 1. Foundation and Cleanup | 3/3 | Complete | 2026-02-14 |
 | 2. CI/CD Automation | 3/3 | Complete | 2026-02-14 |
 | 3. Public Release | 3/3 | Complete | 2026-02-14 |
-| 4. Example Data | 0/TBD | Not started | - |
+| 4. Example Data | 3/3 | Complete | 2026-02-14 |
 | 5. Documentation Site | 0/TBD | Not started | - |
 | 6. Interactive Tutorials | 0/TBD | Not started | - |
