@@ -84,10 +84,12 @@ Plans:
   2. User can download a real calibration dataset (<50MB total) from GitHub Releases or examples/datasets/
   3. User can load example datasets via convenience function `aquacal.datasets.load_example()`
   4. Larger real datasets (>10MB) are hosted on Zenodo with DOI and download instructions
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN: TBD
+- [ ] 04-01-PLAN.md -- Synthetic data API: generate_synthetic_rig() with presets and image rendering
+- [ ] 04-02-PLAN.md -- Dataset loading infrastructure: load_example(), download/cache, in-package small preset
+- [ ] 04-03-PLAN.md -- Real dataset preparation and Zenodo upload
 
 ### Phase 5: Documentation Site
 **Goal**: Comprehensive documentation site with auto-generated API reference and user guide hosted on Read the Docs
