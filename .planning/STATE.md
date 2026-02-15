@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 ## Current Position
 
 Phase: 4 of 6 (Example Data)
-Plan: 1 of 3
+Plan: 2 of 3
 Status: In Progress
-Last activity: 2026-02-15 — Completed 04-01: Synthetic data API with 3 presets
+Last activity: 2026-02-15 — Completed 04-02: Dataset loading and download infrastructure
 
 Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 221 seconds
-- Total execution time: 0.61 hours
+- Total plans completed: 11
+- Average duration: 251 seconds
+- Total execution time: 0.77 hours
 
 **By Phase:**
 
@@ -30,17 +30,17 @@ Progress: [█████░░░░░] 50%
 | 01 | 3 | 514s | 171s |
 | 02 | 3 | 434s | 145s |
 | 03 | 3 | 470s | 157s |
-| 04 | 1 | 660s | 660s |
+| 04 | 2 | 1204s | 602s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 04 | 02 | 544s | 2 | 10 |
 | 04 | 01 | 660s | 2 | 5 |
 | 03 | 03 | 299s | 2 | 1 |
 | 03 | 02 | 175s | 2 | 3 |
 | 03 | 01 | 120s | 2 | 6 |
-| 02 | 03 | 197s | 3 | 8 |
 
 ## Accumulated Context
 
@@ -74,6 +74,11 @@ Recent decisions affecting current work:
 - [Phase 03-public-release]: RELEASE_TOKEN PAT needed for semantic-release to trigger publish workflow
 - [Phase 03-public-release]: TestPyPI stage with manual approval gate before real PyPI publish
 - [Phase 03-public-release]: Codecov enabled and configured for coverage reporting
+- [Phase 04-example-data]: Small preset ships in-package (17KB) for zero-download quick start
+- [Phase 04-example-data]: Cache directory at ./aquacal_data/ with auto-generated .gitignore
+- [Phase 04-example-data]: Zenodo datasets use manifest registry with null placeholders until upload
+- [Phase 04-example-data]: NotImplementedError for non-available datasets with helpful message
+- [Phase 04-example-data]: Download infrastructure with progress bars, checksums, and exponential backoff
 
 ### Pending Todos
 
@@ -92,5 +97,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-15 (phase execution)
-Stopped at: Completed 04-01-PLAN.md — Synthetic data API
+Stopped at: Completed 04-02-PLAN.md — Dataset loading and download infrastructure
 Resume file: None
