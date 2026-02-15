@@ -13,6 +13,8 @@ import numpy as np
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
+from aquacal.core.refractive_geometry import snells_law_3d  # noqa: E402
+
 
 def generate(output_dir: Path):
     """Generate ray trace diagram showing Snell's law refraction.
@@ -25,42 +27,69 @@ def generate(output_dir: Path):
     C = np.array([0.0, 0.0, 0.0])  # Camera at origin
     Q = np.array([0.3, 0.0, 1.2])  # Underwater target (offset in X and Z)
 
-    # Compute interface crossing point using actual Snell's law
-    # This is a simplified 2D version for visualization
+    # Compute interface crossing point using actual Snell's law from AquaCal
     h_c = water_z - C[2]  # Camera to interface gap
     h_q = Q[2] - water_z  # Interface to target gap
     r_q = abs(Q[0] - C[0])  # Horizontal offset
 
-    # Solve for interface crossing point using Newton-Raphson approach
-    # (same logic as in _refractive_project_newton)
+    # Refractive indices
     n_air = 1.0
     n_water = 1.333
+    normal = np.array([0.0, 0.0, -1.0])  # Interface normal (points up, water->air)
 
-    # Initial guess: pinhole projection
-    r_p = r_q * h_c / (h_c + h_q)
+    # Solve for interface crossing point using Newton-Raphson approach
+    # with Snell's law from AquaCal library
+    r_p = r_q * h_c / (h_c + h_q)  # Initial guess: pinhole projection
 
     # Newton iteration (a few steps to get accurate result)
     for _ in range(5):
-        # Snell equation: n_air * sin(theta_air) - n_water * sin(theta_water) = 0
-        sin_air = r_p / np.sqrt(r_p**2 + h_c**2)
-        sin_water = (r_q - r_p) / np.sqrt((r_q - r_p) ** 2 + h_q**2)
-        f = n_air * sin_air - n_water * sin_water
+        # Compute incident ray from C to interface point P
+        P_guess = np.array([C[0] + r_p, 0.0, water_z])
+        d_inc = P_guess - C
+        d_inc = d_inc / np.linalg.norm(d_inc)
 
-        # Derivative
-        f_prime = (
-            n_air * h_c**2 / (r_p**2 + h_c**2) ** 1.5
-            + n_water * h_q**2 / ((r_q - r_p) ** 2 + h_q**2) ** 1.5
-        )
+        # Apply Snell's law using AquaCal function
+        d_refracted = snells_law_3d(d_inc, normal, n_air / n_water)
 
-        # Update
-        r_p = r_p - f / f_prime
+        if d_refracted is None:
+            break  # Shouldn't happen for air->water at normal angles
 
-    # Interface point
+        # Check where the refracted ray from P intersects Q's depth
+        # The refracted ray should reach Q: P + t * d_refracted = Q
+        # Solve for horizontal offset at Q's depth
+        # Z component: P[2] + t * d_refracted[2] = Q[2]
+        if abs(d_refracted[2]) < 1e-10:
+            break  # Ray is horizontal, shouldn't happen
+
+        t_to_Q = (Q[2] - P_guess[2]) / d_refracted[2]
+        x_at_Q = P_guess[0] + t_to_Q * d_refracted[0]
+
+        # Residual: difference between where ray goes and where target is
+        residual = x_at_Q - Q[0]
+
+        # Update r_p based on residual (simple step)
+        r_p = r_p - residual * 0.5  # Damped update for stability
+
+        if abs(residual) < 1e-9:
+            break
+
+    # Final interface point
     P = np.array([C[0] + r_p, 0.0, water_z])
 
-    # Compute angles for annotation
+    # Compute angles for annotation using actual ray directions
+    # Incident ray direction
+    d_inc_final = P - C
+    d_inc_final = d_inc_final / np.linalg.norm(d_inc_final)
+
+    # Refracted ray direction (using AquaCal function)
+    d_refracted_final = snells_law_3d(d_inc_final, normal, n_air / n_water)
+
+    # Angles from normal (vertical Z-axis in this 2D case)
+    # theta = angle from vertical = arctan(horizontal / vertical)
     theta_air = np.arctan2(r_p, h_c) * 180 / np.pi
-    theta_water = np.arctan2(r_q - r_p, h_q) * 180 / np.pi
+    theta_water = (
+        np.arctan2(abs(d_refracted_final[0]), abs(d_refracted_final[2])) * 180 / np.pi
+    )
 
     # Create figure
     fig, ax = plt.subplots(figsize=(10, 6))
