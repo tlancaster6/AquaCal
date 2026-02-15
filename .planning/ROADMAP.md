@@ -110,10 +110,10 @@ Plans:
 - [x] 05-03-PLAN.md -- API reference pages and docstring improvements with examples
 - [x] 05-04-PLAN.md -- Gap closure: ray trace diagram uses actual library functions
 
-### Phase 6: Image Input Support & Interactive Tutorials
-**Goal**: Abstract frame loading to support both video files and image directories, then build Jupyter notebook tutorials demonstrating end-to-end workflows using Phase 4 datasets
+### Phase 6: Image Input Support, Interactive Tutorials & README Overhaul
+**Goal**: Abstract frame loading to support both video files and image directories, build Jupyter notebook tutorials demonstrating end-to-end workflows, overhaul README to be concise with links to docs, and add visual assets (diagrams, screenshots)
 **Depends on**: Phase 5
-**Requirements**: TUT-01, TUT-02, TUT-03, NB-01, NB-02, NB-03
+**Requirements**: TUT-01, TUT-02, TUT-03, NB-01, NB-02, NB-03, README-01, VIS-01
 **Success Criteria** (what must be TRUE):
   1. Pipeline accepts image directories (JPEG/PNG) as input alongside existing video file support via abstracted FrameSet interface (ImageSet + VideoSet)
   2. Config paths can point to directories of images instead of video files; detection pipeline auto-detects input type
@@ -124,10 +124,16 @@ Plans:
   7. Tutorial explains common failure modes (insufficient overlap, degenerate board poses, interface distance convergence)
   8. All notebooks execute end-to-end without manual data preparation using Phase 4 datasets
   9. Notebooks are integrated into Sphinx documentation via nbsphinx for rendered HTML display
-**Plans**: TBD
+  10. README is concise (~50-80 lines): hero visual, badges, one-paragraph description, install, minimal quick start, and links to docs for CLI reference, config, methodology, and API details
+  11. README includes at least one visual asset (e.g., pipeline diagram, ray trace visualization, or sample output screenshot)
+  12. Bulk content removed from README (CLI reference, config reference, technical methodology, output details) is accessible via docs site links
+**Plans:** 4 plans
 
 Plans:
-- [ ] 06-01-PLAN: TBD
+- [ ] 06-01-PLAN.md -- FrameSet protocol, ImageSet implementation, detection pipeline auto-detection (TDD)
+- [ ] 06-02-PLAN.md -- nbsphinx infrastructure, hero visual, README overhaul, tutorial index
+- [ ] 06-03-PLAN.md -- Full pipeline tutorial notebook (NB-01, TUT-01, TUT-02)
+- [ ] 06-04-PLAN.md -- Diagnostics and synthetic validation notebooks (NB-02, NB-03, TUT-03)
 
 ## Progress
 
@@ -141,4 +147,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Public Release | 3/3 | Complete | 2026-02-14 |
 | 4. Example Data | 3/3 | Complete | 2026-02-14 |
 | 5. Documentation Site | 4/4 | Complete | 2026-02-14 |
-| 6. Interactive Tutorials | 0/TBD | Not started | - |
+| 6. Interactive Tutorials | 0/4 | Not started | - |
