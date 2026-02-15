@@ -107,17 +107,20 @@ Plans:
 Plans:
 - [ ] 05-01-PLAN: TBD
 
-### Phase 6: Interactive Tutorials
-**Goal**: Jupyter notebook tutorials demonstrate end-to-end calibration, visualization, and comparison workflows
+### Phase 6: Image Input Support & Interactive Tutorials
+**Goal**: Abstract frame loading to support both video files and image directories, then build Jupyter notebook tutorials demonstrating end-to-end workflows using Phase 4 datasets
 **Depends on**: Phase 5
 **Requirements**: TUT-01, TUT-02, TUT-03, NB-01, NB-02, NB-03
 **Success Criteria** (what must be TRUE):
-  1. User can run a notebook demonstrating full pipeline: config creation, intrinsic calibration, extrinsic estimation, joint optimization, validation
-  2. User can run a notebook demonstrating calibration result visualization and diagnostics interpretation
-  3. User can run a notebook demonstrating synthetic data generation and ground-truth validation
-  4. Tutorial explains common failure modes (insufficient overlap, degenerate board poses, interface distance convergence)
-  5. All notebooks execute end-to-end without manual data preparation using Phase 4 datasets
-  6. Notebooks are integrated into Sphinx documentation via nbsphinx for rendered HTML display
+  1. Pipeline accepts image directories (JPEG/PNG) as input alongside existing video file support via abstracted FrameSet interface (ImageSet + VideoSet)
+  2. Config paths can point to directories of images instead of video files; detection pipeline auto-detects input type
+  3. `load_example('real-rig')` dataset can be fed directly into the calibration pipeline without conversion
+  4. User can run a notebook demonstrating full pipeline: config creation, intrinsic calibration, extrinsic estimation, joint optimization, validation
+  5. User can run a notebook demonstrating calibration result visualization and diagnostics interpretation
+  6. User can run a notebook demonstrating synthetic data generation and ground-truth validation
+  7. Tutorial explains common failure modes (insufficient overlap, degenerate board poses, interface distance convergence)
+  8. All notebooks execute end-to-end without manual data preparation using Phase 4 datasets
+  9. Notebooks are integrated into Sphinx documentation via nbsphinx for rendered HTML display
 **Plans**: TBD
 
 Plans:
