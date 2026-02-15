@@ -9,13 +9,15 @@ from __future__ import annotations
 from aquacal.config.schema import BoardConfig
 from aquacal.datasets.synthetic import (
     SyntheticScenario,
+    compute_calibration_errors,  # noqa: F401
     generate_board_trajectory,
     generate_camera_array,
+    generate_camera_intrinsics,  # noqa: F401
+    generate_dense_xy_grid,  # noqa: F401
     generate_real_rig_array,
     generate_real_rig_trajectory,
+    generate_synthetic_detections,  # noqa: F401
 )
-
-# All generation functions are now imported from aquacal.datasets.synthetic
 
 
 def create_scenario(name: str, seed: int = 42) -> SyntheticScenario:
@@ -130,6 +132,3 @@ def create_scenario(name: str, seed: int = 42) -> SyntheticScenario:
         )
 
     raise ValueError(f"Unknown scenario: {name}")
-
-
-# compute_calibration_errors is now imported from aquacal.datasets.synthetic
