@@ -48,10 +48,10 @@ Plans:
   2. User successfully runs `aquacal init` with real data directories and verifies generated config
   3. User successfully runs `aquacal compare` on multiple calibration runs and validates comparison output
   4. User documents any bugs, friction points, or unexpected behaviors discovered during QA
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 08-01: TBD
+- [ ] 08-01-PLAN.md — QA all CLI workflows (init, calibrate, compare) with real rig data
 
 #### Phase 9: Bug Triage
 **Goal**: Issues discovered during CLI QA are triaged and resolved or captured
