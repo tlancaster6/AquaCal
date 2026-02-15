@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-14)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Phase 5 complete — documentation site verified (20/20). Phase 6 next.
+**Current focus:** Phase 6 complete — all 6 phases delivered. Milestone v1.0 ready for completion.
 
 ## Current Position
 
 Phase: 6 of 6 (Interactive Tutorials)
 Plan: 4 of 4
-Status: Complete
-Last activity: 2026-02-15 — Completed 06-04: Diagnostics and synthetic validation notebooks
+Status: Complete — Phase verified (12/12 must-haves)
+Last activity: 2026-02-15 — Phase 6 verified and complete. All 6 phases delivered.
 
-Progress: [████████████] 90% (18/20 plans)
+Progress: [████████████] 100% (20/20 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
-- Average duration: 329 seconds
-- Total execution time: 1.65 hours
+- Total plans completed: 20
+- Average duration: 333 seconds
+- Total execution time: 1.85 hours
 
 **By Phase:**
 
@@ -32,7 +32,7 @@ Progress: [████████████] 90% (18/20 plans)
 | 03 | 3 | 470s | 157s |
 | 04 | 3 | 1471s | 490s |
 | 05 | 4 | 2367s | 592s |
-| 06 | 3 | 1127s | 376s |
+| 06 | 4 | 1371s | 343s |
 
 **Recent Executions:**
 
@@ -107,5 +107,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-15 (phase execution)
-Stopped at: Completed 06-03-PLAN.md (Full Pipeline Tutorial Notebook)
+Stopped at: Phase 6 complete — all 20/20 plans delivered across 6 phases. Milestone v1.0 ready.
 Resume file: None

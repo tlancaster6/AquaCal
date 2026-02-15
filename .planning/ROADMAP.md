@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Public Release** - PyPI v1.0.0 and community files
 - [x] **Phase 4: Example Data** - Synthetic and real calibration datasets
 - [x] **Phase 5: Documentation Site** - Sphinx API reference and user guide
-- [ ] **Phase 6: Interactive Tutorials** - Jupyter notebooks demonstrating workflows
+- [x] **Phase 6: Interactive Tutorials** - Jupyter notebooks demonstrating workflows
 
 ## Phase Details
 
@@ -130,10 +130,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- FrameSet protocol, ImageSet implementation, detection pipeline auto-detection (TDD)
-- [ ] 06-02-PLAN.md -- nbsphinx infrastructure, hero visual, README overhaul, tutorial index
-- [ ] 06-03-PLAN.md -- Full pipeline tutorial notebook (NB-01, TUT-01, TUT-02)
-- [ ] 06-04-PLAN.md -- Diagnostics and synthetic validation notebooks (NB-02, NB-03, TUT-03)
+- [x] 06-01-PLAN.md -- FrameSet protocol, ImageSet implementation, detection pipeline auto-detection (TDD)
+- [x] 06-02-PLAN.md -- nbsphinx infrastructure, hero visual, README overhaul, tutorial index
+- [x] 06-03-PLAN.md -- Full pipeline tutorial notebook (NB-01, TUT-01, TUT-02)
+- [x] 06-04-PLAN.md -- Diagnostics and synthetic validation notebooks (NB-02, NB-03, TUT-03)
 
 ## Progress
 
@@ -147,4 +147,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Public Release | 3/3 | Complete | 2026-02-14 |
 | 4. Example Data | 3/3 | Complete | 2026-02-14 |
 | 5. Documentation Site | 4/4 | Complete | 2026-02-14 |
-| 6. Interactive Tutorials | 0/4 | Not started | - |
+| 6. Interactive Tutorials | 4/4 | Complete | 2026-02-15 |
