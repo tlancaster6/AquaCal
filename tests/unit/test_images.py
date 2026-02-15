@@ -7,6 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+
 from aquacal.io.images import ImageSet
 
 
@@ -57,10 +58,11 @@ class TestImageSet:
         cam_dir.mkdir()
 
         # Create images in non-lexicographic order
+        # Use PNG to avoid JPEG compression artifacts
         for i in [1, 2, 10, 20, 3]:
             img = np.zeros((50, 50, 3), dtype=np.uint8)
-            img[i, i] = i  # Mark each image differently
-            cv2.imwrite(str(cam_dir / f"img_{i}.jpg"), img)
+            img[10, 10, 0] = i * 10  # Mark each image differently (larger values)
+            cv2.imwrite(str(cam_dir / f"img_{i}.png"), img)
 
         img_set = ImageSet({"cam0": str(cam_dir)})
 
@@ -73,9 +75,9 @@ class TestImageSet:
         for frame_idx, (idx, frame_dict) in enumerate(frames):
             assert idx == frame_idx
             img = frame_dict["cam0"]
-            # Check the marker we set (img[i, i] = i)
-            marker_val = img[expected_indices[frame_idx], expected_indices[frame_idx]]
-            assert marker_val == expected_indices[frame_idx]
+            # Check the marker we set (img[10, 10, 0] = i * 10)
+            marker_val = img[10, 10, 0]
+            assert marker_val == expected_indices[frame_idx] * 10
 
     def test_mismatched_frame_counts_raises(self, tmp_path: Path):
         """Test that mismatched frame counts across cameras raises ValueError."""
@@ -241,6 +243,7 @@ class TestDetectionWithImageSet:
 
     def test_detect_all_frames_with_image_dirs(self, tmp_path: Path):
         """Test that detect_all_frames works with image directories."""
+        from aquacal.config.schema import BoardConfig
         from aquacal.core.board import BoardGeometry
         from aquacal.io.detection import detect_all_frames
 
@@ -258,13 +261,13 @@ class TestDetectionWithImageSet:
         paths = {"cam0": str(cam0_dir), "cam1": str(cam1_dir)}
 
         # Create a minimal board config
-        board_config = {
-            "squares_x": 5,
-            "squares_y": 7,
-            "square_size_m": 0.04,
-            "marker_size_m": 0.03,
-            "aruco_dict": "DICT_4X4_50",
-        }
+        board_config = BoardConfig(
+            squares_x=5,
+            squares_y=7,
+            square_size=0.04,
+            marker_size=0.03,
+            dictionary="DICT_4X4_50",
+        )
         board = BoardGeometry(board_config)
 
         # Run detection (won't find any boards in black images, but should work)

@@ -4,6 +4,10 @@
 __all__ = [
     # From video.py (Task 3.1):
     "VideoSet",
+    # From images.py (Phase 6):
+    "ImageSet",
+    # From frameset.py (Phase 6):
+    "FrameSet",
     # From detection.py (Task 3.2):
     "detect_charuco",
     "detect_all_frames",
@@ -14,5 +18,7 @@ __all__ = [
 
 # Imports will be added as modules are implemented:
 from aquacal.io.detection import detect_all_frames, detect_charuco
+from aquacal.io.frameset import FrameSet
+from aquacal.io.images import ImageSet
 from aquacal.io.serialization import load_calibration, save_calibration
 from aquacal.io.video import VideoSet

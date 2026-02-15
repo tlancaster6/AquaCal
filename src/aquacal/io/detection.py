@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable
 
 import cv2
@@ -10,6 +11,8 @@ from numpy.typing import NDArray
 
 from aquacal.config.schema import Detection, DetectionResult, FrameDetections
 from aquacal.core.board import BoardGeometry
+from aquacal.io.frameset import FrameSet
+from aquacal.io.images import ImageSet
 from aquacal.io.video import VideoSet
 
 
@@ -80,8 +83,61 @@ def detect_charuco(
     )
 
 
+def _create_frame_source(paths: dict[str, str]) -> FrameSet:
+    """
+    Auto-detect frame source type and create appropriate object.
+
+    Detects whether paths point to directories (images) or files (videos)
+    and creates ImageSet or VideoSet accordingly.
+
+    Args:
+        paths: Dict mapping camera_name to path (directory or file)
+
+    Returns:
+        FrameSet implementation (ImageSet or VideoSet)
+
+    Raises:
+        ValueError: If paths contain a mix of directories and files
+        FileNotFoundError: If any path does not exist
+
+    Example:
+        >>> paths = {'cam0': 'data/cam0/', 'cam1': 'data/cam1/'}
+        >>> source = _create_frame_source(paths)  # Returns ImageSet
+        >>> # or
+        >>> paths = {'cam0': 'video0.mp4', 'cam1': 'video1.mp4'}
+        >>> source = _create_frame_source(paths)  # Returns VideoSet
+    """
+    if not paths:
+        raise ValueError("paths cannot be empty")
+
+    # Check first path to determine type
+    first_path = Path(next(iter(paths.values())))
+    if not first_path.exists():
+        raise FileNotFoundError(f"Path not found: {first_path}")
+
+    is_directory = first_path.is_dir()
+
+    # Validate all paths are the same type
+    for camera_name, path_str in paths.items():
+        path = Path(path_str)
+        if not path.exists():
+            raise FileNotFoundError(f"Path not found: {path}")
+
+        if path.is_dir() != is_directory:
+            raise ValueError(
+                "Cannot mix directories and files in paths. "
+                "All paths must be either directories (for images) or files (for videos)."
+            )
+
+    # Create appropriate frame source
+    if is_directory:
+        return ImageSet(paths)
+    else:
+        return VideoSet(paths)
+
+
 def detect_all_frames(
-    video_paths: dict[str, str] | VideoSet,
+    video_paths: dict[str, str] | FrameSet,
     board: BoardGeometry,
     intrinsics: dict[str, tuple[NDArray[np.float64], NDArray[np.float64]]]
     | None = None,
@@ -90,14 +146,18 @@ def detect_all_frames(
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> DetectionResult:
     """
-    Detect ChArUco corners in all frames of synchronized videos.
+    Detect ChArUco corners in all frames of synchronized frame source.
 
     Iterates through all cameras at each frame index, detects ChArUco corners,
     and organizes results into a DetectionResult.
 
+    Supports both video files (VideoSet) and image directories (ImageSet)
+    via automatic detection when dict of paths is passed.
+
     Args:
-        video_paths: Dict mapping camera_name to video file path, or a VideoSet.
-                     If dict is passed, a VideoSet is created internally.
+        video_paths: Dict mapping camera_name to path (video file or image dir),
+                     or a FrameSet implementation (VideoSet/ImageSet).
+                     If dict is passed, frame source is auto-detected.
         board: Board geometry
         intrinsics: Optional dict mapping camera_name to (K, dist_coeffs) tuple.
                     Used for corner refinement. Cameras not in dict use None.
@@ -110,28 +170,33 @@ def detect_all_frames(
         DetectionResult containing all valid detections organized by frame and camera.
 
     Example:
+        >>> # With video files
         >>> paths = {'cam0': 'video0.mp4', 'cam1': 'video1.mp4'}
-        >>> board = BoardGeometry(config)
         >>> result = detect_all_frames(paths, board, min_corners=8, frame_step=5)
+        >>>
+        >>> # With image directories
+        >>> paths = {'cam0': 'data/cam0/', 'cam1': 'data/cam1/'}
+        >>> result = detect_all_frames(paths, board, min_corners=8)
+        >>>
         >>> usable = result.get_frames_with_min_cameras(2)
         >>> print(f"Found {len(usable)} frames with 2+ cameras")
     """
-    # Create VideoSet if dict passed
+    # Create appropriate FrameSet if dict passed
     if isinstance(video_paths, dict):
-        video_set = VideoSet(video_paths)
-        owns_video_set = True
+        frame_source = _create_frame_source(video_paths)
+        owns_frame_source = True
     else:
-        video_set = video_paths
-        owns_video_set = False
+        frame_source = video_paths
+        owns_frame_source = False
 
     try:
-        camera_names = video_set.camera_names
-        total_frames = video_set.frame_count
+        camera_names = frame_source.camera_names
+        total_frames = frame_source.frame_count
         total_to_process = max(1, total_frames // frame_step)
         processed_count = 0
         frames: dict[int, FrameDetections] = {}
 
-        for frame_idx, frame_dict in video_set.iterate_frames(step=frame_step):
+        for frame_idx, frame_dict in frame_source.iterate_frames(step=frame_step):
             processed_count += 1
             frame_detections: dict[str, Detection] = {}
 
@@ -169,6 +234,6 @@ def detect_all_frames(
         )
 
     finally:
-        # Clean up VideoSet if we created it
-        if owns_video_set:
-            video_set.close()
+        # Clean up FrameSet if we created it
+        if owns_frame_source:
+            frame_source.close()
