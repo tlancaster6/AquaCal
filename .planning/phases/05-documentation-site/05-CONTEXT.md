@@ -38,11 +38,13 @@ Comprehensive documentation site with auto-generated API reference and user guid
 - Briefly explain OpenCV conventions when referenced (don't assume prior knowledge)
 - Style reference: scikit-learn documentation
 
+### Sphinx theme
+- Use Furo theme
+
 ### Claude's Discretion
 - Markup format (RST vs MyST Markdown) — pick what works best for the content
 - API reference layout (grouped by functionality vs one page per module) — pick what fits the codebase
 - Exact sidebar ordering and page titles
-- Sphinx theme choice
 
 </decisions>
 
