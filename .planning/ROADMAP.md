@@ -102,10 +102,12 @@ Plans:
   4. API reference is auto-generated from docstrings via Sphinx autodoc with napoleon extension
   5. CITATION.cff file exists in repository root with BibTeX-compatible metadata
   6. README includes "How to Cite" section with DOI and BibTeX entry
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 05-01-PLAN: TBD
+- [ ] 05-01-PLAN.md -- Sphinx infrastructure, Furo theme, RTD config, landing page, and site skeleton
+- [ ] 05-02-PLAN.md -- Theory pages (refractive geometry, coordinates, optimizer) with diagrams
+- [ ] 05-03-PLAN.md -- API reference pages and docstring improvements with examples
 
 ### Phase 6: Image Input Support & Interactive Tutorials
 **Goal**: Abstract frame loading to support both video files and image directories, then build Jupyter notebook tutorials demonstrating end-to-end workflows using Phase 4 datasets
