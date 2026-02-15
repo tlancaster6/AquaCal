@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 ## Current Position
 
 Phase: 4 of 6 (Example Data)
-Plan: 2 of 3
-Status: In Progress
-Last activity: 2026-02-15 — Completed 04-02: Dataset loading and download infrastructure
+Plan: 3 of 3
+Status: Complete
+Last activity: 2026-02-14 — Completed 04-03: Real dataset upload and manifest update
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 251 seconds
-- Total execution time: 0.77 hours
+- Total plans completed: 12
+- Average duration: 272 seconds
+- Total execution time: 0.91 hours
 
 **By Phase:**
 
@@ -30,17 +30,17 @@ Progress: [█████░░░░░] 50%
 | 01 | 3 | 514s | 171s |
 | 02 | 3 | 434s | 145s |
 | 03 | 3 | 470s | 157s |
-| 04 | 2 | 1204s | 602s |
+| 04 | 3 | 1471s | 490s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 04 | 03 | 267s | 2 | 3 |
 | 04 | 02 | 544s | 2 | 10 |
 | 04 | 01 | 660s | 2 | 5 |
 | 03 | 03 | 299s | 2 | 1 |
 | 03 | 02 | 175s | 2 | 3 |
-| 03 | 01 | 120s | 2 | 6 |
 
 ## Accumulated Context
 
@@ -79,6 +79,9 @@ Recent decisions affecting current work:
 - [Phase 04-example-data]: Zenodo datasets use manifest registry with null placeholders until upload
 - [Phase 04-example-data]: NotImplementedError for non-available datasets with helpful message
 - [Phase 04-example-data]: Download infrastructure with progress bars, checksums, and exponential backoff
+- [Phase 04-example-data]: algorithm:hash checksum format supports both MD5 (Zenodo) and SHA256
+- [Phase 04-example-data]: Real datasets return metadata and cache_path for user processing
+- [Phase 04-example-data]: Nested ZIP directory structure handled automatically
 
 ### Pending Todos
 
@@ -86,16 +89,12 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-**Phase 4 (Example Data):**
-- Real calibration dataset availability and size constraints (<50MB)
-- Zenodo account setup for larger dataset hosting
-
 **Phase 5 (Documentation Site):**
 - Read the Docs account and repository integration
 - Docstring completeness verification for all public API
 
 ## Session Continuity
 
-Last session: 2026-02-15 (phase execution)
-Stopped at: Completed 04-02-PLAN.md — Dataset loading and download infrastructure
+Last session: 2026-02-14 (phase execution)
+Stopped at: Completed 04-03-PLAN.md — Real dataset upload and manifest update (Phase 4 COMPLETE)
 Resume file: None
