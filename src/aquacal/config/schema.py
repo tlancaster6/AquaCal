@@ -139,6 +139,16 @@ class CalibrationResult:
         board: ChArUco board configuration used
         diagnostics: Calibration quality metrics
         metadata: Metadata for reproducibility
+
+    Example:
+        >>> from aquacal import run_calibration, save_calibration
+        >>> result = run_calibration("config.yaml")
+        >>> print(f"Water surface at Z = {result.cameras['cam0'].interface_distance:.3f} m")
+        >>> save_calibration(result, "output/calibration.yaml")
+
+    Note:
+        For coordinate system conventions, see the
+        :doc:`Coordinate Conventions </guide/coordinates>` guide.
     """
 
     cameras: dict[str, CameraCalibration]
