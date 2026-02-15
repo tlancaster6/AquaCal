@@ -80,8 +80,8 @@ Plans:
 **Depends on**: Phase 1
 **Requirements**: DATA-01, DATA-02, DATA-03
 **Success Criteria** (what must be TRUE):
-  1. User can generate synthetic calibration scenarios via `aquacal.examples.generate_sample_data()` with configurable rig size
-  2. User can download a real calibration dataset (<50MB total) from GitHub Releases or examples/datasets/
+  1. User can generate synthetic calibration scenarios via `aquacal.datasets.generate_synthetic_rig()` with preset rig sizes ('small', 'medium', 'large')
+  2. User can download a real calibration dataset from Zenodo via `load_example('real-rig')`
   3. User can load example datasets via convenience function `aquacal.datasets.load_example()`
   4. Larger real datasets (>10MB) are hosted on Zenodo with DOI and download instructions
 **Plans:** 3 plans
