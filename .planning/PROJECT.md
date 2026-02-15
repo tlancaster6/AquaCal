@@ -37,7 +37,17 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 
 ### Active
 
-(None — planning next milestone)
+## Current Milestone: v1.3 QA & Polish
+
+**Goal:** Human-in-the-loop QA of CLI workflows with real rig data, documentation audit and polish, and shipping pending infrastructure todos.
+
+**Target features:**
+- Human QA of calibrate, init, and compare CLI workflows with real data
+- Documentation audit (inconsistencies, redundancy, factual errors)
+- Improved visualizations and ASCII diagrams in docs
+- Tutorial verification with correct embedded outputs
+- Visual abstract / hero image creation
+- Ship pending todos (Read the Docs, DOI badge, RELEASE_TOKEN)
 
 ### Out of Scope
 
@@ -84,4 +94,4 @@ Known issues:
 | Pre-execute notebooks | Reproducible docs builds without runtime dependencies | ✓ Good |
 
 ---
-*Last updated: 2026-02-15 after v1.2 milestone*
+*Last updated: 2026-02-15 after v1.3 milestone started*
