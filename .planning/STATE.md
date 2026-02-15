@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-14)
 
 ## Current Position
 
-Phase: 5 of 6 (Documentation Site)
-Plan: 4 of 4
-Status: Complete
-Last activity: 2026-02-15 — Completed 05-04: Ray trace diagram library integration (all verification gaps closed)
+Phase: 6 of 6 (Interactive Tutorials)
+Plan: 2 of 4
+Status: In Progress
+Last activity: 2026-02-15 — Completed 06-02: nbsphinx setup and README overhaul
 
-Progress: [████████████] 100%
+Progress: [██████████░░] 83% (17/20 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
-- Average duration: 334 seconds
-- Total execution time: 1.48 hours
+- Total plans completed: 17
+- Average duration: 329 seconds
+- Total execution time: 1.55 hours
 
 **By Phase:**
 
@@ -32,16 +32,17 @@ Progress: [████████████] 100%
 | 03 | 3 | 470s | 157s |
 | 04 | 3 | 1471s | 490s |
 | 05 | 4 | 2367s | 592s |
+| 06 | 1 | 244s | 244s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 06 | 02 | 244s | 2 | 5 |
 | 05 | 04 | 272s | 1 | 1 |
 | 05 | 03 | 970s | 3 | 13 |
 | 05 | 02 | 802s | 2 | 10 |
 | 05 | 01 | 323s | 2 | 13 |
-| 04 | 03 | 267s | 2 | 3 |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 04-example-data]: Nested ZIP directory structure handled automatically
 - [Phase 05-documentation-site]: Sphinx with Furo theme and MyST Markdown for clean, modern docs
 - [Phase 05-documentation-site]: OpenCV intersphinx removed (no valid inventory available)
+- [Phase 06-02]: nbsphinx configured with 'never' execution mode for reproducible docs builds
+- [Phase 06-02]: README condensed from 318 to 74 lines with hero visual and docs links
 
 ### Pending Todos
 
@@ -99,5 +102,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-15 (phase execution)
-Stopped at: Completed 05-04-PLAN.md (Phase 5 complete - all verification gaps closed: 20/20 must-haves verified)
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
