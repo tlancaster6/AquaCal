@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aquacal"
-version = "1.0.2"
+version = "1.0.3"
 description = "Refractive multi-camera calibration for underwater arrays with Snell's law modeling"
 readme = "README.md"
 requires-python = ">=3.10"
