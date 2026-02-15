@@ -223,9 +223,76 @@ def load_example(name: str) -> ExampleDataset:
         # Download and extract (cached)
         _cache_path = download_and_extract(name, dataset_info)
 
-        # Load from cache
-        # TODO: Implement loading from extracted cache directory
-        # For now, this path won't be reached due to zenodo_record_id = null
-        raise NotImplementedError(
-            f"Loading from cache not yet implemented for '{name}'"
-        )
+        # Handle nested directory structure (Zenodo archives often have top-level folder)
+        if (_cache_path / name).exists():
+            actual_path = _cache_path / name
+        else:
+            actual_path = _cache_path
+
+        # Load based on dataset type
+        if dataset_info["type"] == "real":
+            # Real datasets have config.yaml and optional reference_calibration.json
+            # but no pre-serialized detections
+            reference_calibration = None
+            ref_calib_file = actual_path / "reference_calibration.json"
+            if ref_calib_file.exists():
+                with open(ref_calib_file, encoding="utf-8") as f:
+                    ref_data = json.load(f)
+                # TODO: Deserialize CalibrationResult from JSON
+                # For now, just store the raw dict
+                reference_calibration = ref_data
+
+            # Read config for metadata
+            import yaml
+
+            config_file = actual_path / "config.yaml"
+            if config_file.exists():
+                with open(config_file, encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f)
+                camera_names = config_data.get("cameras", [])
+            else:
+                camera_names = []
+
+            return ExampleDataset(
+                name=name,
+                type=dataset_info["type"],
+                detections=DetectionResult(
+                    frames={}, camera_names=camera_names, total_frames=0
+                ),
+                ground_truth=None,
+                reference_calibration=reference_calibration,
+                metadata={
+                    "description": dataset_info["description"],
+                    "dataset_path": str(actual_path),
+                    "has_reference_calibration": ref_calib_file.exists(),
+                },
+                cache_path=actual_path,
+            )
+
+        else:
+            # Synthetic datasets have serialized detections.json and ground_truth.json
+            detections_file = actual_path / "detections.json"
+            if not detections_file.exists():
+                raise FileNotFoundError(
+                    f"Expected detections.json in {actual_path} for synthetic dataset"
+                )
+
+            with open(detections_file, encoding="utf-8") as f:
+                detections_data = json.load(f)
+            detections = _deserialize_detections(detections_data)
+
+            ground_truth = None
+            gt_file = actual_path / "ground_truth.json"
+            if gt_file.exists():
+                with open(gt_file, encoding="utf-8") as f:
+                    gt_data = json.load(f)
+                ground_truth = _deserialize_ground_truth(gt_data)
+
+            return ExampleDataset(
+                name=name,
+                type=dataset_info["type"],
+                detections=detections,
+                ground_truth=ground_truth,
+                metadata={"description": dataset_info["description"]},
+                cache_path=actual_path,
+            )

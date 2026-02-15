@@ -11,7 +11,7 @@
       "included": false,
       "zenodo_record_id": null,
       "zenodo_filename": "synthetic-medium.zip",
-      "checksum_sha256": null,
+      "checksum": null,
       "size_bytes": null,
       "description": "6 cameras, 80 frames — download from Zenodo"
     },
@@ -20,17 +20,17 @@
       "included": false,
       "zenodo_record_id": null,
       "zenodo_filename": "synthetic-large.zip",
-      "checksum_sha256": null,
+      "checksum": null,
       "size_bytes": null,
       "description": "13 cameras, 300 frames — download from Zenodo"
     },
     "real-rig": {
       "type": "real",
       "included": false,
-      "zenodo_record_id": null,
-      "zenodo_filename": "real-rig.zip",
-      "checksum_sha256": null,
-      "size_bytes": null,
+      "zenodo_record_id": 18645385,
+      "zenodo_filename": "real-rig-calib.zip",
+      "checksum": "md5:c66380aaa8cbca6bc04a3157baacbee8",
+      "size_bytes": 164023590,
       "description": "9+ camera production rig — download from Zenodo"
     }
   }

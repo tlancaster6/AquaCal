@@ -35,7 +35,7 @@ def get_cache_dir() -> Path:
 def download_with_progress(
     url: str,
     dest: Path,
-    expected_sha256: str | None = None,
+    expected_checksum: str | None = None,
     max_retries: int = 3,
 ) -> None:
     """Download a file with progress bar and checksum validation.
@@ -43,7 +43,8 @@ def download_with_progress(
     Args:
         url: URL to download from
         dest: Destination file path
-        expected_sha256: Expected SHA256 checksum (optional)
+        expected_checksum: Expected checksum in format "algorithm:hash"
+            (e.g., "md5:abc123..." or "sha256:def456...")
         max_retries: Maximum number of retry attempts on failure
 
     Raises:
@@ -78,18 +79,34 @@ def download_with_progress(
                         progress_bar.update(len(chunk))
 
             # Verify checksum if provided
-            if expected_sha256:
-                sha256_hash = hashlib.sha256()
+            if expected_checksum:
+                # Parse algorithm:hash format
+                if ":" not in expected_checksum:
+                    raise ValueError(
+                        f"Invalid checksum format: {expected_checksum}. "
+                        "Expected format: 'algorithm:hash' (e.g., 'md5:abc123...')"
+                    )
+
+                algorithm, expected_hash = expected_checksum.split(":", 1)
+
+                # Compute actual checksum
+                if algorithm == "md5":
+                    hash_obj = hashlib.md5()
+                elif algorithm == "sha256":
+                    hash_obj = hashlib.sha256()
+                else:
+                    raise ValueError(f"Unsupported checksum algorithm: {algorithm}")
+
                 with open(temp_dest, "rb") as f:
                     for chunk in iter(lambda: f.read(8192), b""):
-                        sha256_hash.update(chunk)
+                        hash_obj.update(chunk)
 
-                actual_sha256 = sha256_hash.hexdigest()
-                if actual_sha256 != expected_sha256:
+                actual_hash = hash_obj.hexdigest()
+                if actual_hash != expected_hash:
                     temp_dest.unlink()  # Delete corrupted file
                     raise RuntimeError(
                         f"Checksum mismatch for {dest.name}. "
-                        f"Expected: {expected_sha256}, Got: {actual_sha256}"
+                        f"Expected: {expected_hash}, Got: {actual_hash}"
                     )
 
             # Move to final destination
@@ -133,7 +150,7 @@ def download_and_extract(dataset_name: str, dataset_info: dict) -> Path:
     # Validate Zenodo metadata
     record_id = dataset_info.get("zenodo_record_id")
     filename = dataset_info.get("zenodo_filename")
-    checksum = dataset_info.get("checksum_sha256")
+    checksum = dataset_info.get("checksum")
 
     if not record_id or not filename:
         raise ValueError(
@@ -151,7 +168,7 @@ def download_and_extract(dataset_name: str, dataset_info: dict) -> Path:
 
     if not zip_path.exists():
         print(f"Downloading {dataset_name} from Zenodo...")
-        download_with_progress(url, zip_path, expected_sha256=checksum)
+        download_with_progress(url, zip_path, expected_checksum=checksum)
     else:
         print(f"Using cached download: {zip_path}")
 
