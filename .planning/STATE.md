@@ -5,19 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** v1.0 shipped. Planning next milestone.
+**Current focus:** v1.2 shipped. Planning next milestone.
 
 ## Current Position
 
-Phase: v1.0 complete (6 phases, 20 plans)
-Status: Milestone v1.0 MVP shipped
-Last activity: 2026-02-15 — Milestone v1.0 archived
+Phase: v1.2 complete (6 phases, 20 plans)
+Status: Milestone v1.2 MVP shipped
+Last activity: 2026-02-15 — Milestone v1.2 archived
 
-Progress: [████████████] 100% (v1.0 complete)
+Progress: [████████████] 100% (v1.2 complete)
 
 ## Performance Metrics
 
-**Velocity (v1.0):**
+**Velocity (v1.2):**
 - Total plans completed: 20
 - Average duration: 333 seconds
 - Total execution time: 1.85 hours
@@ -42,5 +42,5 @@ None for current milestone.
 ## Session Continuity
 
 Last session: 2026-02-15 (milestone completion)
-Stopped at: v1.0 milestone archived and tagged.
+Stopped at: v1.2 milestone archived and tagged.
 Resume file: None

@@ -27,13 +27,13 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 - ✓ JSON serialization of calibration results — existing
 - ✓ YAML-based configuration — existing
 - ✓ Public API: run_calibration(), load/save_calibration(), core types — existing
-- ✓ Clean pip-installable package on PyPI — v1.0
-- ✓ Getting started tutorial (end-to-end: collect images to calibration result) — v1.0
-- ✓ Theory/math background documentation (refractive geometry, coordinate conventions, optimizer) — v1.0
-- ✓ Example datasets (real calibration data + synthetic) — v1.0
-- ✓ Jupyter notebook examples demonstrating the pipeline — v1.0
-- ✓ Cleanup of legacy development artifacts — v1.0
-- ✓ CI/CD pipeline (GitHub Actions for tests, linting, publishing) — v1.0
+- ✓ Clean pip-installable package on PyPI — v1.2
+- ✓ Getting started tutorial (end-to-end: collect images to calibration result) — v1.2
+- ✓ Theory/math background documentation (refractive geometry, coordinate conventions, optimizer) — v1.2
+- ✓ Example datasets (real calibration data + synthetic) — v1.2
+- ✓ Jupyter notebook examples demonstrating the pipeline — v1.2
+- ✓ Cleanup of legacy development artifacts — v1.2
+- ✓ CI/CD pipeline (GitHub Actions for tests, linting, publishing) — v1.2
 
 ### Active
 
@@ -52,9 +52,9 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 
 ## Context
 
-Shipped v1.0 with ~39,900 LOC Python.
+Shipped v1.2 with ~39,900 LOC Python.
 Tech stack: NumPy, SciPy, OpenCV, Matplotlib, Pandas, PyYAML, Sphinx (Furo), GitHub Actions.
-Published on PyPI as `aquacal` v1.0.2. Sphinx docs with theory pages, API reference, and Jupyter tutorials.
+Published on PyPI as `aquacal` v1.2.0. Sphinx docs with theory pages, API reference, and Jupyter tutorials.
 Zenodo DOI pending webhook setup.
 
 Known issues:
@@ -72,7 +72,7 @@ Known issues:
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| PyPI + GitHub distribution | Standard for research Python libraries | ✓ Good — v1.0.2 live on PyPI |
+| PyPI + GitHub distribution | Standard for research Python libraries | ✓ Good — v1.2.0 live on PyPI |
 | Real + synthetic example data | Real data builds trust, synthetic demonstrates correctness | ✓ Good — both available |
 | Jupyter notebooks for examples | Interactive, visual — ideal for research audience | ✓ Good — 3 notebooks shipped |
 | MIT license | Maximizes adoption in research community | ✓ Good |
@@ -84,4 +84,4 @@ Known issues:
 | Pre-execute notebooks | Reproducible docs builds without runtime dependencies | ✓ Good |
 
 ---
-*Last updated: 2026-02-15 after v1.0 milestone*
+*Last updated: 2026-02-15 after v1.2 milestone*

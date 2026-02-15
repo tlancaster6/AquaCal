@@ -1,13 +1,13 @@
 # Milestones
 
-## v1.0 MVP (Shipped: 2026-02-15)
+## v1.2 MVP (Shipped: 2026-02-15)
 
 **Phases completed:** 6 phases, 20 plans
 **Timeline:** 2 days (2026-02-14 → 2026-02-15)
 **Execution time:** 1.85 hours
 **Changes:** 170 files, +21,632 / -2,180 lines
 **Git range:** `feat(01-01)` → `docs(phase-06)`
-**PyPI:** aquacal v1.0.2 on [pypi.org/project/aquacal](https://pypi.org/project/aquacal/)
+**PyPI:** aquacal v1.2.0 on [pypi.org/project/aquacal](https://pypi.org/project/aquacal/)
 
 **Delivered:** AquaCal transformed from a working calibration library into a pip-installable PyPI package with CI/CD, Sphinx documentation, example datasets, and Jupyter tutorials.
 
