@@ -1,9 +1,18 @@
-"""Tests for aquacal.datasets synthetic data generation."""
+"""Tests for aquacal.datasets synthetic data generation and loading."""
 
 import numpy as np
 import pytest
 
-from aquacal.datasets import SyntheticScenario, generate_synthetic_rig
+from aquacal.datasets import (
+    ExampleDataset,
+    SyntheticScenario,
+    clear_cache,
+    generate_synthetic_rig,
+    get_cache_info,
+    list_datasets,
+    load_example,
+)
+from aquacal.datasets._manifest import get_manifest
 
 
 def test_generate_synthetic_rig_small():
@@ -217,3 +226,183 @@ def test_reference_camera_at_origin():
 
         # Camera center should be at origin
         assert np.allclose(cam0_extrinsics.C, np.zeros(3))
+
+
+# ============================================================================
+# Dataset Loading Tests
+# ============================================================================
+
+
+def test_load_example_small():
+    """Test loading small preset from package data."""
+    ds = load_example("small")
+
+    # Check ExampleDataset structure
+    assert isinstance(ds, ExampleDataset)
+    assert ds.name == "small"
+    assert ds.type == "synthetic"
+    assert ds.cache_path is None  # Included dataset, not cached
+
+    # Check ground truth is populated
+    assert ds.ground_truth is not None
+    assert len(ds.ground_truth.intrinsics) == 2
+    assert len(ds.ground_truth.extrinsics) == 2
+    assert len(ds.ground_truth.board_poses) == 10
+
+    # Check detections are populated
+    assert ds.detections is not None
+    assert len(ds.detections.camera_names) == 2
+    assert ds.detections.total_frames == 10
+
+
+def test_load_example_small_detections_match_generated():
+    """Test that loaded small preset matches generated data."""
+    # Load from package data
+    loaded = load_example("small")
+
+    # Generate fresh
+    generated = generate_synthetic_rig("small")
+
+    # Detection counts should match (both use same seed)
+    assert loaded.detections.total_frames == len(generated.board_poses)
+    assert len(loaded.detections.camera_names) == len(generated.intrinsics)
+
+    # Camera names should match
+    assert set(loaded.detections.camera_names) == set(generated.intrinsics.keys())
+
+
+def test_load_example_nonexistent():
+    """Test that loading nonexistent dataset raises ValueError."""
+    with pytest.raises(ValueError, match="Unknown dataset.*nonexistent"):
+        load_example("nonexistent")
+
+
+def test_load_example_medium_not_available():
+    """Test that medium dataset raises NotImplementedError."""
+    with pytest.raises(
+        NotImplementedError, match="not yet available for download.*medium"
+    ):
+        load_example("medium")
+
+    # Error message should mention generate_synthetic_rig as alternative
+    with pytest.raises(NotImplementedError, match="generate_synthetic_rig"):
+        load_example("medium")
+
+
+def test_list_datasets():
+    """Test listing all available datasets."""
+    datasets = list_datasets()
+
+    assert isinstance(datasets, list)
+    assert "small" in datasets
+    assert "medium" in datasets
+    assert "large" in datasets
+    assert "real-rig" in datasets
+
+
+def test_get_cache_dir(tmp_path, monkeypatch):
+    """Test cache directory creation and .gitignore."""
+    from aquacal.datasets.download import get_cache_dir
+
+    # Monkeypatch cwd to tmp_path
+    monkeypatch.chdir(tmp_path)
+
+    cache_dir = get_cache_dir()
+
+    # Check cache directory was created
+    assert cache_dir.exists()
+    assert cache_dir.is_dir()
+    assert cache_dir.name == "aquacal_data"
+
+    # Check .gitignore was created
+    gitignore = cache_dir / ".gitignore"
+    assert gitignore.exists()
+    assert gitignore.read_text() == "*\n"
+
+
+def test_clear_cache(tmp_path, monkeypatch):
+    """Test clearing the cache."""
+    from aquacal.datasets.download import get_cache_dir
+
+    # Monkeypatch cwd to tmp_path
+    monkeypatch.chdir(tmp_path)
+
+    # Create fake cache structure
+    cache_dir = get_cache_dir()
+    dataset_dir = cache_dir / "medium"
+    dataset_dir.mkdir()
+    (dataset_dir / "test.txt").write_text("test")
+
+    downloads_dir = cache_dir / "downloads"
+    downloads_dir.mkdir()
+    (downloads_dir / "medium.zip").write_text("fake zip")
+
+    # Clear specific dataset
+    clear_cache("medium")
+
+    # Dataset dir should be gone, downloads should be cleaned
+    assert not dataset_dir.exists()
+    assert not (downloads_dir / "medium.zip").exists()
+
+    # Cache dir and downloads dir should still exist
+    assert cache_dir.exists()
+    assert downloads_dir.exists()
+
+    # Test clearing entire cache
+    (cache_dir / "large").mkdir()
+    clear_cache()
+
+    # Entire cache should be gone
+    assert not cache_dir.exists()
+
+
+def test_get_cache_info(tmp_path, monkeypatch):
+    """Test getting cache information."""
+    # Monkeypatch cwd to tmp_path
+    monkeypatch.chdir(tmp_path)
+
+    # Initially empty
+    info = get_cache_info()
+    assert info["cached_datasets"] == []
+    assert info["total_size_mb"] == 0.0
+
+    # Create fake cached datasets
+    from aquacal.datasets.download import get_cache_dir
+
+    cache_dir = get_cache_dir()
+    medium_dir = cache_dir / "medium"
+    medium_dir.mkdir()
+    (medium_dir / "test.txt").write_text("x" * 1024)  # 1KB
+
+    large_dir = cache_dir / "large"
+    large_dir.mkdir()
+    (large_dir / "test.txt").write_text("x" * 2048)  # 2KB
+
+    # Get info
+    info = get_cache_info()
+    assert set(info["cached_datasets"]) == {"medium", "large"}
+    assert info["total_size_mb"] > 0  # Some size
+    assert "aquacal_data" in info["cache_dir"]
+
+
+def test_manifest_loading():
+    """Test that manifest loads and has expected structure."""
+    manifest = get_manifest()
+
+    assert isinstance(manifest, dict)
+    assert "version" in manifest
+    assert "datasets" in manifest
+
+    datasets = manifest["datasets"]
+    assert "small" in datasets
+    assert "medium" in datasets
+    assert "large" in datasets
+    assert "real-rig" in datasets
+
+    # Small should be included
+    assert datasets["small"]["included"] is True
+    assert datasets["small"]["type"] == "synthetic"
+
+    # Medium should not be included
+    assert datasets["medium"]["included"] is False
+    assert datasets["medium"]["zenodo_record_id"] is None
