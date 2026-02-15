@@ -59,6 +59,10 @@ def compute_reprojection_errors(
     Returns:
         ReprojectionErrors with all statistics computed
 
+    Note:
+        For details on refractive projection, see the
+        :doc:`Refractive Geometry </guide/refractive_geometry>` guide.
+
     Notes:
         - Skips observations where refractive_project() returns None
         - RMS is sqrt(mean(residual_x^2 + residual_y^2))
