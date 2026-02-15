@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Milestone v1.3 QA & Polish
+**Current focus:** Milestone v1.4 QA & Polish
 
 ## Current Position
 
 Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
-Last activity: 2026-02-15 — Milestone v1.3 started
+Last activity: 2026-02-15 — Milestone v1.4 started
 
 ## Performance Metrics
 
@@ -41,5 +41,5 @@ None for current milestone.
 ## Session Continuity
 
 Last session: 2026-02-15 (milestone start)
-Stopped at: Defining requirements for v1.3.
+Stopped at: Defining requirements for v1.4.
 Resume file: None

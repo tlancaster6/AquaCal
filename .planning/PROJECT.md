@@ -37,7 +37,7 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 
 ### Active
 
-## Current Milestone: v1.3 QA & Polish
+## Current Milestone: v1.4 QA & Polish
 
 **Goal:** Human-in-the-loop QA of CLI workflows with real rig data, documentation audit and polish, and shipping pending infrastructure todos.
 
