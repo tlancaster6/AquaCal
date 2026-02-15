@@ -147,6 +147,10 @@ def optimize_interface(
     C_z_i is the camera center's Z coordinate. This eliminates the degeneracy
     between camera height and interface distance by construction.
 
+    Note:
+        For details on the optimizer implementation and sparse Jacobian structure,
+        see the :doc:`Optimizer Guide </guide/optimizer>` guide.
+
     Args:
         detections: Underwater ChArUco detections from detect_all_frames
         intrinsics: Per-camera intrinsic parameters (fixed during optimization)

@@ -28,6 +28,17 @@ def snells_law_3d(
     Returns:
         Unit vector of refracted ray direction, or None if total internal reflection.
 
+    Example:
+        >>> import numpy as np
+        >>> incident = np.array([0.0, 0.1, -1.0])  # Ray going down into water
+        >>> normal = np.array([0.0, 0.0, -1.0])    # Points up from water to air
+        >>> refracted = snells_law_3d(incident, normal, n_ratio=0.75)  # Air to water
+        >>> print(f"Refracted: {refracted}")
+
+    Note:
+        For a detailed explanation of the refractive geometry model,
+        see the :doc:`Refractive Geometry </guide/refractive_geometry>` guide.
+
     Notes:
         - Function handles normal orientation internally based on ray direction
         - For air-to-water: n_ratio = n_air / n_water ~= 0.75
@@ -550,6 +561,20 @@ def refractive_project(
     Returns:
         2D pixel coordinates, or None if projection fails.
 
+    Example:
+        >>> import numpy as np
+        >>> from aquacal.core.camera import Camera
+        >>> from aquacal.core.interface_model import Interface
+        >>> # Assuming camera and interface are set up
+        >>> point_3d = np.array([0.5, 0.3, 0.8])  # Underwater point
+        >>> pixel = refractive_project(camera, interface, point_3d)
+        >>> if pixel is not None:
+        >>>     print(f"Projected to pixel: {pixel}")
+
+    Note:
+        For a detailed explanation of the refractive geometry model,
+        see the :doc:`Refractive Geometry </guide/refractive_geometry>` guide.
+
     Notes:
         - Returns None if: point above interface, TIR, optimization fails,
           or refracted ray doesn't reach camera
@@ -588,6 +613,16 @@ def refractive_project_batch(
 
     Raises:
         ValueError: If interface normal is not horizontal [0, 0, -1]
+
+    Example:
+        >>> import numpy as np
+        >>> points = np.array([[0.5, 0.3, 0.8], [0.2, 0.4, 0.9], [0.1, 0.2, 1.0]])
+        >>> pixels = refractive_project_batch(camera, interface, points)
+        >>> valid_pixels = pixels[~np.isnan(pixels).any(axis=1)]
+
+    Note:
+        For a detailed explanation of the refractive geometry model,
+        see the :doc:`Refractive Geometry </guide/refractive_geometry>` guide.
 
     Notes:
         - Batch Brent-search is not implemented. For non-flat interfaces,

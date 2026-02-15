@@ -373,6 +373,16 @@ def run_calibration(
     Raises:
         FileNotFoundError: If config or video files not found
         CalibrationError: If any calibration stage fails
+
+    Example:
+        >>> from aquacal import run_calibration
+        >>> result = run_calibration("config.yaml", verbose=True)
+        >>> print(f"Calibrated {len(result.cameras)} cameras")
+        >>> print(f"Water surface at Z = {result.interface.water_z:.3f} m")
+
+    Note:
+        For details on the optimizer pipeline, see the
+        :doc:`Optimizer Guide </guide/optimizer>` guide.
     """
     config = load_config(config_path)
     return run_calibration_from_config(config, verbose=verbose)

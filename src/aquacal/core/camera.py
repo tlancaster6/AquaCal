@@ -18,6 +18,19 @@ class Camera:
         name: Camera identifier string
         intrinsics: CameraIntrinsics dataclass
         extrinsics: CameraExtrinsics dataclass
+
+    Example:
+        >>> from aquacal.core.camera import Camera
+        >>> from aquacal.config.schema import CameraIntrinsics, CameraExtrinsics
+        >>> import numpy as np
+        >>> # Create camera with intrinsics and extrinsics
+        >>> camera = Camera("cam1", intrinsics, extrinsics)
+        >>> point_3d = np.array([1.0, 0.5, 2.0])
+        >>> pixel = camera.project(point_3d)
+
+    Note:
+        For coordinate system conventions, see the
+        :doc:`Coordinate Conventions </guide/coordinates>` guide.
     """
 
     def __init__(
