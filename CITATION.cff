@@ -14,5 +14,6 @@ keywords:
   - refraction
   - computer-vision
   - snell-law
-version: 1.0.0
+doi: "10.5281/zenodo.18644658"
+version: 1.2.0
 date-released: "2026-02-14"
