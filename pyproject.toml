@@ -46,6 +46,13 @@ dev = [
     "pre-commit",
     "python-semantic-release",
 ]
+docs = [
+    "sphinx>=6.2",
+    "furo",
+    "myst-parser",
+    "sphinx-copybutton",
+    "sphinx-design",
+]
 
 [project.urls]
 Homepage = "https://github.com/tlancaster6/AquaCal"
