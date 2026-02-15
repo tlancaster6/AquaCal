@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-14)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Phase 4 complete — ready for Phase 5
+**Current focus:** Phase 5 in progress — documentation site infrastructure complete
 
 ## Current Position
 
-Phase: 4 of 6 (Example Data)
-Plan: 3 of 3
-Status: Complete
-Last activity: 2026-02-14 — Completed 04-03: Real dataset upload and manifest update
+Phase: 5 of 6 (Documentation Site)
+Plan: 1 of 3
+Status: In Progress
+Last activity: 2026-02-15 — Completed 05-01: Sphinx infrastructure and site skeleton
 
-Progress: [██████████] 100%
+Progress: [███████████░] 87%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 272 seconds
-- Total execution time: 0.91 hours
+- Total plans completed: 13
+- Average duration: 275 seconds
+- Total execution time: 1.00 hours
 
 **By Phase:**
 
@@ -31,16 +31,17 @@ Progress: [██████████] 100%
 | 02 | 3 | 434s | 145s |
 | 03 | 3 | 470s | 157s |
 | 04 | 3 | 1471s | 490s |
+| 05 | 1 | 323s | 323s |
 
 **Recent Executions:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
+| 05 | 01 | 323s | 2 | 13 |
 | 04 | 03 | 267s | 2 | 3 |
 | 04 | 02 | 544s | 2 | 10 |
 | 04 | 01 | 660s | 2 | 5 |
 | 03 | 03 | 299s | 2 | 1 |
-| 03 | 02 | 175s | 2 | 3 |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Recent decisions affecting current work:
 - [Phase 04-example-data]: algorithm:hash checksum format supports both MD5 (Zenodo) and SHA256
 - [Phase 04-example-data]: Real datasets return metadata and cache_path for user processing
 - [Phase 04-example-data]: Nested ZIP directory structure handled automatically
+- [Phase 05-documentation-site]: Sphinx with Furo theme and MyST Markdown for clean, modern docs
+- [Phase 05-documentation-site]: OpenCV intersphinx removed (no valid inventory available)
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-14 (phase execution)
-Stopped at: Phase 4 complete, verified. Ready for Phase 5 planning.
+Last session: 2026-02-15 (phase execution)
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
