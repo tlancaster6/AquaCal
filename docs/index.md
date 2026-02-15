@@ -36,7 +36,7 @@ Detailed API documentation for all public modules and functions.
 :link: tutorials/index
 :link-type: doc
 
-Interactive Jupyter notebook walkthroughs (coming soon).
+Interactive Jupyter notebook examples: full pipeline, diagnostics, and synthetic validation.
 :::
 
 ::::
