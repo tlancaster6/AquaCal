@@ -32,7 +32,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # HTML output
 html_theme = "furo"
 html_title = "AquaCal"
-html_static_path = []
+html_static_path = ["_static"]
 
 # Furo theme options
 html_theme_options = {
