@@ -33,6 +33,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Update DOI badge in README once Zenodo mints DOI
 - Set up Read the Docs deployment
 - Configure RELEASE_TOKEN PAT for semantic-release
+- Design better hero image for README (see .planning/todos/pending/2026-02-15-design-better-hero-image-for-readme.md)
 
 ### Blockers/Concerns
 
