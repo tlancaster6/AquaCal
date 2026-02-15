@@ -57,28 +57,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| QA-01 | — | Pending |
-| QA-02 | — | Pending |
-| QA-03 | — | Pending |
-| QA-04 | — | Pending |
-| DOCS-01 | — | Pending |
-| DOCS-02 | — | Pending |
-| DOCS-03 | — | Pending |
-| VIS-01 | — | Pending |
-| VIS-02 | — | Pending |
-| VIS-03 | — | Pending |
-| TUT-01 | — | Pending |
-| TUT-02 | — | Pending |
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
-| INFRA-04 | — | Pending |
+| INFRA-01 | Phase 7 | Pending |
+| QA-01 | Phase 8 | Pending |
+| QA-02 | Phase 8 | Pending |
+| QA-03 | Phase 8 | Pending |
+| QA-04 | Phase 9 | Pending |
+| DOCS-01 | Phase 10 | Pending |
+| DOCS-02 | Phase 10 | Pending |
+| DOCS-03 | Phase 10 | Pending |
+| VIS-01 | Phase 11 | Pending |
+| VIS-02 | Phase 11 | Pending |
+| VIS-03 | Phase 11 | Pending |
+| TUT-01 | Phase 12 | Pending |
+| TUT-02 | Phase 12 | Pending |
+| INFRA-02 | Phase 13 | Pending |
+| INFRA-03 | Phase 13 | Pending |
+| INFRA-04 | Phase 13 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 (pending roadmap)
+- Mapped to phases: 16
+- Unmapped: 0 (100% coverage)
 
 ---
 *Requirements defined: 2026-02-15*
-*Last updated: 2026-02-15 after initial definition*
+*Last updated: 2026-02-15 after roadmap creation*
