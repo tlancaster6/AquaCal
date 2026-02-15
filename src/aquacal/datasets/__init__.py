@@ -1,38 +1,67 @@
 """Synthetic and example datasets for AquaCal.
 
 This module provides utilities for generating synthetic calibration data with
-known ground truth. Useful for testing, validation, and demonstration purposes.
+known ground truth, and loading example datasets for testing and validation.
 
-The main entry point is `generate_synthetic_rig()`, which produces complete
-calibration scenarios with fixed presets.
+Synthetic Data Generation
+-------------------------
+Use `generate_synthetic_rig()` to create synthetic scenarios with fixed presets::
 
-Examples:
-    Quick smoke test scenario::
+    from aquacal.datasets import generate_synthetic_rig
 
-        from aquacal.datasets import generate_synthetic_rig
+    scenario = generate_synthetic_rig('small')
+    print(f"{len(scenario.intrinsics)} cameras")
+    print(f"{len(scenario.board_poses)} frames")
 
-        scenario = generate_synthetic_rig('small')
-        print(f"{len(scenario.intrinsics)} cameras")
-        print(f"{len(scenario.board_poses)} frames")
+Example Dataset Loading
+------------------------
+Use `load_example()` to load pre-packaged or downloadable example datasets::
 
-    Generate with rendered images::
+    from aquacal.datasets import load_example
 
-        scenario = generate_synthetic_rig('small', include_images=True)
-        img = scenario.images['cam0'][0]  # First frame from cam0
+    # Load small preset (included, no download)
+    ds = load_example('small')
+    print(f"{len(ds.ground_truth.intrinsics)} cameras")
 
-    Add pixel noise for robustness testing::
+    # Access detections
+    frame0 = ds.detections.frames[0]
+    print(frame0.detections.keys())
 
-        scenario = generate_synthetic_rig('medium', noisy=True)
-        print(f"Noise std: {scenario.noise_std}px")
+Available Datasets
+------------------
+- 'small': 2 cameras, 10 frames (included with package)
+- 'medium': 6 cameras, 80 frames (Zenodo download)
+- 'large': 13 cameras, 300 frames (Zenodo download)
+- 'real-rig': Real hardware calibration (Zenodo download)
 
-Available presets:
-    - 'small': 2 cameras, 10 frames - quick smoke test
-    - 'medium': 6 cameras, 80 frames - integration testing
-    - 'large': 13 cameras (real rig), 300 frames - full-scale realistic scenario
+Cache Management
+----------------
+Downloaded datasets are cached in `./aquacal_data/`::
 
-All scenarios use a 12x9 ChArUco board (60mm squares, 45mm markers, DICT_5X5_100).
+    from aquacal.datasets import get_cache_info, clear_cache
+
+    # Check cache status
+    info = get_cache_info()
+    print(f"Cached datasets: {info['cached_datasets']}")
+
+    # Clear specific dataset
+    clear_cache('medium')
+
+    # Clear entire cache
+    clear_cache()
 """
 
+from aquacal.datasets._manifest import list_datasets
+from aquacal.datasets.download import clear_cache, get_cache_info
+from aquacal.datasets.loader import ExampleDataset, load_example
 from aquacal.datasets.synthetic import SyntheticScenario, generate_synthetic_rig
 
-__all__ = ["generate_synthetic_rig", "SyntheticScenario"]
+__all__ = [
+    "generate_synthetic_rig",
+    "SyntheticScenario",
+    "load_example",
+    "ExampleDataset",
+    "list_datasets",
+    "clear_cache",
+    "get_cache_info",
+]

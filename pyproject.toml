@@ -34,6 +34,8 @@ dependencies = [
     "pyyaml",
     "matplotlib",
     "pandas",
+    "requests",
+    "tqdm",
 ]
 
 [project.optional-dependencies]
@@ -57,6 +59,11 @@ aquacal = "aquacal.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+aquacal = [
+    "datasets/data/**/*.json",
+]
 
 [tool.pytest.ini_options]
 markers = [

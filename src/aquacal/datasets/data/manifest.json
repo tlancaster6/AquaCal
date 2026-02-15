@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "datasets": {
+    "small": {
+      "type": "synthetic",
+      "included": true,
+      "description": "2 cameras, 10 frames — ships with package, no download needed"
+    },
+    "medium": {
+      "type": "synthetic",
+      "included": false,
+      "zenodo_record_id": null,
+      "zenodo_filename": "synthetic-medium.zip",
+      "checksum_sha256": null,
+      "size_bytes": null,
+      "description": "6 cameras, 80 frames — download from Zenodo"
+    },
+    "large": {
+      "type": "synthetic",
+      "included": false,
+      "zenodo_record_id": null,
+      "zenodo_filename": "synthetic-large.zip",
+      "checksum_sha256": null,
+      "size_bytes": null,
+      "description": "13 cameras, 300 frames — download from Zenodo"
+    },
+    "real-rig": {
+      "type": "real",
+      "included": false,
+      "zenodo_record_id": null,
+      "zenodo_filename": "real-rig.zip",
+      "checksum_sha256": null,
+      "size_bytes": null,
+      "description": "9+ camera production rig — download from Zenodo"
+    }
+  }
+}
