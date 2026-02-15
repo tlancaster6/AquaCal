@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: CI/CD Automation** - Multi-platform testing and release workflows
 - [x] **Phase 3: Public Release** - PyPI v1.0.0 and community files
 - [x] **Phase 4: Example Data** - Synthetic and real calibration datasets
-- [ ] **Phase 5: Documentation Site** - Sphinx API reference and user guide
+- [x] **Phase 5: Documentation Site** - Sphinx API reference and user guide
 - [ ] **Phase 6: Interactive Tutorials** - Jupyter notebooks demonstrating workflows
 
 ## Phase Details
@@ -102,12 +102,13 @@ Plans:
   4. API reference is auto-generated from docstrings via Sphinx autodoc with napoleon extension
   5. CITATION.cff file exists in repository root with BibTeX-compatible metadata
   6. README includes "How to Cite" section with DOI and BibTeX entry
-**Plans:** 3 plans
+**Plans:** 4 plans
 
 Plans:
-- [ ] 05-01-PLAN.md -- Sphinx infrastructure, Furo theme, RTD config, landing page, and site skeleton
-- [ ] 05-02-PLAN.md -- Theory pages (refractive geometry, coordinates, optimizer) with diagrams
-- [ ] 05-03-PLAN.md -- API reference pages and docstring improvements with examples
+- [x] 05-01-PLAN.md -- Sphinx infrastructure, Furo theme, RTD config, landing page, and site skeleton
+- [x] 05-02-PLAN.md -- Theory pages (refractive geometry, coordinates, optimizer) with diagrams
+- [x] 05-03-PLAN.md -- API reference pages and docstring improvements with examples
+- [x] 05-04-PLAN.md -- Gap closure: ray trace diagram uses actual library functions
 
 ### Phase 6: Image Input Support & Interactive Tutorials
 **Goal**: Abstract frame loading to support both video files and image directories, then build Jupyter notebook tutorials demonstrating end-to-end workflows using Phase 4 datasets
@@ -139,5 +140,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 2. CI/CD Automation | 3/3 | Complete | 2026-02-14 |
 | 3. Public Release | 3/3 | Complete | 2026-02-14 |
 | 4. Example Data | 3/3 | Complete | 2026-02-14 |
-| 5. Documentation Site | 0/TBD | Not started | - |
+| 5. Documentation Site | 4/4 | Complete | 2026-02-14 |
 | 6. Interactive Tutorials | 0/TBD | Not started | - |

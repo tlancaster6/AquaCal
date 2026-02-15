@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-02-14)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Phase 5 in progress — documentation site infrastructure complete
+**Current focus:** Phase 5 complete — documentation site verified (20/20). Phase 6 next.
 
 ## Current Position
 
