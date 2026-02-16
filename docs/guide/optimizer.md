@@ -226,6 +226,139 @@ This prevents auxiliary cameras from poisoning the primary solution while still 
 
 See {func}`aquacal.calibration.interface_estimation.register_auxiliary_camera` for implementation.
 
+## Camera Models
+
+AquaCal supports three distortion models for intrinsic calibration (Stage 1). Choosing the right model depends on your lens type and available calibration data.
+
+### Standard Pinhole Model (5 parameters)
+
+**Distortion coefficients:** k1, k2, p1, p2, k3
+
+**Radial distortion:** Polynomial model
+$$
+r_{\text{distorted}} = r (1 + k_1 r^2 + k_2 r^4 + k_3 r^6)
+$$
+
+**Tangential distortion:** Accounts for lens decentering (p1, p2)
+
+**When to use:**
+- Default for most cameras
+- Lenses with moderate distortion (< 90° field of view)
+- Standard rectilinear lenses
+
+**Auto-simplification:**
+With few calibration frames, higher-order coefficients (k3, k2) can overfit, causing the distortion polynomial to diverge outside the calibrated region. AquaCal detects this via monotonicity checks and automatically retries with simpler models:
+
+1. **Full model:** k1, k2, p1, p2, k3 (5 parameters)
+2. **If roundtrip validation fails:** Fix k3 = 0 (4 parameters)
+3. **If still failing:** Fix k3 = k2 = 0 (2 radial parameters: k1, p1, p2)
+
+This auto-simplification prevents overfitting while preserving model accuracy for well-calibrated cases.
+
+**Implementation:** See {func}`aquacal.calibration.intrinsics.calibrate_intrinsics_single` (lines 351-379) for the progressive simplification logic.
+
+### Rational Model (8 parameters)
+
+**Distortion coefficients:** k1, k2, k3, k4, k5, k6, p1, p2
+
+**Radial distortion:** Rational polynomial (numerator and denominator)
+$$
+r_{\text{distorted}} = r \frac{1 + k_1 r^2 + k_2 r^4 + k_3 r^6}{1 + k_4 r^2 + k_5 r^4 + k_6 r^6}
+$$
+
+**When to use:**
+- Wide-angle lenses with extreme barrel or pincushion distortion
+- Standard 5-parameter model gives RMS > 1.0 pixels despite good calibration data
+- You have 50+ in-air calibration frames with good spatial coverage
+
+**Auto-simplification:** ❌ **No** — Rational model does not auto-simplify. If you suspect overfitting (very low Stage 1 RMS but high validation errors), downgrade to the standard model.
+
+**Configuration:**
+```yaml
+rational_model_cameras:
+  - cam1  # Wide-angle camera needing 8-parameter model
+```
+
+**Note:** Rational model cameras cannot be fisheye cameras (mutually exclusive).
+
+### Fisheye Model (4 parameters, equidistant)
+
+**Distortion coefficients:** k1, k2, k3, k4 (equidistant projection model)
+
+**Projection:** Equidistant fisheye model (not polynomial radial)
+$$
+r_{\text{distorted}} = \theta (1 + k_1 \theta^2 + k_2 \theta^4 + k_3 \theta^6 + k_4 \theta^8)
+$$
+where θ is the angle from optical axis.
+
+**When to use:**
+- True fisheye lenses (> 120° field of view)
+- GoPro cameras (depending on lens mode)
+- Ultra-wide security cameras
+
+**Auto-simplification:** ❌ **No** — Fisheye model does not auto-simplify. If calibration quality is poor, check video quality and spatial coverage.
+
+**Configuration:**
+```yaml
+auxiliary_cameras:
+  - cam2  # Fisheye cameras must be auxiliary
+
+fisheye_cameras:
+  - cam2  # Subset of auxiliary_cameras
+```
+
+**Important constraints:**
+- Fisheye cameras **must** be listed in `auxiliary_cameras` (cannot participate in primary Stage 2-4 optimization)
+- Fisheye cameras **cannot** also be rational model cameras
+
+### Allowed Camera Combinations
+
+| Camera Lists | Constraints |
+|--------------|-------------|
+| `cameras` (primary) | First camera is the reference camera (world origin) |
+| `auxiliary_cameras` | Must not overlap with `cameras` |
+| `rational_model_cameras` | Can be in `cameras` or `auxiliary_cameras`, but not in `fisheye_cameras` |
+| `fisheye_cameras` | Must be a subset of `auxiliary_cameras`; cannot overlap with `rational_model_cameras` |
+
+**Examples:**
+
+✅ **Valid:**
+```yaml
+cameras: [cam0, cam1]           # Primary cameras, standard 5-param model
+auxiliary_cameras: [cam2, cam3]
+rational_model_cameras: [cam1]  # cam1 uses 8-param model
+fisheye_cameras: [cam3]         # cam3 is auxiliary + fisheye
+```
+
+❌ **Invalid:**
+```yaml
+cameras: [cam0]
+auxiliary_cameras: [cam1]
+fisheye_cameras: [cam0]         # ERROR: cam0 is primary, not auxiliary
+```
+
+❌ **Invalid:**
+```yaml
+cameras: [cam0]
+rational_model_cameras: [cam1]
+fisheye_cameras: [cam1]         # ERROR: rational and fisheye are mutually exclusive
+```
+
+### Signs of Overfitting
+
+If your Stage 1 RMS is very low (< 0.2 pixels) but you see any of these symptoms, you may have an overfitted distortion model:
+
+- High round-trip undistortion errors (warnings printed during Stage 1)
+- Validation errors in Stage 3/4 much higher than training errors
+- Distortion correction produces visible artifacts at image edges
+- Distortion polynomial "blows up" outside the calibrated image region
+
+**For standard model:** Auto-simplification should catch this automatically.
+
+**For rational or fisheye models:** Manually downgrade to the standard model by removing the camera from `rational_model_cameras` or `fisheye_cameras`.
+
+For practical troubleshooting, see the [Camera Models and Overfitting](troubleshooting.md#camera-models-and-overfitting) section in the Troubleshooting guide.
+
 ## See Also
 
 - [Refractive Geometry](refractive_geometry.md) — How refractive projection works and why it matters

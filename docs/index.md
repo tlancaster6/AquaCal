@@ -8,6 +8,8 @@
 
 AquaCal is a refractive multi-camera calibration library for underwater arrays. It calibrates air cameras viewing through a flat water surface, modeling Snell's law refraction for accurate 3D reconstruction.
 
+**All values are in meters.** This includes camera positions, water surface position, board dimensions, and 3D reconstruction outputs.
+
 ::::{grid} 1 1 2 2
 :gutter: 3
 

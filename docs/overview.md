@@ -24,14 +24,16 @@ AquaCal provides accurate calibration for research applications requiring precis
 
 ## Learn More
 
-For detailed explanations of the theory and implementation (coming in Plan 02):
+For detailed explanations of theory and implementation:
 
-- **Refractive Geometry** — ray tracing through the water interface
-- **Coordinate Conventions** — world frame, camera frame, transforms
-- **Optimizer Pipeline** — bundle adjustment structure and parameters
+- [Refractive Geometry](guide/refractive_geometry.md) — ray tracing through the water interface
+- [Coordinate Conventions](guide/coordinates.md) — world frame, camera frame, transforms
+- [Optimizer Pipeline](guide/optimizer.md) — bundle adjustment structure, parameters, and camera models
 
-For hands-on usage:
+For practical usage:
 
-- [User Guide](guide/index) — theory pages (Plan 02)
-- [API Reference](api/index) — complete function and class documentation (Plan 03)
-- [Tutorials](tutorials/index) — interactive notebook examples (coming soon)
+- [CLI Reference](guide/cli.md) — command-line tools and options
+- [Troubleshooting](guide/troubleshooting.md) — common issues and solutions
+- [User Guide](guide/index) — complete theory and practical guides
+- [API Reference](api/index) — function and class documentation
+- [Tutorials](tutorials/index) — interactive notebook examples
