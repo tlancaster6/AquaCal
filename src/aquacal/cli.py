@@ -583,7 +583,7 @@ def _generate_config_yaml(
             "",
             "  # Optional: approximate camera-to-water-surface distances (meters)",
             "  # Improves Stage 3 initialization",
-            "  # initial_distances:",
+            "  # initial_water_z:",
         ]
     )
 

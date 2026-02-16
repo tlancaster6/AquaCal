@@ -104,7 +104,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     extrinsic_paths = {k: Path(v) for k, v in paths["extrinsic_videos"].items()}
     output_dir = Path(paths["output_dir"])
 
-    # Auxiliary cameras (parsed early since initial_distances references it)
+    # Auxiliary cameras (parsed early since initial_water_z references it)
     auxiliary_cameras = data.get("auxiliary_cameras", [])
     if auxiliary_cameras:
         overlap = set(data["cameras"]) & set(auxiliary_cameras)
@@ -136,7 +136,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
 
         warnings.warn(
             "Config field 'initial_distances' is deprecated. Use 'initial_water_z' instead.",
-            DeprecationWarning,
+            UserWarning,
             stacklevel=2,
         )
         raw_distances = interface["initial_distances"]
@@ -145,7 +145,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         if isinstance(raw_distances, (int, float)):
             if raw_distances <= 0:
                 raise ValueError(
-                    f"initial_distances must be positive, got {raw_distances}"
+                    f"initial_water_z must be positive, got {raw_distances}"
                 )
             initial_water_z = {
                 cam: float(raw_distances) for cam in data["cameras"] + auxiliary_cameras
@@ -156,7 +156,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
             missing_cameras = set(data["cameras"]) - set(raw_distances.keys())
             if missing_cameras:
                 raise ValueError(
-                    f"initial_distances dict must cover all cameras. "
+                    f"initial_water_z dict must cover all cameras. "
                     f"Missing: {sorted(missing_cameras)}"
                 )
 
@@ -164,7 +164,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
             for cam, dist in raw_distances.items():
                 if dist <= 0:
                     raise ValueError(
-                        f"initial_distances['{cam}'] must be positive, got {dist}"
+                        f"initial_water_z['{cam}'] must be positive, got {dist}"
                     )
 
             # Warn about extra cameras (not in cameras or auxiliary list)
@@ -177,7 +177,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
                 import sys
 
                 print(
-                    f"Warning: initial_distances contains cameras not in cameras list: "
+                    f"Warning: initial_water_z contains cameras not in cameras list: "
                     f"{sorted(extra_cameras)}",
                     file=sys.stderr,
                 )
@@ -185,7 +185,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
             initial_water_z = {k: float(v) for k, v in raw_distances.items()}
         else:
             raise ValueError(
-                f"initial_distances must be a number or dict, got {type(raw_distances).__name__}"
+                f"initial_water_z must be a number or dict, got {type(raw_distances).__name__}"
             )
     elif "initial_water_z" in interface:
         raw_distances = interface["initial_water_z"]
@@ -577,7 +577,7 @@ def run_calibration_from_config(
         primary_intrinsics,
         board,
         reference_camera,
-        water_z_values=config.initial_water_z,
+        water_zs=config.initial_water_z,
         interface_normal=interface_normal,
         n_air=config.n_air,
         n_water=config.n_water,

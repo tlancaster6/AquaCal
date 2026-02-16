@@ -64,7 +64,7 @@ interface:
 
   # Optional: approximate camera-to-water-surface distances (meters)
   # Improves Stage 3 initialization
-  # initial_distances:
+  # initial_water_z:
   #   cam0: 0.20
   #   cam1: 0.20
   #   cam2: 0.20

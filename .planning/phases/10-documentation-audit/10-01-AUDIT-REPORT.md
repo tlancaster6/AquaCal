@@ -264,7 +264,7 @@ For hands-on usage:
 
 **Needed content:**
 - High Stage 1 RMS → lower frame_step, check board measurements
-- Stage 3 fails to converge → check initial_distances, verify detections
+- Stage 3 fails to converge → check initial_water_z, verify detections
 - Bad round-trip errors → check reference camera choice (use lowest Stage 1 RMS)
 - Memory/CPU load issues → use max_calibration_frames
 - Connectivity errors → ensure overlapping camera views
