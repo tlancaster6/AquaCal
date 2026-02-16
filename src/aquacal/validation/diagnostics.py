@@ -155,7 +155,7 @@ def compute_depth_stratified_errors(
                 continue
 
             cam_calib = calibration.cameras[cam_name]
-            interface_z = cam_calib.interface_distance
+            interface_z = cam_calib.water_z
             detection = frame_det.detections[cam_name]
 
             for i, corner_id in enumerate(detection.corner_ids):
@@ -222,12 +222,12 @@ def compute_camera_heights(
 
     Returns:
         Dict with keys:
-        - "water_z": The water surface Z-coordinate (from interface_distance)
+        - "water_z": The water surface Z-coordinate (from water_z)
         - "per_camera_height": Dict mapping camera name to height above water
         - "mean_height": Mean camera height above water
         - "height_spread": Max - min camera height
     """
-    # All cameras have the same interface_distance (water surface Z-coordinate)
+    # All cameras have the same water_z (water surface Z-coordinate)
     water_z = None
     camera_heights = {}
 
@@ -236,7 +236,7 @@ def compute_camera_heights(
         camera_z = C[2]
 
         if water_z is None:
-            water_z = cam_calib.interface_distance
+            water_z = cam_calib.water_z
 
         # h_c = water_z - camera_z (positive when camera is above water)
         h_c = water_z - camera_z
@@ -478,8 +478,8 @@ def plot_camera_rig(
         C = cam_calib.extrinsics.C
         camera_positions.append(C)
         camera_names.append(cam_name)
-        # interface_distance is the water surface Z-coordinate
-        interface_z = cam_calib.interface_distance
+        # water_z is the water surface Z-coordinate
+        interface_z = cam_calib.water_z
         interface_zs.append(interface_z)
 
     camera_positions = np.array(camera_positions)

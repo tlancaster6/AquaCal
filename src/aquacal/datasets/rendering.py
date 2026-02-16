@@ -231,11 +231,11 @@ def render_scenario_images(
 
         intrinsics = scenario.intrinsics[cam_name]
         extrinsics = scenario.extrinsics[cam_name]
-        interface_distance = scenario.interface_distances[cam_name]
+        water_z = scenario.water_zs[cam_name]
 
         interface = Interface(
             normal=interface_normal,
-            camera_distances={cam_name: interface_distance},
+            camera_distances={cam_name: water_z},
         )
 
         # Render each frame where board is visible

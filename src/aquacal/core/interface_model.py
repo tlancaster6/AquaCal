@@ -43,7 +43,7 @@ class Interface:
         self.n_air = n_air
         self.n_water = n_water
 
-    def get_interface_distance(self, camera_name: str) -> float:
+    def get_water_z(self, camera_name: str) -> float:
         """
         Get the water surface Z-coordinate for a specific camera.
 

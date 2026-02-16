@@ -50,7 +50,7 @@ def pack_params(
     Args:
         extrinsics: Camera extrinsics dict
         water_z: Global water surface Z coordinate. This is stored as the
-            interface_distance for all cameras (a Z-coordinate, not a distance).
+            water_z for all cameras (a Z-coordinate, not a distance).
         board_poses: Board poses dict (frame_idx -> BoardPose)
         reference_camera: Name of reference camera (skipped in extrinsics packing)
         camera_order: Ordered list of camera names
@@ -159,7 +159,7 @@ def unpack_params(
     idx += 1
 
     # Derive per-camera interface distances from water_z
-    # interface_distance is the Z-coordinate of the water surface for all cameras
+    # water_z is the Z-coordinate of the water surface for all cameras
     distances_out = {}
     for cam_name in camera_order:
         distances_out[cam_name] = water_z
@@ -438,7 +438,7 @@ def compute_residuals(
     Returns:
         1D array of residuals [r0_x, r0_y, r1_x, r1_y, ...] in pixels.
     """
-    extrinsics, interface_distances, board_poses, intrinsics = unpack_params(
+    extrinsics, water_zs, board_poses, intrinsics = unpack_params(
         params,
         reference_camera,
         reference_extrinsics,
@@ -471,7 +471,7 @@ def compute_residuals(
 
             interface = Interface(
                 normal=interface_normal,
-                camera_distances={cam_name: interface_distances[cam_name]},
+                camera_distances={cam_name: water_zs[cam_name]},
                 n_air=n_air,
                 n_water=n_water,
             )

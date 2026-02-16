@@ -41,7 +41,7 @@ def _compute_initial_board_poses(
     extrinsics: dict[str, CameraExtrinsics],
     board: BoardGeometry,
     min_corners: int = 4,
-    interface_distances: dict[str, float] | None = None,
+    water_zs: dict[str, float] | None = None,
     interface_normal: NDArray[np.float64] | None = None,
     n_air: float = 1.0,
     n_water: float = 1.333,
@@ -59,7 +59,7 @@ def _compute_initial_board_poses(
         extrinsics: Per-camera extrinsics (for transforming to world frame)
         board: Board geometry
         min_corners: Minimum corners required for PnP
-        interface_distances: Per-camera interface distances. If None,
+        water_zs: Per-camera interface distances. If None,
             defaults to 0.15m for all cameras.
         interface_normal: Interface normal vector. If None, uses [0, 0, -1].
         n_air: Refractive index of air (default 1.0)
@@ -68,8 +68,8 @@ def _compute_initial_board_poses(
     Returns:
         Dict mapping frame_idx to BoardPose (in world frame)
     """
-    if interface_distances is None:
-        interface_distances = {cam: 0.15 for cam in intrinsics.keys()}
+    if water_zs is None:
+        water_zs = {cam: 0.15 for cam in intrinsics.keys()}
 
     board_poses = {}
 
@@ -92,7 +92,7 @@ def _compute_initial_board_poses(
             det.corners_2d,
             det.corner_ids,
             board,
-            interface_distances.get(best_cam, 0.15),
+            water_zs.get(best_cam, 0.15),
             interface_normal,
             n_air,
             n_water,
@@ -125,7 +125,7 @@ def optimize_interface(
     initial_extrinsics: dict[str, CameraExtrinsics],
     board: BoardGeometry,
     reference_camera: str,
-    initial_interface_distances: dict[str, float] | None = None,
+    initial_water_zs: dict[str, float] | None = None,
     interface_normal: Vec3 | None = None,
     n_air: float = 1.0,
     n_water: float = 1.333,
@@ -157,7 +157,7 @@ def optimize_interface(
         initial_extrinsics: Initial camera extrinsics from Stage 2
         board: ChArUco board geometry
         reference_camera: Camera name to fix at origin (extrinsics not optimized)
-        initial_interface_distances: Optional initial distances per camera.
+        initial_water_zs: Optional initial distances per camera.
             If None, defaults to 0.15m for all cameras.
         interface_normal: Interface normal vector. If None, uses [0, 0, -1].
             Normal is fixed during optimization.
@@ -199,8 +199,8 @@ def optimize_interface(
         interface_normal = np.asarray(interface_normal, dtype=np.float64)
 
     # Set default interface distances
-    if initial_interface_distances is None:
-        initial_interface_distances = {cam: 0.15 for cam in initial_extrinsics.keys()}
+    if initial_water_zs is None:
+        initial_water_zs = {cam: 0.15 for cam in initial_extrinsics.keys()}
 
     # Create ordered lists for consistent parameter packing
     camera_order = sorted(initial_extrinsics.keys())
@@ -212,7 +212,7 @@ def optimize_interface(
         initial_extrinsics,
         board,
         min_corners,
-        interface_distances=initial_interface_distances,
+        water_zs=initial_water_zs,
         interface_normal=interface_normal,
         n_air=n_air,
         n_water=n_water,
@@ -230,7 +230,7 @@ def optimize_interface(
 
     # Compute initial water_z from reference camera
     # C_z_ref = 0 since reference camera is at origin, so water_z = d_ref
-    initial_water_z = initial_interface_distances[reference_camera]
+    initial_water_z = initial_water_zs[reference_camera]
 
     # Pack initial parameters
     initial_params = pack_params(
@@ -479,8 +479,8 @@ def register_auxiliary_camera(
         verbose: Verbosity level
 
     Returns:
-        When refine_intrinsics=False: Tuple of (extrinsics, interface_distance, rms_error)
-        When refine_intrinsics=True: Tuple of (extrinsics, interface_distance, rms_error, refined_intrinsics)
+        When refine_intrinsics=False: Tuple of (extrinsics, water_z, rms_error)
+        When refine_intrinsics=True: Tuple of (extrinsics, water_z, rms_error, refined_intrinsics)
 
     Raises:
         InsufficientDataError: If no usable frames found

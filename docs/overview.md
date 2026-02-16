@@ -2,19 +2,7 @@
 
 ## The Problem
 
-Standard multi-camera calibration assumes cameras and targets occupy the same optical medium. For underwater scenarios, this assumption breaks down: cameras are in air, viewing targets underwater through a flat water surface.
-
-```
-    Camera Array (in air)
-    |  |  |  |  |  |
-    ┴──┴──┴──┴──┴──┴── Air
-    ═════════════════ Water Surface
-    ~~~~~~~~~~~~~~~~~~ Water
-           ●
-      Target (underwater)
-```
-
-Light rays from underwater targets refract at the air-water interface following Snell's law. Standard calibration methods ignore refraction, leading to systematic errors in 3D reconstruction.
+Standard multi-camera calibration assumes cameras and targets occupy the same optical medium. For underwater scenarios, this assumption breaks down: cameras are in air, viewing targets underwater through a flat water surface. Light rays from underwater targets refract at the air-water interface following Snell's law. Standard calibration methods ignore refraction, leading to systematic errors in 3D reconstruction.
 
 ## What AquaCal Does
 

@@ -78,7 +78,7 @@ def _serialize_camera_calibration(cam: CameraCalibration) -> dict[str, Any]:
         "name": cam.name,
         "intrinsics": _serialize_camera_intrinsics(cam.intrinsics),
         "extrinsics": _serialize_camera_extrinsics(cam.extrinsics),
-        "interface_distance": cam.interface_distance,
+        "water_z": cam.water_z,
     }
     if cam.is_auxiliary:
         result["is_auxiliary"] = True
@@ -86,12 +86,26 @@ def _serialize_camera_calibration(cam: CameraCalibration) -> dict[str, Any]:
 
 
 def _deserialize_camera_calibration(data: dict[str, Any]) -> CameraCalibration:
-    """Deserialize dict to CameraCalibration."""
+    """Deserialize dict to CameraCalibration.
+
+    Supports backward compatibility: accepts both 'water_z' (new) and
+    'interface_distance' (legacy).
+    """
+    # Backward compatibility: accept both water_z and interface_distance
+    if "water_z" in data:
+        water_z = data["water_z"]
+    elif "interface_distance" in data:
+        water_z = data["interface_distance"]
+    else:
+        raise ValueError(
+            "Missing 'water_z' or 'interface_distance' field in camera calibration"
+        )
+
     return CameraCalibration(
         name=data["name"],
         intrinsics=_deserialize_camera_intrinsics(data["intrinsics"]),
         extrinsics=_deserialize_camera_extrinsics(data["extrinsics"]),
-        interface_distance=data["interface_distance"],
+        water_z=water_z,
         is_auxiliary=data.get("is_auxiliary", False),
     )
 

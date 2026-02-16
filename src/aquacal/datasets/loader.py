@@ -116,9 +116,7 @@ def _deserialize_ground_truth(data: dict) -> SyntheticScenario:
         )
 
     # Deserialize interface distances
-    interface_distances = {
-        cam_name: float(dist) for cam_name, dist in data["interface_distances"].items()
-    }
+    water_zs = {cam_name: float(dist) for cam_name, dist in data["water_zs"].items()}
 
     # Deserialize board poses
     board_poses = []
@@ -136,7 +134,7 @@ def _deserialize_ground_truth(data: dict) -> SyntheticScenario:
         board_config=board_config,
         intrinsics=intrinsics,
         extrinsics=extrinsics,
-        interface_distances=interface_distances,
+        water_zs=water_zs,
         board_poses=board_poses,
         noise_std=data["noise_std"],
         description=data["description"],

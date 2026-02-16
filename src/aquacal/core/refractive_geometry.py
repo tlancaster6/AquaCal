@@ -171,7 +171,7 @@ def _refractive_project_brent(
     """
     C = camera.C
     Q = np.asarray(point_3d, dtype=np.float64)
-    z_int = interface.get_interface_distance(camera.name)
+    z_int = interface.get_water_z(camera.name)
 
     # Check point is below interface (in water)
     if Q[2] <= z_int:
@@ -345,7 +345,7 @@ def _refractive_project_newton(
 
     C = camera.C
     Q = np.asarray(point_3d, dtype=np.float64)
-    z_int = interface.get_interface_distance(camera.name)
+    z_int = interface.get_water_z(camera.name)
     n_air = interface.n_air
     n_water = interface.n_water
 
@@ -445,7 +445,7 @@ def _refractive_project_newton_batch(
     result = np.full((n_points, 2), np.nan, dtype=np.float64)
 
     C = camera.C
-    z_int = interface.get_interface_distance(camera.name)
+    z_int = interface.get_water_z(camera.name)
     n_air = interface.n_air
     n_water = interface.n_water
 

@@ -64,7 +64,7 @@ def joint_refinement(
 
     Args:
         stage3_result: Output tuple from optimize_interface:
-            (extrinsics, interface_distances, board_poses, rms_error)
+            (extrinsics, water_zs, board_poses, rms_error)
         detections: Underwater ChArUco detections
         intrinsics: Per-camera intrinsic parameters (used as initial values)
         board: ChArUco board geometry

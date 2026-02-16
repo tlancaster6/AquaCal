@@ -113,9 +113,9 @@ def _build_metric_table(
         # Actually, the task says "percent error of 3D reconstruction" but doesn't specify the denominator
         # Let's use the mean error itself as a percentage (mean / typical_scale * 100)
         # Since we don't have a clear scale, let's use mean_error / water_z * 100 as a rough metric
-        # Get water_z from first camera's interface_distance
+        # Get water_z from first camera's water_z
         first_camera = next(iter(result.cameras.values()))
-        water_z = first_camera.interface_distance
+        water_z = first_camera.water_z
 
         pct_error = (
             (diag.validation_3d_error_mean / water_z * 100) if water_z > 0 else 0.0
@@ -151,7 +151,7 @@ def _build_per_camera_metrics(
     Columns:
         - reprojection_rms: Per-camera RMS (pixels)
         - position_x, position_y, position_z: Camera center in world frame (meters)
-        - interface_distance: Per-camera interface distance (meters)
+        - water_z: Per-camera interface distance (meters)
         - fx, fy, cx, cy: Intrinsic parameters (pixels)
     """
     # Collect all camera names across all results
@@ -182,7 +182,7 @@ def _build_per_camera_metrics(
                         "position_x": C[0],
                         "position_y": C[1],
                         "position_z": C[2],
-                        "interface_distance": cam.interface_distance,
+                        "water_z": cam.water_z,
                         "fx": fx,
                         "fy": fy,
                         "cx": cx,
@@ -197,7 +197,7 @@ def _build_per_camera_metrics(
                         "position_x": np.nan,
                         "position_y": np.nan,
                         "position_z": np.nan,
-                        "interface_distance": np.nan,
+                        "water_z": np.nan,
                         "fx": np.nan,
                         "fy": np.nan,
                         "cx": np.nan,

@@ -110,7 +110,7 @@ def refractive_solve_pnp(
     corners_2d: NDArray[np.float64],
     corner_ids: NDArray[np.int32],
     board: BoardGeometry,
-    interface_distance: float,
+    water_z: float,
     interface_normal: NDArray[np.float64] | None = None,
     n_air: float = 1.0,
     n_water: float = 1.333,
@@ -130,7 +130,7 @@ def refractive_solve_pnp(
         corners_2d: Detected corner positions, shape (N, 2)
         corner_ids: Corner IDs corresponding to corners_2d, shape (N,)
         board: Board geometry for 3D corner positions
-        interface_distance: Distance from camera to water surface in meters
+        water_z: Distance from camera to water surface in meters
         interface_normal: Interface normal vector. If None, uses [0, 0, -1].
         n_air: Refractive index of air (default 1.0)
         n_water: Refractive index of water (default 1.333)
@@ -157,7 +157,7 @@ def refractive_solve_pnp(
     camera = Camera("_pnp", intrinsics, identity_ext)
     interface = Interface(
         normal=interface_normal,
-        camera_distances={"_pnp": interface_distance},
+        camera_distances={"_pnp": water_z},
         n_air=n_air,
         n_water=n_water,
     )
@@ -352,7 +352,7 @@ def _refine_poses_multi_frame(
     intrinsics: dict[str, CameraIntrinsics],
     board: BoardGeometry,
     reference_camera: str,
-    interface_distances: dict[str, float] | None = None,
+    water_zs: dict[str, float] | None = None,
     interface_normal: NDArray[np.float64] | None = None,
     n_air: float = 1.0,
     n_water: float = 1.333,
@@ -371,7 +371,7 @@ def _refine_poses_multi_frame(
         intrinsics: Per-camera intrinsics
         board: Board geometry
         reference_camera: Camera fixed at world origin
-        interface_distances: Optional per-camera interface distances
+        water_zs: Optional per-camera interface distances
         interface_normal: Interface normal vector
         n_air: Refractive index of air
         n_water: Refractive index of water
@@ -400,13 +400,13 @@ def _refine_poses_multi_frame(
             obs = obs_maybe
 
             # PnP: board in camera frame
-            if interface_distances is not None and cam_name in interface_distances:
+            if water_zs is not None and cam_name in water_zs:
                 result = refractive_solve_pnp(
                     intrinsics[cam_name],
                     obs.corners_2d,
                     obs.corner_ids,
                     board,
-                    interface_distances[cam_name],
+                    water_zs[cam_name],
                     interface_normal,
                     n_air,
                     n_water,
@@ -457,13 +457,13 @@ def _refine_poses_multi_frame(
             obs = obs_maybe
 
             # PnP: board in camera frame
-            if interface_distances is not None and cam_name in interface_distances:
+            if water_zs is not None and cam_name in water_zs:
                 result = refractive_solve_pnp(
                     intrinsics[cam_name],
                     obs.corners_2d,
                     obs.corner_ids,
                     board,
-                    interface_distances[cam_name],
+                    water_zs[cam_name],
                     interface_normal,
                     n_air,
                     n_water,
@@ -501,7 +501,7 @@ def estimate_extrinsics(
     intrinsics: dict[str, CameraIntrinsics],
     board: BoardGeometry,
     reference_camera: str | None = None,
-    interface_distances: dict[str, float] | None = None,
+    water_zs: dict[str, float] | None = None,
     interface_normal: NDArray[np.float64] | None = None,
     n_air: float = 1.0,
     n_water: float = 1.333,
@@ -527,7 +527,7 @@ def estimate_extrinsics(
         board: Board geometry
         reference_camera: Camera to place at world origin.
             If None, uses first camera name (sorted).
-        interface_distances: Optional dict mapping camera names to interface
+        water_zs: Optional dict mapping camera names to interface
             distances in meters. When provided, uses refractive PnP for
             cameras with known distances.
         interface_normal: Interface normal vector. If None, uses [0, 0, -1].
@@ -615,13 +615,13 @@ def estimate_extrinsics(
                 if frame_idx in visited_frames:
                     continue
 
-                if interface_distances is not None and cam_name in interface_distances:
+                if water_zs is not None and cam_name in water_zs:
                     result = refractive_solve_pnp(
                         intrinsics[cam_name],
                         obs.corners_2d,
                         obs.corner_ids,
                         board,
-                        interface_distances[cam_name],
+                        water_zs[cam_name],
                         interface_normal,
                         n_air,
                         n_water,
@@ -668,13 +668,13 @@ def estimate_extrinsics(
                 if cam_name in visited_cameras:
                     continue
 
-                if interface_distances is not None and cam_name in interface_distances:
+                if water_zs is not None and cam_name in water_zs:
                     result = refractive_solve_pnp(
                         intrinsics[cam_name],
                         obs.corners_2d,
                         obs.corner_ids,
                         board,
-                        interface_distances[cam_name],
+                        water_zs[cam_name],
                         interface_normal,
                         n_air,
                         n_water,
@@ -710,7 +710,7 @@ def estimate_extrinsics(
         intrinsics,
         board,
         reference_camera,
-        interface_distances,
+        water_zs,
         interface_normal,
         n_air,
         n_water,

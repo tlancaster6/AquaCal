@@ -121,7 +121,7 @@
       ]
     }
   },
-  "interface_distances": {
+  "water_z_values": {
     "cam0": 0.15,
     "cam1": 0.14688004768127852
   },

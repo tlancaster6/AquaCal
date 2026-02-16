@@ -34,7 +34,7 @@ def triangulate_point(
 
     # Build camera_distances dict with ALL cameras
     camera_distances = {
-        cam_name: calibration.cameras[cam_name].interface_distance
+        cam_name: calibration.cameras[cam_name].water_z
         for cam_name in calibration.cameras
     }
 

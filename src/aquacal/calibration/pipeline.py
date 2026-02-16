@@ -129,9 +129,16 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
     n_water = interface.get("n_water", 1.333)
     normal_fixed = interface.get("normal_fixed", True)
 
-    # Parse initial_interface_distances (optional)
-    initial_interface_distances = None
+    # Parse initial_water_z (optional) with backward compatibility
+    initial_water_z = None
     if "initial_distances" in interface:
+        import warnings
+
+        warnings.warn(
+            "Config field 'initial_distances' is deprecated. Use 'initial_water_z' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         raw_distances = interface["initial_distances"]
 
         # Handle scalar format (apply to all cameras including auxiliary)
@@ -140,7 +147,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
                 raise ValueError(
                     f"initial_distances must be positive, got {raw_distances}"
                 )
-            initial_interface_distances = {
+            initial_water_z = {
                 cam: float(raw_distances) for cam in data["cameras"] + auxiliary_cameras
             }
         # Handle dict format (per-camera)
@@ -175,12 +182,59 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
                     file=sys.stderr,
                 )
 
-            initial_interface_distances = {
-                k: float(v) for k, v in raw_distances.items()
-            }
+            initial_water_z = {k: float(v) for k, v in raw_distances.items()}
         else:
             raise ValueError(
                 f"initial_distances must be a number or dict, got {type(raw_distances).__name__}"
+            )
+    elif "initial_water_z" in interface:
+        raw_distances = interface["initial_water_z"]
+
+        # Handle scalar format (apply to all cameras including auxiliary)
+        if isinstance(raw_distances, (int, float)):
+            if raw_distances <= 0:
+                raise ValueError(
+                    f"initial_water_z must be positive, got {raw_distances}"
+                )
+            initial_water_z = {
+                cam: float(raw_distances) for cam in data["cameras"] + auxiliary_cameras
+            }
+        # Handle dict format (per-camera)
+        elif isinstance(raw_distances, dict):
+            # Validate all cameras are covered
+            missing_cameras = set(data["cameras"]) - set(raw_distances.keys())
+            if missing_cameras:
+                raise ValueError(
+                    f"initial_water_z dict must cover all cameras. "
+                    f"Missing: {sorted(missing_cameras)}"
+                )
+
+            # Validate all distances are positive
+            for cam, dist in raw_distances.items():
+                if dist <= 0:
+                    raise ValueError(
+                        f"initial_water_z['{cam}'] must be positive, got {dist}"
+                    )
+
+            # Warn about extra cameras (not in cameras or auxiliary list)
+            extra_cameras = (
+                set(raw_distances.keys())
+                - set(data["cameras"])
+                - set(auxiliary_cameras)
+            )
+            if extra_cameras:
+                import sys
+
+                print(
+                    f"Warning: initial_water_z contains cameras not in cameras list: "
+                    f"{sorted(extra_cameras)}",
+                    file=sys.stderr,
+                )
+
+            initial_water_z = {k: float(v) for k, v in raw_distances.items()}
+        else:
+            raise ValueError(
+                f"initial_water_z must be a number or dict, got {type(raw_distances).__name__}"
             )
 
     # Optimization settings
@@ -242,7 +296,7 @@ def load_config(config_path: str | Path) -> CalibrationConfig:
         refine_intrinsics=refine_intrinsics,
         refine_auxiliary_intrinsics=refine_auxiliary_intrinsics,
         save_detailed_residuals=save_detailed,
-        initial_interface_distances=initial_interface_distances,
+        initial_water_z=initial_water_z,
         rational_model_cameras=rational_model_cameras,
         auxiliary_cameras=auxiliary_cameras,
         fisheye_cameras=fisheye_cameras,
@@ -523,7 +577,7 @@ def run_calibration_from_config(
         primary_intrinsics,
         board,
         reference_camera,
-        interface_distances=config.initial_interface_distances,
+        water_z_values=config.initial_water_z,
         interface_normal=interface_normal,
         n_air=config.n_air,
         n_water=config.n_water,
@@ -538,8 +592,8 @@ def run_calibration_from_config(
     # Build initial CalibrationResult for saving and visualization
     initial_interface_dists = {}
     for cam_name in extrinsics:
-        if config.initial_interface_distances is not None:
-            initial_interface_dists[cam_name] = config.initial_interface_distances.get(
+        if config.initial_water_z is not None:
+            initial_interface_dists[cam_name] = config.initial_water_z.get(
                 cam_name, 0.15
             )
         else:
@@ -548,7 +602,7 @@ def run_calibration_from_config(
     initial_result = _build_calibration_result(
         intrinsics=primary_intrinsics,
         extrinsics=extrinsics,
-        interface_distances=initial_interface_dists,
+        water_z_values=initial_interface_dists,
         board_config=config.board,
         interface_params=InterfaceParams(
             normal=interface_normal,
@@ -620,7 +674,7 @@ def run_calibration_from_config(
         initial_extrinsics=extrinsics,
         board=board,
         reference_camera=reference_camera,
-        initial_interface_distances=config.initial_interface_distances,
+        initial_water_z=config.initial_water_z,
         interface_normal=interface_normal,
         n_air=config.n_air,
         n_water=config.n_water,
@@ -818,7 +872,7 @@ def run_calibration_from_config(
     temp_result = _build_calibration_result(
         intrinsics=final_intrinsics,
         extrinsics=final_extrinsics,
-        interface_distances=final_distances,
+        water_z_values=final_distances,
         board_config=config.board,
         interface_params=interface_params,
         diagnostics=DiagnosticsData(
@@ -950,7 +1004,7 @@ def run_calibration_from_config(
     result = _build_calibration_result(
         intrinsics=final_intrinsics,
         extrinsics=final_extrinsics,
-        interface_distances=final_distances,
+        water_z_values=final_distances,
         board_config=config.board,
         interface_params=interface_params,
         diagnostics=diagnostics,
@@ -995,7 +1049,7 @@ def _estimate_validation_poses(
     initial_poses: dict[int, BoardPose],
     intrinsics: dict[str, CameraIntrinsics],
     extrinsics: dict[str, CameraExtrinsics],
-    interface_distances: dict[str, float],
+    water_z_values: dict[str, float],
     board: BoardGeometry,
     interface_normal: np.ndarray,
     n_air: float,
@@ -1011,7 +1065,7 @@ def _estimate_validation_poses(
         initial_poses: PnP-initialized board poses
         intrinsics: Per-camera intrinsics
         extrinsics: Per-camera extrinsics
-        interface_distances: Per-camera interface distances
+        water_z_values: Per-camera interface distances
         board: Board geometry
         interface_normal: Interface normal vector
         n_air: Refractive index of air
@@ -1044,7 +1098,7 @@ def _estimate_validation_poses(
 
         interface = Interface(
             normal=interface_normal,
-            camera_distances=interface_distances,
+            camera_distances=water_z_values,
             n_air=n_air,
             n_water=n_water,
         )
@@ -1115,7 +1169,7 @@ def _filter_cameras(
 def _build_calibration_result(
     intrinsics: dict[str, CameraIntrinsics],
     extrinsics: dict[str, CameraExtrinsics],
-    interface_distances: dict[str, float],
+    water_z_values: dict[str, float],
     board_config: BoardConfig,
     interface_params: InterfaceParams,
     diagnostics: DiagnosticsData,
@@ -1128,7 +1182,7 @@ def _build_calibration_result(
     Args:
         intrinsics: Per-camera intrinsic parameters
         extrinsics: Per-camera extrinsic parameters
-        interface_distances: Per-camera interface distances
+        water_z_values: Per-camera interface distances
         board_config: Board configuration used
         interface_params: Interface parameters (normal, refractive indices)
         diagnostics: Validation diagnostics
@@ -1144,7 +1198,7 @@ def _build_calibration_result(
             name=cam_name,
             intrinsics=intrinsics[cam_name],
             extrinsics=extrinsics[cam_name],
-            interface_distance=interface_distances[cam_name],
+            water_z=water_z_values[cam_name],
             is_auxiliary=cam_name in (auxiliary_cameras or set()),
         )
 
@@ -1185,10 +1239,10 @@ def _compute_config_hash(config: CalibrationConfig) -> str:
             f"{config.intrinsic_board.marker_size}"
         )
 
-    # Include initial_interface_distances if provided
-    if config.initial_interface_distances is not None:
+    # Include initial_water_z if provided
+    if config.initial_water_z is not None:
         # Sort by camera name for deterministic hash
-        sorted_distances = sorted(config.initial_interface_distances.items())
+        sorted_distances = sorted(config.initial_water_z.items())
         distance_str = ",".join(f"{cam}:{dist}" for cam, dist in sorted_distances)
         hash_input += f",init_dist:{distance_str}"
 

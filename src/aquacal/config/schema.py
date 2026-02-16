@@ -97,9 +97,8 @@ class CameraCalibration:
         name: Camera identifier (e.g., "cam0", "cam1")
         intrinsics: Intrinsic camera parameters
         extrinsics: Extrinsic camera parameters (pose in world frame)
-        interface_distance: Z-coordinate of the water surface in world frame (meters).
-            Same for all cameras after optimization. Despite the name, this is a
-            coordinate, not a per-camera distance.
+        water_z: Z-coordinate of the water surface in world frame (meters).
+            Same for all cameras after optimization.
         is_auxiliary: If True, this camera was registered post-hoc against
             fixed board poses (excluded from joint Stage 3/4 optimization).
     """
@@ -107,7 +106,7 @@ class CameraCalibration:
     name: str
     intrinsics: CameraIntrinsics
     extrinsics: CameraExtrinsics
-    interface_distance: float
+    water_z: float
     is_auxiliary: bool = False
 
 
@@ -143,7 +142,7 @@ class CalibrationResult:
     Example:
         >>> from aquacal import run_calibration, save_calibration
         >>> result = run_calibration("config.yaml")
-        >>> print(f"Water surface at Z = {result.cameras['cam0'].interface_distance:.3f} m")
+        >>> print(f"Water surface at Z = {result.cameras['cam0'].water_z:.3f} m")
         >>> save_calibration(result, "output/calibration.yaml")
 
     Note:
@@ -226,7 +225,7 @@ class CalibrationConfig:
             distances. Distortion coefficients are NOT refined. Only enable after
             Stage 3 converges reliably. Default False (Stage 4 skipped).
         save_detailed_residuals: Whether to save per-corner residuals
-        initial_interface_distances: Optional dict mapping camera names to approximate
+        initial_water_z: Optional dict mapping camera names to approximate
             camera-to-water-surface distances in meters. When None, all cameras default
             to 0.15m. Doesn't need to be exact — within 2-3x of the true value is
             sufficient for good initialization in Stage 3.
@@ -268,7 +267,7 @@ class CalibrationConfig:
     refine_intrinsics: bool = False
     refine_auxiliary_intrinsics: bool = False  # If True, Stage 4b refines auxiliary camera intrinsics (fx, fy, cx, cy) alongside extrinsics. Requires auxiliary_cameras to be set. Independent of refine_intrinsics (which controls primary camera refinement in Stage 4). Distortion coefficients are NOT refined.
     save_detailed_residuals: bool = True
-    initial_interface_distances: dict[str, float] | None = None
+    initial_water_z: dict[str, float] | None = None
     rational_model_cameras: list[str] = field(default_factory=list)
     auxiliary_cameras: list[str] = field(default_factory=list)
     fisheye_cameras: list[str] = field(default_factory=list)

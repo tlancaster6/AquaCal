@@ -37,7 +37,7 @@ class SyntheticScenario:
         board_config: ChArUco board specification
         intrinsics: Per-camera intrinsics
         extrinsics: Per-camera extrinsics
-        interface_distances: Per-camera interface distances (Z-coordinate of water surface)
+        water_zs: Per-camera interface distances (Z-coordinate of water surface)
         board_poses: List of board poses for all frames
         noise_std: Gaussian noise standard deviation applied to detections (pixels)
         description: Human-readable description
@@ -48,7 +48,7 @@ class SyntheticScenario:
     board_config: BoardConfig
     intrinsics: dict[str, CameraIntrinsics]
     extrinsics: dict[str, CameraExtrinsics]
-    interface_distances: dict[str, float]
+    water_zs: dict[str, float]
     board_poses: list[BoardPose]
     noise_std: float
     description: str
@@ -142,7 +142,7 @@ def generate_camera_array(
         seed: Random seed for reproducibility
 
     Returns:
-        Tuple of (intrinsics, extrinsics, interface_distances) dicts keyed by camera name.
+        Tuple of (intrinsics, extrinsics, water_zs) dicts keyed by camera name.
         Camera "cam0" is always the reference camera at origin with identity rotation.
     """
     rng = np.random.default_rng(seed)
@@ -242,7 +242,7 @@ def generate_real_rig_array(
         seed: Random seed for height variations
 
     Returns:
-        Tuple of (intrinsics, extrinsics, interface_distances) dicts keyed by camera name.
+        Tuple of (intrinsics, extrinsics, water_zs) dicts keyed by camera name.
     """
     rng = np.random.default_rng(seed)
 
@@ -323,7 +323,7 @@ def generate_real_rig_array(
 def generate_board_trajectory(
     n_frames: int,
     camera_positions: dict[str, NDArray[np.float64]],
-    interface_distances: dict[str, float],
+    water_zs: dict[str, float],
     depth_range: tuple[float, float] = (0.3, 0.6),
     xy_extent: float = 0.15,
     rotation_range_deg: float = 15.0,
@@ -341,7 +341,7 @@ def generate_board_trajectory(
     Args:
         n_frames: Number of frames to generate
         camera_positions: Dict of camera center positions (from extrinsics)
-        interface_distances: Per-camera interface distances
+        water_zs: Per-camera interface distances
         depth_range: (min_z, max_z) for board center in world coords
         xy_extent: Maximum XY offset from origin
         rotation_range_deg: Maximum board tilt from horizontal
@@ -478,7 +478,7 @@ def generate_dense_xy_grid(
 def generate_synthetic_detections(
     intrinsics: dict[str, CameraIntrinsics],
     extrinsics: dict[str, CameraExtrinsics],
-    interface_distances: dict[str, float],
+    water_zs: dict[str, float],
     board: BoardGeometry,
     board_poses: list[BoardPose],
     noise_std: float = 0.0,
@@ -498,7 +498,7 @@ def generate_synthetic_detections(
     Args:
         intrinsics: Per-camera intrinsics
         extrinsics: Per-camera extrinsics
-        interface_distances: Per-camera interface distances
+        water_zs: Per-camera interface distances
         board: Board geometry
         board_poses: List of board poses
         noise_std: Gaussian noise standard deviation (pixels)
@@ -520,7 +520,7 @@ def generate_synthetic_detections(
             camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
             interface = Interface(
                 normal=interface_normal,
-                camera_distances={cam_name: interface_distances[cam_name]},
+                camera_distances={cam_name: water_zs[cam_name]},
             )
 
             corner_ids: list[int] = []
@@ -571,7 +571,7 @@ def compute_calibration_errors(
     - principal_point_error_px: Max error in cx, cy
     - rotation_error_deg: Max rotation error across cameras
     - translation_error_mm: Max translation error across cameras
-    - interface_distance_error_mm: Max interface distance error
+    - water_z_error_mm: Max interface distance error
 
     Args:
         result: Calibration result from pipeline
@@ -592,12 +592,12 @@ def compute_calibration_errors(
 
         gt_intr = ground_truth.intrinsics[cam_name]
         gt_extr = ground_truth.extrinsics[cam_name]
-        gt_dist = ground_truth.interface_distances[cam_name]
+        gt_dist = ground_truth.water_zs[cam_name]
 
         cal = result.cameras[cam_name]
         cal_intr = cal.intrinsics
         cal_extr = cal.extrinsics
-        cal_dist = cal.interface_distance
+        cal_dist = cal.water_z
 
         # Focal length error (relative)
         fx_gt, fy_gt = gt_intr.K[0, 0], gt_intr.K[1, 1]
@@ -639,7 +639,7 @@ def compute_calibration_errors(
         "principal_point_error_px": max_pp_error_px,
         "rotation_error_deg": max_rotation_error_deg,
         "translation_error_mm": max_translation_error_mm,
-        "interface_distance_error_mm": max_interface_error_mm,
+        "water_z_error_mm": max_interface_error_mm,
     }
 
 
@@ -723,7 +723,7 @@ def generate_synthetic_rig(
         board_poses = generate_board_trajectory(
             n_frames=10,
             camera_positions=camera_positions,
-            interface_distances=distances,
+            water_zs=distances,
             depth_range=(0.25, 0.40),
             xy_extent=0.06,
             seed=seed,
@@ -745,7 +745,7 @@ def generate_synthetic_rig(
         board_poses = generate_board_trajectory(
             n_frames=80,
             camera_positions=camera_positions,
-            interface_distances=distances,
+            water_zs=distances,
             depth_range=(0.25, 0.45),
             xy_extent=0.10,
             seed=seed,
@@ -776,7 +776,7 @@ def generate_synthetic_rig(
     detection_result = generate_synthetic_detections(
         intrinsics=intrinsics,
         extrinsics=extrinsics,
-        interface_distances=distances,
+        water_zs=distances,
         board=board,
         board_poses=board_poses,
         noise_std=noise_std,
@@ -790,7 +790,7 @@ def generate_synthetic_rig(
         board_config=board_config,
         intrinsics=intrinsics,
         extrinsics=extrinsics,
-        interface_distances=distances,
+        water_zs=distances,
         board_poses=board_poses,
         noise_std=noise_std,
         description=description,
