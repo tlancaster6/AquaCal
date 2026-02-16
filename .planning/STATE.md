@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Phase 7 - Infrastructure Check
+**Current focus:** Phase 8 - CLI QA Execution
 
 ## Current Position
 
-Phase: 7 of 13 (Infrastructure Check)
+Phase: 8 of 12 (CLI QA Execution)
 Plan: 01 complete
 Status: Phase complete
-Last activity: 2026-02-15 — Infrastructure audit complete, all items verified
+Last activity: 2026-02-15 — All CLI workflows verified with real rig data
 
-Progress: [█████████████░░░░░░░] 54% (7/13 phases complete)
+Progress: [██████████████░░░░░░] 67% (8/12 phases complete)
 
 ## Performance Metrics
 
@@ -62,6 +62,13 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 - Design better hero image for README (Phase 11)
+- Detailed CLI usage guide — currently no documentation on CLI commands (Phase 10)
+- Clarify allowed combinations of auxiliary_cameras, fisheye_cameras, and rational_model_cameras (Phase 10)
+- Add usage note: extrinsic calibration is sensitive to reference camera choice. Set reference camera to whichever had lowest RMS in Stage 1 (printed to console during calibrate) (Phase 10)
+- Check for misspellings of "auxiliary" (commonly misspelled "auxillary") across all docs (Phase 10)
+- Add usage tip: bad RMS or high round-trip errors in Stage 1 → lower frame_step for more intrinsic data, optionally set max_calibration_frames to limit expensive Stage 3/4 optimization (Phase 10)
+- Document the three camera models (standard 5-param, rational 8-param, fisheye 4-param) with a section on auto-simplification logic (git 0863fae). Note: only standard model has auto-simplification; rational/fisheye users should downgrade to standard if overfitting suspected. Include signs of overfitting (Phase 10)
+- Reduce memory and CPU load during calibration
 
 ### Blockers/Concerns
 
