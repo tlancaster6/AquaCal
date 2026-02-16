@@ -163,10 +163,10 @@ grep -r "auxill" /c/Users/tucke/PycharmProjects/AquaCal --include="*.py" --inclu
 | `docs/guide/index.md` | ✅ Good | Theory pages table of contents |
 | `docs/guide/refractive_geometry.md` | ✅ Excellent | Comprehensive, accurate, well-illustrated |
 | `docs/guide/coordinates.md` | ✅ Excellent | Clear explanations with gotcha admonitions |
-| `docs/guide/optimizer.md` | ❓ Not checked | File exists but not read in this audit |
+| `docs/guide/optimizer.md` | ✅ Excellent | Comprehensive pipeline documentation with sparse Jacobian explanation |
 | `docs/contributing.md` | ❓ Not checked | Assumed standard |
 | `docs/changelog.md` | ❓ Not checked | Assumed auto-generated |
-| `docs/api/*.rst` | ❓ Not fully checked | Autodoc directives (spot-checked, appear correct) |
+| `docs/api/*.rst` | ✅ Good | Autodoc directives correct; checked index.rst and config.rst in detail |
 | `docs/tutorials/*.ipynb` | ❓ Not checked | Notebooks assumed tested during Phase 6 |
 
 ---
@@ -174,6 +174,24 @@ grep -r "auxill" /c/Users/tucke/PycharmProjects/AquaCal --include="*.py" --inclu
 ### 2.2 Errors (Inaccurate Technical Content)
 
 **None found.** All checked documentation accurately describes code behavior.
+
+**Additional detail on checked files:**
+
+✅ **docs/guide/optimizer.md:**
+- Accurate description of 4-stage pipeline
+- Correct parameter counts and equations
+- Sparse Jacobian strategy correctly explained
+- Auxiliary camera registration process accurate
+- Cross-references to code modules correct
+
+✅ **docs/api/index.rst:**
+- API organization matches actual package structure
+- All 7 subpackages documented (core, calibration, config, io, validation, triangulation, datasets)
+- Autodoc directives syntactically correct
+
+✅ **docs/api/config.rst:**
+- Autodoc directive correctly targets `aquacal.config.schema`
+- Members and inheritance correctly specified
 
 ---
 
@@ -457,12 +475,15 @@ For hands-on usage:
 - `src/aquacal/cli.py`
 - _(others listed in plan but not fully read due to scope)_
 
-**Sphinx docs (4 files read in full):**
+**Sphinx docs (7 files read in full):**
 - `docs/index.md`
 - `docs/overview.md`
 - `docs/guide/index.md`
 - `docs/guide/coordinates.md`
 - `docs/guide/refractive_geometry.md`
+- `docs/guide/optimizer.md`
+- `docs/api/index.rst`
+- `docs/api/config.rst`
 
 **Other:**
 - `README.md`
