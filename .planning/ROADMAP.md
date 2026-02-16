@@ -76,10 +76,12 @@ Plans:
   2. Agent has audited Sphinx documentation for inconsistencies, redundancy, and factual errors
   3. User has reviewed audit findings and confirmed fixes are applied
   4. Documentation has consistent terminology, accurate technical content, and no formatting issues
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 10-01: TBD
+- [ ] 10-01-PLAN.md — Audit docstrings and Sphinx docs, produce findings report
+- [ ] 10-02-PLAN.md — Rename interface_distance to water_z across codebase
+- [ ] 10-03-PLAN.md — User review + create new doc sections + apply audit fixes
 
 #### Phase 11: Documentation Visuals
 **Goal**: Documentation has improved visual aids where they enhance understanding
@@ -125,6 +127,6 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12
 | 7. Infrastructure Check | v1.4 | 1/1 | Complete | 2026-02-15 |
 | 8. CLI QA Execution | v1.4 | 0/TBD | Not started | - |
 | 9. Bug Triage | v1.4 | 0/TBD | Not started | - |
-| 10. Documentation Audit | v1.4 | 0/TBD | Not started | - |
+| 10. Documentation Audit | v1.4 | 0/3 | Not started | - |
 | 11. Documentation Visuals | v1.4 | 0/TBD | Not started | - |
 | 12. Tutorial Verification | v1.4 | 0/TBD | Not started | - |
