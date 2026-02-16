@@ -153,7 +153,7 @@ class TestCalibrateSingle:
             writer.write(np.full((480, 640, 3), 128, dtype=np.uint8))
         writer.release()
 
-        with pytest.raises(ValueError, match="No valid frames"):
+        with pytest.raises(ValueError, match="No ChArUco board detected"):
             calibrate_intrinsics_single(video_path, board)
 
     def test_filters_collinear_detections(self, tmp_path, board):

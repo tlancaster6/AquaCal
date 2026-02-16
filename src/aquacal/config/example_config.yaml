@@ -19,8 +19,9 @@ board:
 #   dictionary: "DICT_4X4_100"
 #   # legacy_pattern: false  # Set to true if board has marker in top-left cell
 
+# The first camera listed is the reference camera (world origin)
 cameras:
-  - cam0    # Reference camera (will be at world origin)
+  - cam0
   - cam1
   - cam2
   - cam3
@@ -58,11 +59,11 @@ paths:
 
 interface:
   n_air: 1.0             # Refractive index of air
-  n_water: 1.333         # Refractive index of water (fresh water at 20C)
+  n_water: 1.333         # Refractive index of water (1.333 for fresh water at 20C)
   normal_fixed: false    # If true, assume reference camera is perpendicular to water surface
 
   # Optional: approximate camera-to-water-surface distances (meters)
-  # Improves Stage 3 initialization. Doesn't need to be exact (within 2-3x is fine)
+  # Improves Stage 3 initialization
   # initial_distances:
   #   cam0: 0.20
   #   cam1: 0.20

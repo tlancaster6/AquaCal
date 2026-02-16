@@ -164,10 +164,24 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
 
     # Dry run: just validate
     if args.dry_run:
-        print("Configuration valid.")
-        print(f"  Cameras: {', '.join(config.camera_names)}")
-        print(f"  Board: {config.board.squares_x}x{config.board.squares_y}")
-        print(f"  Output: {config.output_dir}")
+        n_primary = len(config.camera_names)
+        n_rational = len(config.rational_model_cameras)
+        n_auxiliary = len(config.auxiliary_cameras)
+        n_fisheye = len(config.fisheye_cameras)
+
+        parts = [f"{n_primary} primary camera(s)"]
+        if n_rational:
+            parts.append(f"{n_rational} rational model")
+        if n_auxiliary:
+            parts.append(f"{n_auxiliary} auxiliary")
+        if n_fisheye:
+            parts.append(f"{n_fisheye} fisheye")
+
+        print(
+            f"Configuration valid. {', '.join(parts)} detected. "
+            f"Output will be saved to {config.output_dir}. "
+            f"Ready for calibration."
+        )
         return 0
 
     # Run calibration
@@ -497,6 +511,7 @@ def _generate_config_yaml(
         "  square_size: 0.030     # TODO: measure your board (meters)",
         "  marker_size: 0.022     # TODO: measure your board (meters)",
         '  dictionary: "DICT_4X4_50"  # ArUco dictionary name',
+        "  legacy_pattern: false  # Set to true if board has marker in top-left cell (pre-OpenCV 4.6)",
         "",
         "# Optional: use a different board for in-air intrinsic calibration",
         "# If omitted, the board above is used for both intrinsic and extrinsic steps",
@@ -506,7 +521,9 @@ def _generate_config_yaml(
         "#   square_size: 0.025",
         "#   marker_size: 0.018",
         '#   dictionary: "DICT_4X4_100"',
+        "#   # legacy_pattern: false  # Set to true if board has marker in top-left cell",
         "",
+        "# The first camera listed is the reference camera (world origin)",
         "cameras:",
     ]
 
@@ -516,26 +533,22 @@ def _generate_config_yaml(
     lines.extend(
         [
             "",
-            "# Optional: cameras needing 8-coefficient rational distortion model",
-            "# Use for wide-angle lenses where the standard 5-coefficient model is insufficient",
-            "# rational_model_cameras:",
-        ]
-    )
-
-    for cam in camera_names:
-        lines.append(f"  # - {cam}")
-
-    lines.extend(
-        [
-            "",
             "# Optional: auxiliary cameras (registered post-hoc, excluded from joint optimization)",
             "# Move camera names from 'cameras' to here if they should not participate in Stage 3",
             "# auxiliary_cameras:",
+            "#   - cam_name",
+            "",
+            "# Optional: cameras needing 8-coefficient rational distortion model",
+            "# Use for wide-angle lenses where the standard 5-coefficient model is insufficient",
+            "# rational_model_cameras:",
+            "#   - cam_name",
+            "",
+            "# Optional: cameras using equidistant fisheye projection model",
+            "# Must be a subset of auxiliary_cameras. Must not overlap with rational_model_cameras.",
+            "# fisheye_cameras:",
+            "#   - cam_name",
         ]
     )
-
-    for cam in camera_names:
-        lines.append(f"  # - {cam}")
 
     lines.extend(
         [
@@ -565,11 +578,11 @@ def _generate_config_yaml(
             "",
             "interface:",
             "  n_air: 1.0             # Refractive index of air",
-            "  n_water: 1.333         # Refractive index of water (fresh water at 20C)",
+            "  n_water: 1.333         # Refractive index of water (1.333 for fresh water at 20C)",
             "  normal_fixed: false    # If true, assume reference camera is perpendicular to water surface",
             "",
             "  # Optional: approximate camera-to-water-surface distances (meters)",
-            "  # Improves Stage 3 initialization. Doesn't need to be exact (within 2-3x is fine)",
+            "  # Improves Stage 3 initialization",
             "  # initial_distances:",
         ]
     )
@@ -585,6 +598,7 @@ def _generate_config_yaml(
             "  loss_scale: 1.0        # Residual scale for robust loss (pixels)",
             "  # max_calibration_frames: 150  # Max frames for Stage 3/4 (null = no limit)",
             "  # refine_intrinsics: false  # Stage 4: refine focal lengths and principal points",
+            "  # refine_auxiliary_intrinsics: false  # Stage 4b: refine auxiliary camera intrinsics",
             "",
             "detection:",
             "  min_corners: 8         # Minimum corners per frame to use detection",

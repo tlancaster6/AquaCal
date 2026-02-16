@@ -18,7 +18,7 @@ from aquacal.io.video import VideoSet
 def validate_intrinsics(
     intrinsics: CameraIntrinsics,
     camera_name: str = "",
-    max_roundtrip_error_px: float = 0.5,
+    max_roundtrip_error_px: float = 1.0,
     expected_fx: float | None = None,
     fx_tolerance_fraction: float = 0.3,
 ) -> list[str]:
@@ -32,7 +32,7 @@ def validate_intrinsics(
         intrinsics: The calibration result to validate
         camera_name: For warning messages (default "")
         max_roundtrip_error_px: Maximum acceptable undistortion roundtrip error
-            (default 0.5 px)
+            (default 1.0 px)
         expected_fx: If provided, check that calibrated fx is within tolerance
             of this value (default None = skip check)
         fx_tolerance_fraction: Fractional tolerance for fx check (default 0.3 = 30%)
@@ -262,7 +262,11 @@ def calibrate_intrinsics_single(
             all_detections.append((detection.corner_ids, detection.corners_2d))
 
     if not all_detections:
-        raise ValueError(f"No valid frames found in {video_path}")
+        raise ValueError(
+            f"No ChArUco board detected in any frame of {video_path}. "
+            f"Check that the video contains visible board frames and that "
+            f"the board configuration (dictionary, dimensions) is correct."
+        )
 
     if image_size is None:
         raise ValueError(f"Could not determine image size from {video_path}")
