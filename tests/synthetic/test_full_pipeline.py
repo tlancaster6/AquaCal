@@ -51,7 +51,7 @@ def _run_calibration_stages(
     detections = generate_synthetic_detections(
         intrinsics=scenario.intrinsics,
         extrinsics=scenario.extrinsics,
-        interface_distances=scenario.interface_distances,
+        water_zs=scenario.water_zs,
         board=board,
         board_poses=scenario.board_poses,
         noise_std=actual_noise,
@@ -88,7 +88,7 @@ def _run_calibration_stages(
             name=cam_name,
             intrinsics=scenario.intrinsics[cam_name],  # Use ground truth intrinsics
             extrinsics=opt_extrinsics[cam_name],
-            interface_distance=opt_distances[cam_name],
+            water_z=opt_distances[cam_name],
         )
 
     interface_params = InterfaceParams(
@@ -348,7 +348,7 @@ class TestCreateScenario:
         assert scenario.name == "realistic"
         assert len(scenario.intrinsics) == 13
         assert len(scenario.extrinsics) == 13
-        assert len(scenario.interface_distances) == 13
+        assert len(scenario.water_zs) == 13
         assert len(scenario.board_poses) == 30
         assert scenario.noise_std == 0.5
 
@@ -367,7 +367,7 @@ class TestGenerateSyntheticDetections:
         detections = generate_synthetic_detections(
             intrinsics=scenario_ideal.intrinsics,
             extrinsics=scenario_ideal.extrinsics,
-            interface_distances=scenario_ideal.interface_distances,
+            water_zs=scenario_ideal.water_zs,
             board=board,
             board_poses=scenario_ideal.board_poses,
             noise_std=0.0,
@@ -384,7 +384,7 @@ class TestGenerateSyntheticDetections:
         detections = generate_synthetic_detections(
             intrinsics=scenario_ideal.intrinsics,
             extrinsics=scenario_ideal.extrinsics,
-            interface_distances=scenario_ideal.interface_distances,
+            water_zs=scenario_ideal.water_zs,
             board=board,
             board_poses=scenario_ideal.board_poses,
             noise_std=0.0,
@@ -407,9 +407,9 @@ class TestIdealScenario:
         result, errors = ideal_result
         assert errors["translation_error_mm"] < 5.0
 
-    def test_interface_distance_accuracy(self, ideal_result):
+    def test_water_z_accuracy(self, ideal_result):
         result, errors = ideal_result
-        assert errors["interface_distance_error_mm"] < 10.0
+        assert errors["water_z_error_mm"] < 10.0
 
     def test_rms_reprojection_error(self, ideal_result):
         result, errors = ideal_result
@@ -428,9 +428,9 @@ class TestRealisticScenario:
         result, errors = realistic_result
         assert errors["translation_error_mm"] < 15.0
 
-    def test_interface_distance_accuracy(self, realistic_result):
+    def test_water_z_accuracy(self, realistic_result):
         result, errors = realistic_result
-        assert errors["interface_distance_error_mm"] < 20.0
+        assert errors["water_z_error_mm"] < 20.0
 
     def test_rms_reprojection_error(self, realistic_result):
         result, errors = realistic_result
@@ -449,9 +449,9 @@ class TestMinimalScenario:
         result, errors = minimal_result
         assert errors["translation_error_mm"] < 30.0
 
-    def test_interface_distance_accuracy(self, minimal_result):
+    def test_water_z_accuracy(self, minimal_result):
         result, errors = minimal_result
-        assert errors["interface_distance_error_mm"] < 30.0
+        assert errors["water_z_error_mm"] < 30.0
 
     def test_rms_reprojection_error(self, minimal_result):
         result, errors = minimal_result
@@ -470,7 +470,7 @@ class TestComputeCalibrationErrors:
                 name=cam_name,
                 intrinsics=scenario_ideal.intrinsics[cam_name],
                 extrinsics=scenario_ideal.extrinsics[cam_name],
-                interface_distance=scenario_ideal.interface_distances[cam_name],
+                water_z=scenario_ideal.water_zs[cam_name],
             )
 
         result = CalibrationResult(
@@ -504,6 +504,4 @@ class TestComputeCalibrationErrors:
         np.testing.assert_allclose(errors["principal_point_error_px"], 0.0, atol=1e-10)
         np.testing.assert_allclose(errors["rotation_error_deg"], 0.0, atol=1e-10)
         np.testing.assert_allclose(errors["translation_error_mm"], 0.0, atol=1e-10)
-        np.testing.assert_allclose(
-            errors["interface_distance_error_mm"], 0.0, atol=1e-10
-        )
+        np.testing.assert_allclose(errors["water_z_error_mm"], 0.0, atol=1e-10)

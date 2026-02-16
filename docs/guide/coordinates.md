@@ -147,10 +147,10 @@ The normal points **outward from the denser medium** (water). This is a standard
 
 The {func}`~aquacal.core.refractive_geometry.snells_law_3d` function handles normal orientation automatically based on the incident ray direction, so you don't need to manually flip the normal.
 
-:::{admonition} Gotcha: interface_distance is a Z-coordinate, not a distance
+:::{admonition} Gotcha: water_z is a Z-coordinate, not a distance
 :class: warning
 
-Despite its name, `interface_distance` in AquaCal's internal representation is actually the **Z-coordinate of the water surface** (i.e., the value of water_z), **not** the physical distance from a camera to the water.
+Despite its name, `water_z` in AquaCal's internal representation is actually the **Z-coordinate of the water surface** (i.e., the value of water_z), **not** the physical distance from a camera to the water.
 
 The physical camera-to-water gap is computed as:
 
@@ -160,7 +160,7 @@ $$
 
 where $C_z$ is the camera's Z position in world coordinates.
 
-After optimization, all cameras receive the same `interface_distance` value (the global water_z). This reparameterization eliminates a degeneracy between camera Z position and interface distance. See the [Refractive Geometry](refractive_geometry.md) page for details.
+After optimization, all cameras receive the same `water_z` value (the global water_z). This reparameterization eliminates a degeneracy between camera Z position and interface distance. See the [Refractive Geometry](refractive_geometry.md) page for details.
 :::
 
 ## Transforms

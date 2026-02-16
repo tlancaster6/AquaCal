@@ -229,7 +229,7 @@ class TestLoadConfig:
         assert config.min_cameras_per_frame == 2
         assert config.holdout_fraction == 0.2
         assert config.save_detailed_residuals is True
-        assert config.initial_interface_distances is None  # Should default to None
+        assert config.initial_water_z is None  # Should default to None
         assert config.refine_intrinsics is False
 
     def test_load_config_with_intrinsic_board(self, valid_config_yaml):
@@ -289,7 +289,7 @@ class TestLoadConfig:
         assert config.intrinsic_board is None
 
     def test_load_config_without_initial_distances(self, valid_config_yaml):
-        """Test that initial_interface_distances is None when not provided."""
+        """Test that initial_water_z is None when not provided."""
         # Ensure initial_distances is not in config
         if "initial_distances" in valid_config_yaml.get("interface", {}):
             del valid_config_yaml["interface"]["initial_distances"]
@@ -299,8 +299,8 @@ class TestLoadConfig:
             f.flush()
             config = load_config(f.name)
 
-        # initial_interface_distances should be None (backward compatible)
-        assert config.initial_interface_distances is None
+        # initial_water_z should be None (backward compatible)
+        assert config.initial_water_z is None
 
     def test_load_config_with_per_camera_initial_distances(self, valid_config_yaml):
         """Test loading config with per-camera initial_distances."""
@@ -314,8 +314,8 @@ class TestLoadConfig:
             f.flush()
             config = load_config(f.name)
 
-        assert config.initial_interface_distances is not None
-        assert config.initial_interface_distances == {"cam0": 0.25, "cam1": 0.28}
+        assert config.initial_water_z is not None
+        assert config.initial_water_z == {"cam0": 0.25, "cam1": 0.28}
 
     def test_load_config_with_scalar_initial_distance(self, valid_config_yaml):
         """Test loading config with scalar initial_distance (expanded to all cameras)."""
@@ -326,8 +326,8 @@ class TestLoadConfig:
             f.flush()
             config = load_config(f.name)
 
-        assert config.initial_interface_distances is not None
-        assert config.initial_interface_distances == {"cam0": 0.3, "cam1": 0.3}
+        assert config.initial_water_z is not None
+        assert config.initial_water_z == {"cam0": 0.3, "cam1": 0.3}
 
     def test_load_config_with_incomplete_initial_distances_dict(
         self, valid_config_yaml
@@ -390,10 +390,10 @@ class TestLoadConfig:
         assert "not in cameras list" in captured.err
 
         # Config should still load successfully with all cameras
-        assert config.initial_interface_distances is not None
-        assert "cam0" in config.initial_interface_distances
-        assert "cam1" in config.initial_interface_distances
-        assert "cam2" in config.initial_interface_distances
+        assert config.initial_water_z is not None
+        assert "cam0" in config.initial_water_z
+        assert "cam1" in config.initial_water_z
+        assert "cam2" in config.initial_water_z
 
     def test_load_config_with_invalid_type_initial_distance(self, valid_config_yaml):
         """Test that invalid type for initial_distances raises ValueError."""
@@ -635,7 +635,7 @@ class TestBuildCalibrationResult:
         """Test that components are assembled correctly."""
         intrinsics = {"cam0": sample_intrinsics, "cam1": sample_intrinsics}
         extrinsics = {"cam0": sample_extrinsics, "cam1": sample_extrinsics}
-        interface_distances = {"cam0": 0.15, "cam1": 0.16}
+        water_zs = {"cam0": 0.15, "cam1": 0.16}
         interface_params = InterfaceParams(
             normal=np.array([0, 0, -1], dtype=np.float64),
             n_air=1.0,
@@ -658,7 +658,7 @@ class TestBuildCalibrationResult:
         result = _build_calibration_result(
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distances=interface_distances,
+            water_z_values=water_zs,
             board_config=sample_board_config,
             interface_params=interface_params,
             diagnostics=diagnostics,
@@ -672,7 +672,7 @@ class TestBuildCalibrationResult:
         # Check camera calibration assembly
         cam0 = result.cameras["cam0"]
         assert cam0.name == "cam0"
-        assert cam0.interface_distance == 0.15
+        assert cam0.water_z == 0.15
         assert np.allclose(cam0.intrinsics.K, sample_intrinsics.K)
         assert np.allclose(cam0.extrinsics.R, sample_extrinsics.R)
 
@@ -830,17 +830,15 @@ class TestComputeConfigHash:
         # Different intrinsic_board should produce different hash
         assert hash1 != hash2
 
-    def test_compute_config_hash_includes_initial_interface_distances(
-        self, sample_board_config
-    ):
-        """Test that initial_interface_distances is included in hash when provided."""
+    def test_compute_config_hash_includes_initial_water_z(self, sample_board_config):
+        """Test that initial_water_z is included in hash when provided."""
         config1 = CalibrationConfig(
             board=sample_board_config,
             camera_names=["cam0", "cam1"],
             intrinsic_video_paths={"cam0": Path("/a"), "cam1": Path("/b")},
             extrinsic_video_paths={"cam0": Path("/c"), "cam1": Path("/d")},
             output_dir=Path("/out"),
-            initial_interface_distances=None,
+            initial_water_z=None,
         )
 
         config2 = CalibrationConfig(
@@ -849,7 +847,7 @@ class TestComputeConfigHash:
             intrinsic_video_paths={"cam0": Path("/a"), "cam1": Path("/b")},
             extrinsic_video_paths={"cam0": Path("/c"), "cam1": Path("/d")},
             output_dir=Path("/out"),
-            initial_interface_distances={"cam0": 0.25, "cam1": 0.28},
+            initial_water_z={"cam0": 0.25, "cam1": 0.28},
         )
 
         config3 = CalibrationConfig(
@@ -858,14 +856,14 @@ class TestComputeConfigHash:
             intrinsic_video_paths={"cam0": Path("/a"), "cam1": Path("/b")},
             extrinsic_video_paths={"cam0": Path("/c"), "cam1": Path("/d")},
             output_dir=Path("/out"),
-            initial_interface_distances={"cam0": 0.30, "cam1": 0.28},
+            initial_water_z={"cam0": 0.30, "cam1": 0.28},
         )
 
         hash1 = _compute_config_hash(config1)
         hash2 = _compute_config_hash(config2)
         hash3 = _compute_config_hash(config3)
 
-        # Different initial_interface_distances should produce different hashes
+        # Different initial_water_z should produce different hashes
         assert hash1 != hash2
         assert hash2 != hash3
         assert hash1 != hash3
@@ -1186,10 +1184,10 @@ class TestRunCalibrationFromConfig:
             assert board_arg.config.square_size == 0.03
             assert board_arg.config.marker_size == 0.022
 
-    def test_run_calibration_from_config_passes_initial_interface_distances(
+    def test_run_calibration_from_config_passes_initial_water_z(
         self, mock_calibration_stages, sample_board_config
     ):
-        """Test that initial_interface_distances is passed to optimize_interface."""
+        """Test that initial_water_z is passed to optimize_interface."""
         with tempfile.TemporaryDirectory() as tmpdir:
             initial_distances = {"cam0": 0.25, "cam1": 0.28}
             config = CalibrationConfig(
@@ -1204,17 +1202,17 @@ class TestRunCalibrationFromConfig:
                     "cam1": Path("/path/cam1_uw.mp4"),
                 },
                 output_dir=Path(tmpdir),
-                initial_interface_distances=initial_distances,
+                initial_water_z=initial_distances,
             )
 
             run_calibration_from_config(config)
 
-            # Verify optimize_interface was called with initial_interface_distances
+            # Verify optimize_interface was called with initial_water_z
             mock_calibration_stages["optimize"].assert_called_once()
             call_args = mock_calibration_stages["optimize"].call_args
 
-            # Check that initial_interface_distances was passed
-            assert call_args[1]["initial_interface_distances"] == initial_distances
+            # Check that initial_water_z was passed
+            assert call_args[1]["initial_water_z"] == initial_distances
 
     def test_run_calibration_from_config_estimates_validation_poses(
         self, mock_calibration_stages, sample_board_config, capsys

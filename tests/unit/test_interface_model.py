@@ -34,14 +34,14 @@ class TestInterfaceInit:
 class TestGetInterfaceDistance:
     def test_returns_correct_distance(self, simple_interface):
         """Returns the stored distance for each camera."""
-        assert simple_interface.get_interface_distance("cam0") == 0.15
-        assert simple_interface.get_interface_distance("cam1") == 0.16
-        assert simple_interface.get_interface_distance("cam2") == 0.145
+        assert simple_interface.get_water_z("cam0") == 0.15
+        assert simple_interface.get_water_z("cam1") == 0.16
+        assert simple_interface.get_water_z("cam2") == 0.145
 
     def test_unknown_camera_raises(self, simple_interface):
         """Unknown camera should raise KeyError."""
         with pytest.raises(KeyError):
-            simple_interface.get_interface_distance("unknown_cam")
+            simple_interface.get_water_z("unknown_cam")
 
 
 class TestGetInterfacePoint:

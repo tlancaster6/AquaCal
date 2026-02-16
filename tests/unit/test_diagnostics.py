@@ -69,7 +69,7 @@ def camera_calibration():
         name="cam0",
         intrinsics=intrinsics,
         extrinsics=extrinsics,
-        interface_distance=0.5,
+        water_z=0.5,
     )
 
 
@@ -280,7 +280,7 @@ class TestComputeDepthStratifiedErrors:
             num_bins=1,
         )
 
-        # Board is at Z=1.0, interface_distance=0.5
+        # Board is at Z=1.0, water_z=0.5
         # Depth should be around 1.0 - 0.5 = 0.5
         assert df.iloc[0]["depth_min"] < 0.6
         assert df.iloc[0]["depth_max"] > 0.4
@@ -524,7 +524,7 @@ class TestGenerateDiagnosticReport:
             name="cam1",
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distance=0.5,
+            water_z=0.5,
         )
 
         # Build calibration with two cameras
@@ -532,7 +532,7 @@ class TestGenerateDiagnosticReport:
             name="cam0",
             intrinsics=intrinsics,
             extrinsics=CameraExtrinsics(R=np.eye(3), t=np.array([0.0, 0.0, 0.5])),
-            interface_distance=0.5,
+            water_z=0.5,
         )
 
         cameras = {"cam0": cam0, "cam1": cam1}
@@ -745,7 +745,7 @@ class TestPlotCameraRig:
                 name=f"cam{i}",
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=0.5,
+                water_z=0.5,
             )
 
         interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
@@ -814,7 +814,7 @@ class TestPlotCameraRig:
                 name=cam_name,
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=0.0,  # Water at Z=0
+                water_z=0.0,  # Water at Z=0
             )
             expected_order.append((cam_name, x, y, angle_rad))
 
@@ -945,13 +945,13 @@ class TestPlotReprojectionQuiver:
             name="cam0",
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distance=0.5,
+            water_z=0.5,
         )
         cam1 = CameraCalibration(
             name="cam1",
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distance=0.5,
+            water_z=0.5,
         )
 
         cameras = {"cam0": cam0, "cam1": cam1}
@@ -1124,7 +1124,7 @@ class TestSaveDiagnosticReportWithNewPlots:
                 name=cam_name,
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=0.5,
+                water_z=0.5,
             )
             per_camera_rms[cam_name] = 0.5
 
@@ -1180,8 +1180,8 @@ class TestComputeCameraHeights:
     """Tests for compute_camera_heights()."""
 
     def test_coplanar_cameras(self, board_config):
-        """Test cameras at same Z with same interface_distance -> all h_c equal, spread = 0."""
-        # Create 3 cameras all at Z=0 with interface_distance=0.5
+        """Test cameras at same Z with same water_z -> all h_c equal, spread = 0."""
+        # Create 3 cameras all at Z=0 with water_z=0.5
         cameras = {}
         for i in range(3):
             K = np.array([[800.0, 0.0, 320.0], [0.0, 800.0, 240.0], [0.0, 0.0, 1.0]])
@@ -1195,7 +1195,7 @@ class TestComputeCameraHeights:
                 name=f"cam{i}",
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=0.5,  # water_z = 0.5
+                water_z=0.5,  # water_z = 0.5
             )
 
         interface = InterfaceParams(normal=np.array([0.0, 0.0, -1.0]))
@@ -1231,7 +1231,7 @@ class TestComputeCameraHeights:
             assert np.isclose(h_c, 0.5)
 
     def test_different_heights(self, board_config):
-        """Test cameras at different Z with same interface_distance -> h_c varies, spread > 0."""
+        """Test cameras at different Z with same water_z -> h_c varies, spread > 0."""
         # Create 3 cameras at different heights, all with same water_z
         cameras = {}
         water_z = 0.5
@@ -1248,12 +1248,12 @@ class TestComputeCameraHeights:
             cam_c_z = 0.1 * i  # cam0 at Z=0, cam1 at Z=0.1, cam2 at Z=0.2
             t = np.array([i * 0.1, 0.0, -cam_c_z])  # Note: t_z = -C_z
             extrinsics = CameraExtrinsics(R=R, t=t)
-            # All cameras have same interface_distance (water_z)
+            # All cameras have same water_z (water_z)
             cameras[f"cam{i}"] = CameraCalibration(
                 name=f"cam{i}",
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=water_z,
+                water_z=water_z,
             )
             expected_heights.append(water_z - cam_c_z)
 
@@ -1309,7 +1309,7 @@ class TestComputeCameraHeights:
                 name="cam0",
                 intrinsics=intrinsics,
                 extrinsics=extrinsics,
-                interface_distance=0.5,
+                water_z=0.5,
             )
         }
 

@@ -62,7 +62,7 @@ def calibrate_synthetic(
     detections = generate_synthetic_detections(
         intrinsics=scenario.intrinsics,
         extrinsics=scenario.extrinsics,
-        interface_distances=scenario.interface_distances,
+        water_zs=scenario.water_zs,
         board=board,
         board_poses=scenario.board_poses,
         noise_std=scenario.noise_std,
@@ -125,7 +125,7 @@ def calibrate_synthetic(
             name=cam_name,
             intrinsics=opt_intrinsics[cam_name],
             extrinsics=opt_extrinsics[cam_name],
-            interface_distance=opt_distances[cam_name],
+            water_z=opt_distances[cam_name],
         )
 
     interface_params = InterfaceParams(

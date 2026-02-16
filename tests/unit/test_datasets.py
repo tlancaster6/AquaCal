@@ -23,7 +23,7 @@ def test_generate_synthetic_rig_small():
     assert scenario.name == "small"
     assert len(scenario.intrinsics) == 2
     assert len(scenario.extrinsics) == 2
-    assert len(scenario.interface_distances) == 2
+    assert len(scenario.water_zs) == 2
     assert len(scenario.board_poses) == 10
     assert scenario.noise_std == 0.0  # Clean by default
     assert scenario.images is None  # No images by default
@@ -37,7 +37,7 @@ def test_generate_synthetic_rig_medium():
     assert scenario.name == "medium"
     assert len(scenario.intrinsics) == 6
     assert len(scenario.extrinsics) == 6
-    assert len(scenario.interface_distances) == 6
+    assert len(scenario.water_zs) == 6
     assert len(scenario.board_poses) == 80
     assert scenario.noise_std == 0.0  # Clean by default
     assert scenario.images is None
@@ -52,7 +52,7 @@ def test_generate_synthetic_rig_large():
     assert scenario.name == "large"
     assert len(scenario.intrinsics) == 13
     assert len(scenario.extrinsics) == 13
-    assert len(scenario.interface_distances) == 13
+    assert len(scenario.water_zs) == 13
     assert len(scenario.board_poses) == 300
     assert scenario.noise_std == 0.0  # Clean by default
     assert scenario.images is None
@@ -76,10 +76,8 @@ def test_generate_synthetic_rig_reproducibility():
         assert np.allclose(scenario1.extrinsics[cam].t, scenario2.extrinsics[cam].t)
 
     # Check interface distances are identical
-    for cam in scenario1.interface_distances:
-        assert np.isclose(
-            scenario1.interface_distances[cam], scenario2.interface_distances[cam]
-        )
+    for cam in scenario1.water_zs:
+        assert np.isclose(scenario1.water_zs[cam], scenario2.water_zs[cam])
 
     # Check board poses are identical
     assert len(scenario1.board_poses) == len(scenario2.board_poses)
@@ -165,7 +163,7 @@ def test_render_synthetic_frame():
     interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
     interface = Interface(
         normal=interface_normal,
-        camera_distances={cam_name: scenario.interface_distances[cam_name]},
+        camera_distances={cam_name: scenario.water_zs[cam_name]},
     )
 
     # Render frame
@@ -211,7 +209,7 @@ def test_camera_naming_convention():
     expected_names = [f"cam{i}" for i in range(6)]
     assert list(scenario.intrinsics.keys()) == expected_names
     assert list(scenario.extrinsics.keys()) == expected_names
-    assert list(scenario.interface_distances.keys()) == expected_names
+    assert list(scenario.water_zs.keys()) == expected_names
 
 
 def test_reference_camera_at_origin():

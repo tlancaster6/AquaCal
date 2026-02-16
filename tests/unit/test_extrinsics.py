@@ -450,7 +450,7 @@ def _generate_refractive_detections(
     board: BoardGeometry,
     board_rvec: np.ndarray,
     board_tvec: np.ndarray,
-    interface_distance: float,
+    water_z: float,
     n_air: float = 1.0,
     n_water: float = 1.333,
 ) -> Detection | None:
@@ -463,7 +463,7 @@ def _generate_refractive_detections(
     camera = Camera(cam_name, intrinsics_single, camera_ext)
     interface = Interface(
         normal=np.array([0.0, 0.0, -1.0]),
-        camera_distances={cam_name: interface_distance},
+        camera_distances={cam_name: water_z},
         n_air=n_air,
         n_water=n_water,
     )
@@ -495,7 +495,7 @@ class TestRefractiveSolvePnp:
         rvec_true = np.array([0.1, -0.05, 0.02])
         tvec_true = np.array([0.01, -0.02, 0.50])
 
-        interface_distance = 0.15
+        water_z = 0.15
 
         # Generate synthetic detections using identity camera
         identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
@@ -506,7 +506,7 @@ class TestRefractiveSolvePnp:
             board,
             rvec_true,
             tvec_true,
-            interface_distance,
+            water_z,
         )
         assert det is not None
 
@@ -515,7 +515,7 @@ class TestRefractiveSolvePnp:
             det.corners_2d,
             det.corner_ids,
             board,
-            interface_distance,
+            water_z,
         )
         assert result is not None
         rvec_est, tvec_est = result
@@ -537,7 +537,7 @@ class TestRefractiveSolvePnp:
         """Refractive PnP is at least 5x more accurate than standard PnP on refractive data."""
         rvec_true = np.array([0.08, -0.03, 0.01])
         tvec_true = np.array([0.02, -0.01, 0.45])
-        interface_distance = 0.15
+        water_z = 0.15
 
         # Generate refractive detections
         identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
@@ -548,7 +548,7 @@ class TestRefractiveSolvePnp:
             board,
             rvec_true,
             tvec_true,
-            interface_distance,
+            water_z,
         )
         assert det is not None
 
@@ -569,7 +569,7 @@ class TestRefractiveSolvePnp:
             det.corners_2d,
             det.corner_ids,
             board,
-            interface_distance,
+            water_z,
         )
         assert result_ref is not None
         _, tvec_ref = result_ref
@@ -595,7 +595,7 @@ class TestRefractiveSolvePnp:
         """Returns arrays with float64 dtype."""
         rvec_true = np.array([0.05, -0.02, 0.01])
         tvec_true = np.array([0.0, 0.0, 0.40])
-        interface_distance = 0.15
+        water_z = 0.15
 
         identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
         det = _generate_refractive_detections(
@@ -605,7 +605,7 @@ class TestRefractiveSolvePnp:
             board,
             rvec_true,
             tvec_true,
-            interface_distance,
+            water_z,
         )
         assert det is not None
 
@@ -614,7 +614,7 @@ class TestRefractiveSolvePnp:
             det.corners_2d,
             det.corner_ids,
             board,
-            interface_distance,
+            water_z,
         )
         assert result is not None
         rvec, tvec = result
@@ -661,7 +661,7 @@ class TestEstimateExtrinsicsRefractive:
         # C1 = [0.3, 0, 0]: t = -R @ C = [-0.3, 0, 0]
         ext1 = CameraExtrinsics(R=np.eye(3), t=np.array([-0.3, 0.0, 0.0]))
 
-        interface_distance = 0.15
+        water_z = 0.15
 
         # Board in world frame, below interface
         board_rvec = np.array([0.1, -0.05, 0.02])
@@ -675,7 +675,7 @@ class TestEstimateExtrinsicsRefractive:
             board,
             board_rvec,
             board_tvec,
-            interface_distance,
+            water_z,
         )
         det1 = _generate_refractive_detections(
             intrinsics["cam1"],
@@ -684,7 +684,7 @@ class TestEstimateExtrinsicsRefractive:
             board,
             board_rvec,
             board_tvec,
-            interface_distance,
+            water_z,
         )
         assert det0 is not None and det1 is not None
 
@@ -703,13 +703,13 @@ class TestEstimateExtrinsicsRefractive:
         graph = build_pose_graph(detection_result)
 
         # Estimate with refractive PnP
-        interface_distances = {"cam0": interface_distance, "cam1": interface_distance}
+        water_zs = {"cam0": water_z, "cam1": water_z}
         extrinsics_result = estimate_extrinsics(
             graph,
             intrinsics,
             board,
             reference_camera="cam0",
-            interface_distances=interface_distances,
+            water_zs=water_zs,
         )
 
         # Both cameras should be near Z=0 (coplanar)
@@ -882,7 +882,7 @@ class TestMultiFrameAveraging:
         ext1 = CameraExtrinsics(R=np.eye(3), t=np.array([-0.3, 0.0, 0.0]))
         ext2 = CameraExtrinsics(R=np.eye(3), t=np.array([0.0, -0.3, 0.0]))
 
-        interface_distance = 0.15
+        water_z = 0.15
         camera_exts = {"cam0": ext0, "cam1": ext1, "cam2": ext2}
 
         # 3 board poses at different positions
@@ -903,7 +903,7 @@ class TestMultiFrameAveraging:
                     board,
                     brvec,
                     btvec,
-                    interface_distance,
+                    water_z,
                 )
                 if det is not None:
                     dets[cam_name] = det
@@ -919,13 +919,13 @@ class TestMultiFrameAveraging:
         )
         graph = build_pose_graph(det_result)
 
-        interface_distances = {cam: interface_distance for cam in camera_exts}
+        water_zs = {cam: water_z for cam in camera_exts}
         result = estimate_extrinsics(
             graph,
             intrinsics,
             board,
             reference_camera="cam0",
-            interface_distances=interface_distances,
+            water_zs=water_zs,
         )
 
         # Check cam1 position accuracy (should be close to ground truth)

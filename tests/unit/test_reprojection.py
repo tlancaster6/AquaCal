@@ -89,7 +89,7 @@ def extrinsics() -> dict[str, CameraExtrinsics]:
 
 
 @pytest.fixture
-def interface_distances() -> dict[str, float]:
+def water_zs() -> dict[str, float]:
     return {"cam0": 0.15, "cam1": 0.16, "cam2": 0.14}
 
 
@@ -110,7 +110,7 @@ def board_poses() -> dict[int, BoardPose]:
 
 @pytest.fixture
 def calibration_result(
-    board_config, intrinsics, extrinsics, interface_distances
+    board_config, intrinsics, extrinsics, water_zs
 ) -> CalibrationResult:
     """Build a complete CalibrationResult for testing."""
     cameras = {}
@@ -119,7 +119,7 @@ def calibration_result(
             name=cam_name,
             intrinsics=intrinsics[cam_name],
             extrinsics=extrinsics[cam_name],
-            interface_distance=interface_distances[cam_name],
+            water_z=water_zs[cam_name],
         )
 
     return CalibrationResult(
@@ -154,7 +154,7 @@ class TestReprojectionErrors:
         calibration_result,
         intrinsics,
         extrinsics,
-        interface_distances,
+        water_zs,
         board,
         board_poses,
     ):
@@ -163,7 +163,7 @@ class TestReprojectionErrors:
         detections = generate_synthetic_detections(
             intrinsics,
             extrinsics,
-            interface_distances,
+            water_zs,
             board,
             list(board_poses.values()),
             noise_std=0.0,
@@ -185,7 +185,7 @@ class TestReprojectionErrors:
         calibration_result,
         intrinsics,
         extrinsics,
-        interface_distances,
+        water_zs,
         board,
         board_poses,
     ):
@@ -197,7 +197,7 @@ class TestReprojectionErrors:
         detections = generate_synthetic_detections(
             intrinsics,
             extrinsics,
-            interface_distances,
+            water_zs,
             board,
             list(board_poses.values()),
             noise_std=noise_std,
@@ -219,7 +219,7 @@ class TestReprojectionErrors:
         calibration_result,
         intrinsics,
         extrinsics,
-        interface_distances,
+        water_zs,
         board,
         board_poses,
     ):
@@ -227,7 +227,7 @@ class TestReprojectionErrors:
         detections = generate_synthetic_detections(
             intrinsics,
             extrinsics,
-            interface_distances,
+            water_zs,
             board,
             list(board_poses.values()),
             noise_std=0.0,
@@ -253,7 +253,7 @@ class TestReprojectionErrors:
         calibration_result,
         intrinsics,
         extrinsics,
-        interface_distances,
+        water_zs,
         board,
         board_poses,
     ):
@@ -261,7 +261,7 @@ class TestReprojectionErrors:
         detections = generate_synthetic_detections(
             intrinsics,
             extrinsics,
-            interface_distances,
+            water_zs,
             board,
             list(board_poses.values()),
             noise_std=0.0,
@@ -286,7 +286,7 @@ class TestReprojectionErrors:
         calibration_result,
         intrinsics,
         extrinsics,
-        interface_distances,
+        water_zs,
         board,
         board_poses,
     ):
@@ -294,7 +294,7 @@ class TestReprojectionErrors:
         detections = generate_synthetic_detections(
             intrinsics,
             extrinsics,
-            interface_distances,
+            water_zs,
             board,
             list(board_poses.values()),
             noise_std=0.0,
@@ -311,7 +311,7 @@ class TestReprojectionErrors:
         assert errors.residuals.shape[0] == errors.num_observations
 
     def test_single_camera_single_frame(
-        self, intrinsics, extrinsics, interface_distances, board, board_poses
+        self, intrinsics, extrinsics, water_zs, board, board_poses
     ):
         """Test compute_reprojection_error_single() in isolation."""
         # Use first frame and first camera
@@ -321,7 +321,7 @@ class TestReprojectionErrors:
         camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
         interface = Interface(
             normal=np.array([0.0, 0.0, -1.0], dtype=np.float64),
-            camera_distances={cam_name: interface_distances[cam_name]},
+            camera_distances={cam_name: water_zs[cam_name]},
         )
 
         # Generate synthetic detection for this camera/frame
@@ -362,7 +362,7 @@ class TestReprojectionErrors:
         assert rms < 1e-6
 
     def test_handles_projection_failures(
-        self, calibration_result, intrinsics, extrinsics, interface_distances, board
+        self, calibration_result, intrinsics, extrinsics, water_zs, board
     ):
         """Test graceful handling when some projections fail."""
         # Create a board pose where board is very close to interface (may cause TIR)
@@ -378,7 +378,7 @@ class TestReprojectionErrors:
         detections = generate_synthetic_detections(
             intrinsics,
             extrinsics,
-            interface_distances,
+            water_zs,
             board,
             [board_pose],
             noise_std=0.0,
@@ -419,7 +419,7 @@ class TestReprojectionErrors:
         assert len(errors.per_frame) == 0
 
     def test_single_returns_none_for_no_valid_projections(
-        self, intrinsics, extrinsics, interface_distances, board
+        self, intrinsics, extrinsics, water_zs, board
     ):
         """Test that compute_reprojection_error_single returns None when no corners project."""
         # Create a board pose above the interface (in air)
@@ -433,7 +433,7 @@ class TestReprojectionErrors:
         camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
         interface = Interface(
             normal=np.array([0.0, 0.0, -1.0], dtype=np.float64),
-            camera_distances={cam_name: interface_distances[cam_name]},
+            camera_distances={cam_name: water_zs[cam_name]},
         )
 
         # Create a detection with some corners

@@ -102,14 +102,14 @@ $$
 
 This Newton-Raphson approach is **~50× faster** than bracketing methods like Brent's method, while maintaining excellent numerical stability. See {func}`aquacal.core.refractive_geometry.refractive_project` for the implementation.
 
-:::{admonition} Gotcha: interface_distance is a Z-coordinate, not a distance
+:::{admonition} Gotcha: water_z is a Z-coordinate, not a distance
 :class: warning
 
-Despite its name, the `interface_distance` parameter in AquaCal is actually the **Z-coordinate of the water surface** in the world frame (the value of water_z), **not** the physical distance from a camera to the water.
+Despite its name, the `water_z` parameter in AquaCal is actually the **Z-coordinate of the water surface** in the world frame (the value of water_z), **not** the physical distance from a camera to the water.
 
 The physical camera-to-water gap $h_c$ is computed internally as `water_z - C_z`, where `C_z` is the camera's Z position in world coordinates.
 
-For the reference camera at the world origin (C_z = 0), the interface_distance equals the physical gap. For other cameras at slightly different heights, the gap differs, but all cameras share the same interface_distance value (the global water surface Z).
+For the reference camera at the world origin (C_z = 0), the water_z equals the physical gap. For other cameras at slightly different heights, the gap differs, but all cameras share the same water_z value (the global water surface Z).
 
 This reparameterization eliminates a mathematical degeneracy between camera Z position and interface distance. See the [Optimizer Pipeline](optimizer.md) page for details.
 :::

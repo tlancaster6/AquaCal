@@ -335,11 +335,11 @@ class TestPackUnpackParams:
             frame_order=frame_order,
         )
 
-        # All cameras should have interface_distance = water_z, regardless of C_z
+        # All cameras should have water_z = water_z, regardless of C_z
         for cam in camera_order:
             assert abs(dist_out[cam] - water_z) < 1e-10, (
                 f"Camera {cam} with C_z={extrinsics_nonzero_cz[cam].C[2]:.4f} "
-                f"should have interface_distance={water_z}, got {dist_out[cam]}"
+                f"should have water_z={water_z}, got {dist_out[cam]}"
             )
 
 
@@ -390,7 +390,7 @@ class TestOptimizeInterface:
             initial_extrinsics=initial_extrinsics,
             board=board,
             reference_camera="cam0",
-            initial_interface_distances=initial_distances,
+            initial_water_zs=initial_distances,
         )
 
         # Should achieve low RMS error
@@ -475,7 +475,7 @@ class TestOptimizeInterface:
         for cam, dist in dist_opt.items():
             assert 0.01 <= dist <= 2.0, f"Distance out of bounds for {cam}: {dist}"
 
-    def test_default_interface_distances(
+    def test_default_water_zs(
         self,
         board,
         intrinsics,
@@ -496,14 +496,14 @@ class TestOptimizeInterface:
             min_corners=4,
         )
 
-        # Don't provide initial_interface_distances
+        # Don't provide initial_water_zs
         ext_opt, dist_opt, poses_opt, rms = optimize_interface(
             detections=detections,
             intrinsics=intrinsics,
             initial_extrinsics=ground_truth_extrinsics,
             board=board,
             reference_camera="cam0",
-            initial_interface_distances=None,  # Should default to 0.15
+            initial_water_zs=None,  # Should default to 0.15
         )
 
         assert rms < 2.0
@@ -748,24 +748,22 @@ class TestOptimizeInterface:
                 )
 
         initial_water_z_perturbed = ground_truth_water_z + 0.02
-        initial_interface_distances = {
-            cam: initial_water_z_perturbed for cam in intrinsics.keys()
-        }
+        initial_water_zs = {cam: initial_water_z_perturbed for cam in intrinsics.keys()}
 
         # Run optimization
         opt_extrinsics, opt_distances, opt_board_poses, rms_error = optimize_interface(
             detections=detections,
             intrinsics=intrinsics,
             initial_extrinsics=initial_extrinsics,
-            initial_interface_distances=initial_interface_distances,
+            initial_water_zs=initial_water_zs,
             board=board,
             reference_camera="cam0",
             verbose=0,
         )
 
-        # After the fix, all interface_distances should be identical (= water_z)
-        interface_distances = list(opt_distances.values())
-        recovered_water_z = interface_distances[0]
+        # After the fix, all water_zs should be identical (= water_z)
+        water_zs = list(opt_distances.values())
+        recovered_water_z = water_zs[0]
 
         # Verify water_z is recovered
         assert abs(recovered_water_z - ground_truth_water_z) < 0.01, (
@@ -773,10 +771,10 @@ class TestOptimizeInterface:
             f"got {recovered_water_z}"
         )
 
-        # Verify all cameras have same interface_distance (= water_z)
-        assert np.std(interface_distances) < 1e-6, (
+        # Verify all cameras have same water_z (= water_z)
+        assert np.std(water_zs) < 1e-6, (
             f"Interface distances should be identical (all equal to water_z), "
-            f"got std={np.std(interface_distances)}"
+            f"got std={np.std(water_zs)}"
         )
 
         # Verify reprojection error is low
@@ -1254,7 +1252,7 @@ class TestTiltEstimation:
             initial_extrinsics=initial_extrinsics,
             board=board,
             reference_camera="cam0",
-            initial_interface_distances=ground_truth_distances,
+            initial_water_zs=ground_truth_distances,
             normal_fixed=False,
         )
 

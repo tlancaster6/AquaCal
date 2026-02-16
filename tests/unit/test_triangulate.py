@@ -72,14 +72,14 @@ def extrinsics() -> dict[str, CameraExtrinsics]:
 
 
 @pytest.fixture
-def interface_distances() -> dict[str, float]:
+def water_zs() -> dict[str, float]:
     """Interface distances for 3 cameras (all same Z since cameras at same height)."""
     return {"cam0": 0.15, "cam1": 0.15, "cam2": 0.15}
 
 
 @pytest.fixture
 def calibration_result(
-    board_config, intrinsics, extrinsics, interface_distances
+    board_config, intrinsics, extrinsics, water_zs
 ) -> CalibrationResult:
     """Build a complete CalibrationResult for testing."""
     cameras = {}
@@ -88,7 +88,7 @@ def calibration_result(
             name=cam_name,
             intrinsics=intrinsics[cam_name],
             extrinsics=extrinsics[cam_name],
-            interface_distance=interface_distances[cam_name],
+            water_z=water_zs[cam_name],
         )
 
     return CalibrationResult(
@@ -233,7 +233,7 @@ class TestTriangulatePoint:
     """Tests for triangulate_point function."""
 
     def test_synthetic_point_reconstruction(
-        self, calibration_result, intrinsics, extrinsics, interface_distances
+        self, calibration_result, intrinsics, extrinsics, water_zs
     ):
         """Test triangulation of a known 3D point from synthetic observations."""
         # Known 3D point underwater
@@ -243,7 +243,7 @@ class TestTriangulatePoint:
         interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
         interface = Interface(
             normal=interface_normal,
-            camera_distances=interface_distances,  # All cameras
+            camera_distances=water_zs,  # All cameras
             n_air=1.0,
             n_water=1.333,
         )
@@ -293,7 +293,7 @@ class TestTriangulatePoint:
         assert result is None
 
     def test_round_trip_multiple_points(
-        self, calibration_result, intrinsics, extrinsics, interface_distances
+        self, calibration_result, intrinsics, extrinsics, water_zs
     ):
         """Test round-trip projection and triangulation for multiple points."""
         # Multiple 3D points underwater at different depths and positions
@@ -309,7 +309,7 @@ class TestTriangulatePoint:
         # Create shared interface with all cameras
         interface = Interface(
             normal=interface_normal,
-            camera_distances=interface_distances,  # All cameras
+            camera_distances=water_zs,  # All cameras
             n_air=1.0,
             n_water=1.333,
         )
@@ -332,7 +332,7 @@ class TestTriangulatePoint:
             assert error < 1e-6  # Sub-micrometer accuracy expected
 
     def test_handles_back_projection_failures(
-        self, calibration_result, intrinsics, extrinsics, interface_distances
+        self, calibration_result, intrinsics, extrinsics, water_zs
     ):
         """Test graceful handling when refractive_back_project fails."""
         # Use observations from point above interface (may cause back-projection failure)
@@ -349,7 +349,7 @@ class TestTriangulatePoint:
         assert result is None or isinstance(result, np.ndarray)
 
     def test_with_two_cameras_only(
-        self, calibration_result, intrinsics, extrinsics, interface_distances
+        self, calibration_result, intrinsics, extrinsics, water_zs
     ):
         """Test triangulation with exactly two cameras."""
         point_3d = np.array([0.05, 0.03, 0.33], dtype=np.float64)
@@ -358,7 +358,7 @@ class TestTriangulatePoint:
         # Create shared interface with all cameras
         interface = Interface(
             normal=interface_normal,
-            camera_distances=interface_distances,  # All cameras
+            camera_distances=water_zs,  # All cameras
             n_air=1.0,
             n_water=1.333,
         )

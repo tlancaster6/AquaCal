@@ -123,11 +123,11 @@ class TestCameraCalibration:
             name="cam0",
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distance=0.12,
+            water_z=0.12,
         )
 
         assert calib.name == "cam0"
-        assert calib.interface_distance == 0.12
+        assert calib.water_z == 0.12
         assert calib.intrinsics == intrinsics
         assert calib.extrinsics == extrinsics
 

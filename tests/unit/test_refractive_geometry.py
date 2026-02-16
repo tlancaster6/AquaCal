@@ -535,13 +535,13 @@ class TestRefractiveProjectFast:
 
     def test_point_above_interface_returns_none(self, simple_camera, simple_interface):
         """Returns None for point above interface."""
-        z_int = simple_interface.get_interface_distance(simple_camera.name)
+        z_int = simple_interface.get_water_z(simple_camera.name)
         point = np.array([0.0, 0.0, z_int - 0.05])
         assert refractive_project(simple_camera, simple_interface, point) is None
 
     def test_point_at_interface_returns_none(self, simple_camera, simple_interface):
         """Returns None for point exactly at interface."""
-        z_int = simple_interface.get_interface_distance(simple_camera.name)
+        z_int = simple_interface.get_water_z(simple_camera.name)
         point = np.array([0.05, 0.02, z_int])
         assert refractive_project(simple_camera, simple_interface, point) is None
 
@@ -656,7 +656,7 @@ class TestRefractiveProjectBatch:
 
     def test_batch_handles_invalid_points(self, simple_camera, simple_interface):
         """Batch returns NaN for invalid points."""
-        z_int = simple_interface.get_interface_distance(simple_camera.name)
+        z_int = simple_interface.get_water_z(simple_camera.name)
         points = np.array(
             [
                 [0.0, 0.0, 0.5],  # valid

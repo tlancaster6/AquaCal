@@ -427,7 +427,7 @@ def run_experiment_2(output_dir: str | Path, seed: int = 42) -> dict:
     print("Experiment 2: Depth Generalization")
 
     # Generate 13-camera rig
-    intrinsics, extrinsics, interface_distances = generate_real_rig_array(
+    intrinsics, extrinsics, water_zs = generate_real_rig_array(
         height_above_water=0.75, height_variation=0.002, seed=seed
     )
 
@@ -452,7 +452,7 @@ def run_experiment_2(output_dir: str | Path, seed: int = 42) -> dict:
         board_config=board_config,
         intrinsics=intrinsics,
         extrinsics=extrinsics,
-        interface_distances=interface_distances,
+        water_zs=water_zs,
         board_poses=calib_poses,
         noise_std=0.5,
         description="Narrow depth band calibration (0.95-1.05m)",
@@ -495,7 +495,7 @@ def run_experiment_2(output_dir: str | Path, seed: int = 42) -> dict:
         test_detections = generate_synthetic_detections(
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distances=interface_distances,
+            water_zs=water_zs,
             board=board,
             board_poses=test_poses,
             noise_std=0.5,
@@ -923,7 +923,7 @@ def run_experiment_3(output_dir: str | Path, seed: int = 42) -> dict:
     print("Experiment 3: Depth Scaling")
 
     # Generate 13-camera rig
-    intrinsics, extrinsics, interface_distances = generate_real_rig_array(
+    intrinsics, extrinsics, water_zs = generate_real_rig_array(
         height_above_water=0.75, height_variation=0.002, seed=seed
     )
 
@@ -964,7 +964,7 @@ def run_experiment_3(output_dir: str | Path, seed: int = 42) -> dict:
             board_config=board_config,
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distances=interface_distances,
+            water_zs=water_zs,
             board_poses=calib_poses,
             noise_std=0.5,
             description=f"Calibration at depth {depth:.2f}m",
@@ -998,7 +998,7 @@ def run_experiment_3(output_dir: str | Path, seed: int = 42) -> dict:
         test_detections = generate_synthetic_detections(
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distances=interface_distances,
+            water_zs=water_zs,
             board=board,
             board_poses=test_poses,
             noise_std=0.5,

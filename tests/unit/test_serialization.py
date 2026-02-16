@@ -49,7 +49,7 @@ def sample_camera(sample_intrinsics, sample_extrinsics) -> CameraCalibration:
         name="cam0",
         intrinsics=sample_intrinsics,
         extrinsics=sample_extrinsics,
-        interface_distance=0.15,
+        water_z=0.15,
     )
 
 
@@ -124,7 +124,7 @@ def sample_calibration_result(
             R=np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]], dtype=np.float64),
             t=np.array([0.1, 0.0, 0.0], dtype=np.float64),
         ),
-        interface_distance=0.16,
+        water_z=0.16,
     )
     return CalibrationResult(
         cameras={"cam0": sample_camera, "cam1": cam1},
@@ -193,7 +193,7 @@ class TestLoadCalibration:
             assert load.intrinsics.image_size == orig.intrinsics.image_size
             np.testing.assert_allclose(load.extrinsics.R, orig.extrinsics.R)
             np.testing.assert_allclose(load.extrinsics.t, orig.extrinsics.t)
-            assert load.interface_distance == orig.interface_distance
+            assert load.water_z == orig.water_z
 
         # Check interface
         np.testing.assert_allclose(
@@ -346,7 +346,7 @@ class TestFisheyeSerialization:
             name="fisheye_cam",
             intrinsics=fisheye_intrinsics,
             extrinsics=CameraExtrinsics(R=np.eye(3), t=np.zeros(3)),
-            interface_distance=0.15,
+            water_z=0.15,
             is_auxiliary=True,
         )
         result = CalibrationResult(

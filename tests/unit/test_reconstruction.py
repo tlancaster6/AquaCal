@@ -76,7 +76,7 @@ def create_camera_calibration(
     intrinsics: CameraIntrinsics,
     R: np.ndarray,
     t: np.ndarray,
-    interface_distance: float,
+    water_z: float,
 ) -> CameraCalibration:
     """Helper to create CameraCalibration."""
     extrinsics = CameraExtrinsics(R=R, t=t)
@@ -84,7 +84,7 @@ def create_camera_calibration(
         name=name,
         intrinsics=intrinsics,
         extrinsics=extrinsics,
-        interface_distance=interface_distance,
+        water_z=water_z,
     )
 
 
@@ -153,7 +153,7 @@ def create_synthetic_detections(
         camera = Camera(cam_name, cam_calib.intrinsics, cam_calib.extrinsics)
         interface = Interface(
             normal=calibration.interface.normal,
-            camera_distances={cam_name: cam_calib.interface_distance},
+            camera_distances={cam_name: cam_calib.water_z},
             n_air=calibration.interface.n_air,
             n_water=calibration.interface.n_water,
         )
@@ -225,14 +225,14 @@ def test_triangulate_charuco_corners_basic(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -278,7 +278,7 @@ def test_triangulate_charuco_corners_empty_frame(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -304,7 +304,7 @@ def test_triangulate_charuco_corners_single_camera(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -340,14 +340,14 @@ def test_compute_3d_distance_errors_perfect(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -392,14 +392,14 @@ def test_compute_3d_distance_errors_with_noise(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -447,14 +447,14 @@ def test_compute_3d_distance_errors_multiple_frames(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -504,14 +504,14 @@ def test_compute_3d_distance_errors_signed_error(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -551,7 +551,7 @@ def test_compute_3d_distance_errors_empty(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -584,14 +584,14 @@ def test_compute_3d_distance_errors_include_per_pair(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -698,14 +698,14 @@ def test_spatial_measurements_basic(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -756,14 +756,14 @@ def test_spatial_measurements_midpoint_values(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -810,14 +810,14 @@ def test_spatial_measurements_frame_indices(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -873,14 +873,14 @@ def test_spatial_measurements_disabled_by_default(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
     cam2 = create_camera_calibration(
         "cam2",
         camera_intrinsics,
         R=np.array([[0.866, 0.0, 0.5], [0.0, 1.0, 0.0], [-0.5, 0.0, 0.866]]),
         t=np.array([0.2, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(
@@ -915,7 +915,7 @@ def test_spatial_measurements_empty_data(
         camera_intrinsics,
         R=np.eye(3),
         t=np.array([0.0, 0.0, 0.5]),
-        interface_distance=0.3,
+        water_z=0.3,
     )
 
     calibration = create_calibration_result(

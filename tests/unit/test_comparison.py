@@ -67,7 +67,7 @@ def make_test_result(
             name=name,
             intrinsics=intrinsics,
             extrinsics=extrinsics,
-            interface_distance=water_z,
+            water_z=water_z,
             is_auxiliary=False,
         )
 
