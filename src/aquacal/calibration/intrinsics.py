@@ -338,12 +338,40 @@ def calibrate_intrinsics_single(
     if not ret:
         raise ValueError("OpenCV calibration failed")
 
-    # Create CameraIntrinsics
     intrinsics = CameraIntrinsics(
         K=K.astype(np.float64),
         dist_coeffs=dist_coeffs.flatten().astype(np.float64),
         image_size=image_size,
     )
+
+    # If the full model produces a bad undistortion roundtrip, retry with
+    # progressively simpler distortion models (fix k3, then fix k3+k2).
+    # With few calibration frames, higher-order radial coefficients overfit
+    # and the distortion polynomial blows up outside the calibrated region.
+    if not rational_model:
+        simplification_flags = [
+            cv2.CALIB_FIX_K3,
+            cv2.CALIB_FIX_K3 | cv2.CALIB_FIX_K2,
+        ]
+        for simp_flags in simplification_flags:
+            warnings = validate_intrinsics(intrinsics)
+            if not warnings:
+                break
+            ret_s, K_s, d_s, _, _ = cv2.calibrateCamera(  # type: ignore[call-overload]
+                object_points,
+                image_points,
+                image_size,
+                None,
+                None,
+                flags=simp_flags,
+            )
+            if ret_s:
+                intrinsics = CameraIntrinsics(
+                    K=K_s.astype(np.float64),
+                    dist_coeffs=d_s.flatten().astype(np.float64),
+                    image_size=image_size,
+                )
+                ret = ret_s
 
     return intrinsics, float(ret)  # ret is RMS reprojection error
 
