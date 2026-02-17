@@ -50,6 +50,11 @@ pre-commit install
 pre-commit install --hook-type pre-push
 ```
 
+If you modify documentation, you can verify the build locally before pushing, or let the GitHub CI catch issues after you push:
+```bash
+sphinx-build -W --keep-going -b html docs docs/_build/html
+```
+
 ## Running Tests
 
 Run all tests:
