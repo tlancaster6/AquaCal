@@ -93,8 +93,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — Style guide, hero image, update existing diagrams to shared palette
-- [ ] 11-02-PLAN.md — Mermaid pipeline, sparsity pattern, BFS graph, user verification
+- [x] 11-01-PLAN.md — Style guide, hero image, update existing diagrams to shared palette
+- [x] 11-02-PLAN.md — Mermaid pipeline, sparsity pattern, BFS graph, user verification
 
 #### Phase 12: Tutorial Verification
 **Goal**: All Jupyter tutorials run correctly with proper embedded outputs
@@ -105,10 +105,12 @@ Plans:
   2. Static cell outputs in documentation are verified as correctly embedded
   3. Tutorial content is accurate and matches current API
   4. Tutorials provide clear learning path for new users
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 12-01: TBD
+- [ ] 12-01-PLAN.md — Restructure to 2 tutorials: merge diagnostics into pipeline, rename files, update index
+- [ ] 12-02-PLAN.md — Rewrite synthetic validation with 3 experiments, execute both tutorials
+- [ ] 12-03-PLAN.md — User verification of tutorial quality
 
 ## Progress
 
@@ -128,4 +130,4 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12
 | 9. Bug Triage | v1.4 | 0/0 | Complete | 2026-02-17 |
 | 10. Documentation Audit | v1.4 | 3/3 | Complete | 2026-02-16 |
 | 11. Documentation Visuals | v1.4 | Complete    | 2026-02-17 | - |
-| 12. Tutorial Verification | v1.4 | 0/TBD | Not started | - |
+| 12. Tutorial Verification | v1.4 | 0/3 | Not started | - |
