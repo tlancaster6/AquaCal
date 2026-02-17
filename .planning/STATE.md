@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Phase 11 - Documentation Visuals
+**Current focus:** Phase 12 - Tutorial Verification
 
 ## Current Position
 
-Phase: 11 of 12 (Documentation Visuals)
+Phase: 12 of 12 (Tutorial Verification)
 Plan: 01 complete (Plan 02 next)
 Status: In progress
-Last activity: 2026-02-17 — Phase 11 Plan 01 complete — palette, style guide, hero image, updated diagrams
+Last activity: 2026-02-17 — Phase 12 Plan 01 complete — tutorial restructure (3 to 2), diagnostics merged into tutorial 01
 
-Progress: [██████████████████░░] 83% (10/12 phases complete)
+Progress: [████████████████████] 92% (11/12 phases complete, Phase 12 in progress)
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Progress: [██████████████████░░] 83% (10
 | Phase 10 P02 | 14 | 2 tasks | 43 files |
 | Phase 10 P03 | 4 | 2 tasks | 7 files |
 | Phase 11 P01 | 3 | 2 tasks | 8 files |
+| Phase 12 P01 | 12 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,9 @@ Recent decisions affecting current work:
 - v1.2: python-semantic-release for automated version bumping from conventional commits
 - [Phase 11]: Centralized palette.py module — all diagram scripts import colors from docs/_static/scripts/palette.py
 - [Phase 11]: Mermaid pipeline replaces ASCII diagram; intermediate data labels dropped for cleaner look
+- [Phase 12 P01]: Diagnostics merged into tutorial 01 (not standalone) — calibrate-then-diagnose in single notebook
+- [Phase 12 P01]: Tutorial 02 (was 03) content unchanged; rewrite deferred to Plan 02
+- [Phase 12 P01]: Old 02_diagnostics.ipynb deleted; content subsumed by merged sections in tutorial 01
 
 ### Pending Todos
 
@@ -84,8 +88,8 @@ None - all previously flagged infrastructure items (RTD, DOI, RELEASE_TOKEN) ver
 
 ## Session Continuity
 
-Last session: 2026-02-17 (Phase 11 Plan 01 complete — Visual Foundation)
-Stopped at: Completed 11-01-PLAN.md (Visual Foundation)
+Last session: 2026-02-17 (Phase 12 Plan 01 complete — Tutorial Restructure)
+Stopped at: Completed 12-01-PLAN.md (Tutorial Restructure)
 Resume file: N/A
 
-**Next step:** Execute Phase 11 Plan 02 (new diagrams: sparsity pattern, BFS pose graph, pipeline Mermaid)
+**Next step:** Execute Phase 12 Plan 02 (tutorial 01 re-execution and tutorial 02 rewrite)
