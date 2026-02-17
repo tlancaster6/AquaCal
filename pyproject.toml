@@ -54,6 +54,7 @@ docs = [
     "sphinx-copybutton",
     "sphinx-design",
     "nbsphinx>=0.9.8",
+    "sphinxcontrib-mermaid",
 ]
 
 [project.urls]

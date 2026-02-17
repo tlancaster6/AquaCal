@@ -24,6 +24,7 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_design",
     "nbsphinx",
+    "sphinxcontrib.mermaid",
 ]
 
 # Templates and static files

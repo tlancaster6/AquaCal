@@ -6,24 +6,20 @@ AquaCal's calibration pipeline runs four sequential stages to produce a complete
 
 The calibration proceeds through four stages:
 
-```
-Stage 1           Stage 2          Stage 3                 Stage 4
-In-air        →   Extrinsic    →   Joint Refractive    →   Intrinsic
-Intrinsics        Init (BFS)       Bundle Adjustment       Refinement
-(OpenCV)          (PnP graph)      (nonlinear BA)          (optional)
+```{mermaid}
+flowchart LR
+    I1["In-air videos<br/>Board params"] --> S1
+    I2["Underwater videos<br/>Intrinsics"] --> S2
 
-Input:            Input:           Input:                  Input:
-- in-air          - underwater     - Stage 2 extrinsics    - Stage 3 result
-  videos            videos         - Stage 2 water_z       - same detections
-- board           - intrinsics     - detections
-  params            from Stage 1                           Output:
-                                                            - refined K
-Output:           Output:          Output:                   per camera
-- K, dist         - R, t per       - refined R, t          - refined R, t
-  per camera        camera         - global water_z        - refined water_z
-                  - initial        - refined board poses   - refined boards
-                    water_z
-                  - board poses
+    S1["**Stage 1**<br/>In-air Intrinsics<br/><small>(OpenCV)</small>"]
+    S2["**Stage 2**<br/>Extrinsic Init<br/><small>(BFS/PnP)</small>"]
+    S3["**Stage 3**<br/>Joint Refractive BA<br/><small>(nonlinear)</small>"]
+    S4["**Stage 4**<br/>Intrinsic Refinement<br/><small>(optional)</small>"]
+
+    S1 -->|"K, dist"| S2
+    S2 -->|"R, t<br/>water_z<br/>board poses"| S3
+    S3 -->|"refined params"| S4
+    S4 --> O["Refined K, R, t<br/>water_z, boards"]
 ```
 
 Each stage builds on the previous one, progressively refining the calibration. Stages 3 and 4 use the same optimization infrastructure ({mod}`aquacal.calibration._optim_common`), just with different parameter sets.
@@ -68,6 +64,8 @@ See {func}`aquacal.calibration.intrinsics.calibrate_intrinsics_all` for implemen
 - Initial board poses (rvec, tvec) for each frame
 
 **Why BFS?** Cameras in an AquaCal rig typically have **non-overlapping fields of view**. Direct pairwise camera-to-camera pose estimation isn't possible. Instead, we use the calibration board as a "connector": if cam0 and cam1 both observe the same board pose, we can chain their board-to-camera transforms to get a cam0-to-cam1 transform.
+
+![BFS pose graph](../_static/diagrams/bfs_pose_graph.png)
 
 See {func}`aquacal.calibration.extrinsics.estimate_extrinsics` for implementation.
 
@@ -180,6 +178,8 @@ Each residual (2D reprojection error of one corner) depends on:
 - **4 intrinsic params** (for the camera, if refining intrinsics)
 
 Total: at most **14-17 columns** touched per residual row.
+
+![Jacobian sparsity pattern](../_static/diagrams/sparsity_pattern.png)
 
 For a 13-camera, 100-frame rig:
 - Parameters: ~630 (extrinsics + water_z + board poses)
