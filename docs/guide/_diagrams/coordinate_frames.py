@@ -4,10 +4,27 @@ Generates a 3D perspective view showing world coordinate frame, camera positions
 water surface, and underwater region.
 """
 
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Add shared scripts dir to import palette
+_project_root = Path(__file__).parent.parent.parent.parent
+_scripts_dir = _project_root / "docs" / "_static" / "scripts"
+sys.path.insert(0, str(_scripts_dir))
+
+from palette import (  # noqa: E402
+    AXIS_X,
+    AXIS_Y,
+    AXIS_Z,
+    BOARD_COLOR,
+    CAMERA_COLOR,
+    LABEL_COLOR,
+    WATER_FILL,
+    WATER_SURFACE,
+)
 
 
 def generate(output_dir: Path):
@@ -28,7 +45,7 @@ def generate(output_dir: Path):
         axis_length,
         0,
         0,
-        color="r",
+        color=AXIS_X,
         arrow_length_ratio=0.15,
         linewidth=2.5,
         label="+X (right)",
@@ -40,7 +57,7 @@ def generate(output_dir: Path):
         0,
         axis_length,
         0,
-        color="g",
+        color=AXIS_Y,
         arrow_length_ratio=0.15,
         linewidth=2.5,
         label="+Y (forward)",
@@ -52,19 +69,21 @@ def generate(output_dir: Path):
         0,
         0,
         axis_length,
-        color="b",
+        color=AXIS_Z,
         arrow_length_ratio=0.15,
         linewidth=2.5,
         label="+Z (down)",
     )
 
     # Axis labels
-    ax.text(axis_length + 0.05, 0, 0, "+X", color="r", fontsize=12, weight="bold")
-    ax.text(0, axis_length + 0.05, 0, "+Y", color="g", fontsize=12, weight="bold")
-    ax.text(0, 0, axis_length + 0.05, "+Z", color="b", fontsize=12, weight="bold")
+    ax.text(axis_length + 0.05, 0, 0, "+X", color=AXIS_X, fontsize=12, weight="bold")
+    ax.text(0, axis_length + 0.05, 0, "+Y", color=AXIS_Y, fontsize=12, weight="bold")
+    ax.text(0, 0, axis_length + 0.05, "+Z", color=AXIS_Z, fontsize=12, weight="bold")
 
     # Mark origin (reference camera)
-    ax.scatter([0], [0], [0], color="black", s=100, marker="^", label="Camera (Z≈0)")
+    ax.scatter(
+        [0], [0], [0], color=CAMERA_COLOR, s=100, marker="^", label="Camera (Z≈0)"
+    )
     ax.text(0, 0, -0.08, "Origin\n(Cam0)", ha="center", va="top", fontsize=9)
 
     # Draw additional camera positions
@@ -74,7 +93,9 @@ def generate(output_dir: Path):
         [0.1, -0.3, 0.02],
     ]
     for i, pos in enumerate(camera_positions, start=1):
-        ax.scatter(pos[0], pos[1], pos[2], color="black", s=60, marker="^", alpha=0.6)
+        ax.scatter(
+            pos[0], pos[1], pos[2], color=CAMERA_COLOR, s=60, marker="^", alpha=0.6
+        )
 
     # Water surface plane
     water_z = 0.5
@@ -88,8 +109,8 @@ def generate(output_dir: Path):
         Y_plane,
         Z_plane,
         alpha=0.2,
-        color="cyan",
-        edgecolor="blue",
+        color=WATER_FILL,
+        edgecolor=WATER_SURFACE,
         linewidth=0.5,
     )
     ax.text(
@@ -97,7 +118,7 @@ def generate(output_dir: Path):
         0.4,
         water_z,
         "Water surface\n(Z = water_z)",
-        color="blue",
+        color=WATER_SURFACE,
         fontsize=10,
         weight="bold",
         ha="center",
@@ -116,10 +137,10 @@ def generate(output_dir: Path):
         target_x,
         target_y,
         target_z,
-        color="darkblue",
+        color=BOARD_COLOR,
         s=50,
         marker="o",
-        alpha=0.5,
+        alpha=0.7,
         label="Targets (Z>water_z)",
     )
 
@@ -138,9 +159,9 @@ def generate(output_dir: Path):
         board_corners[:, 0],
         board_corners[:, 1],
         board_corners[:, 2],
-        "k-",
+        color=BOARD_COLOR,
         linewidth=2,
-        alpha=0.4,
+        alpha=0.7,
     )
     ax.text(0, -0.12, board_z, "Calibration\nboard", ha="center", va="top", fontsize=9)
 
@@ -153,6 +174,7 @@ def generate(output_dir: Path):
         fontsize=9,
         ha="right",
         va="center",
+        color=LABEL_COLOR,
         bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.3),
     )
     ax.text(
@@ -163,7 +185,8 @@ def generate(output_dir: Path):
         fontsize=9,
         ha="right",
         va="center",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="cyan", alpha=0.4),
+        color=LABEL_COLOR,
+        bbox=dict(boxstyle="round,pad=0.3", facecolor=WATER_FILL, alpha=0.4),
     )
     ax.text(
         -0.55,
@@ -173,7 +196,8 @@ def generate(output_dir: Path):
         fontsize=9,
         ha="right",
         va="center",
-        bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.4),
+        color=LABEL_COLOR,
+        bbox=dict(boxstyle="round,pad=0.3", facecolor=WATER_SURFACE, alpha=0.25),
     )
 
     # Configure 3D axes

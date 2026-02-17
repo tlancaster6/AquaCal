@@ -13,6 +13,22 @@ import numpy as np
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
+# Add shared scripts dir to import palette
+scripts_dir = project_root / "docs" / "_static" / "scripts"
+sys.path.insert(0, str(scripts_dir))
+
+from palette import (  # noqa: E402
+    AIR_FILL,
+    BOARD_COLOR,
+    CAMERA_COLOR,
+    INTERFACE_POINT,
+    LABEL_COLOR,
+    RAY_AIR,
+    RAY_WATER,
+    WATER_FILL,
+    WATER_SURFACE,
+)
+
 from aquacal.core.refractive_geometry import snells_law_3d  # noqa: E402
 
 
@@ -95,7 +111,7 @@ def generate(output_dir: Path):
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Draw water surface
-    ax.axhline(water_z, color="blue", linewidth=2, linestyle="--", alpha=0.5)
+    ax.axhline(water_z, color=WATER_SURFACE, linewidth=2, linestyle="--", alpha=0.8)
     ax.text(
         0.95,
         water_z + 0.05,
@@ -103,22 +119,27 @@ def generate(output_dir: Path):
         ha="right",
         va="bottom",
         fontsize=10,
-        color="blue",
+        color=WATER_SURFACE,
     )
 
     # Draw air and water regions
     ax.fill_between(
-        [-0.1, 1.0], 0, water_z, alpha=0.05, color="cyan", label="Air (n=1.0)"
+        [-0.1, 1.0], 0, water_z, alpha=0.12, color=AIR_FILL, label="Air (n=1.0)"
     )
     ax.fill_between(
-        [-0.1, 1.0], water_z, 1.5, alpha=0.1, color="blue", label="Water (n=1.333)"
+        [-0.1, 1.0],
+        water_z,
+        1.5,
+        alpha=0.15,
+        color=WATER_FILL,
+        label="Water (n=1.333)",
     )
 
     # Draw incident ray (camera to interface)
     ax.plot(
         [C[0], P[0]],
         [C[2], P[2]],
-        "r-",
+        color=RAY_AIR,
         linewidth=2,
         label="Incident ray (air)",
         marker="o",
@@ -129,7 +150,7 @@ def generate(output_dir: Path):
     ax.plot(
         [P[0], Q[0]],
         [P[2], Q[2]],
-        "g-",
+        color=RAY_WATER,
         linewidth=2,
         label="Refracted ray (water)",
         marker="o",
@@ -145,8 +166,8 @@ def generate(output_dir: Path):
         -normal_length,
         head_width=0.03,
         head_length=0.04,
-        fc="black",
-        ec="black",
+        fc=LABEL_COLOR,
+        ec=LABEL_COLOR,
         linewidth=1.5,
     )
     ax.text(
@@ -155,16 +176,19 @@ def generate(output_dir: Path):
         "n [0,0,-1]",
         fontsize=9,
         va="center",
+        color=LABEL_COLOR,
     )
 
     # Mark points
-    ax.plot(C[0], C[2], "ko", markersize=8, label="Camera C")
+    ax.plot(C[0], C[2], "o", color=CAMERA_COLOR, markersize=8, label="Camera C")
     ax.text(C[0] - 0.05, C[2] - 0.08, "C (camera)", ha="right", fontsize=10)
 
-    ax.plot(P[0], P[2], "mo", markersize=8, label="Interface point P")
+    ax.plot(
+        P[0], P[2], "o", color=INTERFACE_POINT, markersize=8, label="Interface point P"
+    )
     ax.text(P[0], P[2] + 0.08, "P (interface)", ha="center", va="bottom", fontsize=10)
 
-    ax.plot(Q[0], Q[2], "bo", markersize=8, label="Target Q")
+    ax.plot(Q[0], Q[2], "o", color=BOARD_COLOR, markersize=8, label="Target Q")
     ax.text(Q[0] + 0.05, Q[2], "Q (target)", ha="left", fontsize=10)
 
     # Add angle annotations
@@ -174,14 +198,14 @@ def generate(output_dir: Path):
         xy=(P[0], P[2]),
         xytext=(P[0] - angle_offset, P[2] - angle_offset),
         fontsize=9,
-        color="red",
+        color=RAY_AIR,
     )
     ax.annotate(
         f"θᵣ = {theta_water:.1f}°",
         xy=(P[0], P[2]),
         xytext=(P[0] + angle_offset, P[2] + angle_offset),
         fontsize=9,
-        color="green",
+        color=RAY_WATER,
     )
 
     # Add Snell's law equation
