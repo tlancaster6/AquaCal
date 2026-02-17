@@ -26,28 +26,28 @@ repos:
     hooks:
       - id: ruff-check-all
         name: Ruff lint all files
-        entry: bash scripts/pre-push-ruff-check.sh
+        entry: bash .hooks/pre-push-ruff-check.sh
         language: system
         pass_filenames: false
         stages: [pre-push]
 
       - id: ruff-format-check-all
         name: Ruff format check all files
-        entry: bash scripts/pre-push-ruff-format.sh
+        entry: bash .hooks/pre-push-ruff-format.sh
         language: system
         pass_filenames: false
         stages: [pre-push]
 
       - id: tests
         name: Run tests
-        entry: bash scripts/pre-push-tests.sh
+        entry: bash .hooks/pre-push-tests.sh
         language: system
         pass_filenames: false
         stages: [pre-push]
 
       - id: docs-build
         name: Build documentation
-        entry: bash scripts/pre-push-docs.sh
+        entry: bash .hooks/pre-push-docs.sh
         language: system
         pass_filenames: false
         stages: [pre-push]
