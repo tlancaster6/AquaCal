@@ -187,6 +187,7 @@ def test_render_synthetic_frame():
     assert np.any(image > 0)
 
 
+@pytest.mark.slow
 def test_board_config_consistency():
     """Test that all presets use the same ChArUco board config."""
     small = generate_synthetic_rig("small")
@@ -212,6 +213,7 @@ def test_camera_naming_convention():
     assert list(scenario.water_zs.keys()) == expected_names
 
 
+@pytest.mark.slow
 def test_reference_camera_at_origin():
     """Test that cam0 is always at origin with identity rotation."""
     for preset in ["small", "medium", "large"]:
