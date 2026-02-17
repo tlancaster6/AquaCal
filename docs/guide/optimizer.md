@@ -9,16 +9,16 @@ The calibration proceeds through four stages:
 ```{mermaid}
 flowchart LR
     I1["In-air videos<br/>Board params"] --> S1
-    I2["Underwater videos<br/>Intrinsics"] --> S2
+    I2["Underwater videos<br/>Board params"] --> S2
 
     S1["**Stage 1**<br/>In-air Intrinsics<br/><small>(OpenCV)</small>"]
     S2["**Stage 2**<br/>Extrinsic Init<br/><small>(BFS/PnP)</small>"]
     S3["**Stage 3**<br/>Joint Refractive BA<br/><small>(nonlinear)</small>"]
     S4["**Stage 4**<br/>Intrinsic Refinement<br/><small>(optional)</small>"]
 
-    S1 -->|"K, dist"| S2
-    S2 -->|"R, t<br/>water_z<br/>board poses"| S3
-    S3 -->|"refined params"| S4
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
     S4 --> O["Refined K, R, t<br/>water_z, boards"]
 ```
 

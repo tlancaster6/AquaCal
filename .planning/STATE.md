@@ -70,11 +70,12 @@ Recent decisions affecting current work:
 - v1.2: Pre-execute notebooks for reproducible docs builds without runtime dependencies
 - v1.2: Trusted Publishing (OIDC) for PyPI — no API tokens needed
 - v1.2: python-semantic-release for automated version bumping from conventional commits
-- [Phase 11]: Hero image uses 2D cross-section with 3 cameras, refracted rays, and minimal labels only
 - [Phase 11]: Centralized palette.py module — all diagram scripts import colors from docs/_static/scripts/palette.py
+- [Phase 11]: Mermaid pipeline replaces ASCII diagram; intermediate data labels dropped for cleaner look
 
 ### Pending Todos
 
+- Design better hero image for README (deferred from Phase 11 — user wants to rethink concept)
 - Reduce memory and CPU load during calibration
 
 ### Blockers/Concerns
