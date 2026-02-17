@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-15)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** Phase 10 - Documentation Audit
+**Current focus:** Phase 11 - Documentation Visuals
 
 ## Current Position
 
-Phase: 10 of 12 (Documentation Audit)
-Plan: 03 of 03 complete
-Status: Complete
-Last activity: 2026-02-16 — Created new documentation sections (CLI, troubleshooting, glossary, camera models) and applied audit fixes
+Phase: 11 of 12 (Documentation Visuals)
+Plan: not yet planned
+Status: Ready to plan
+Last activity: 2026-02-17 — Phase 9 (Bug Triage) marked complete — no major bugs found during CLI QA
 
 Progress: [██████████████████░░] 83% (10/12 phases complete)
 
@@ -81,8 +81,8 @@ None - all previously flagged infrastructure items (RTD, DOI, RELEASE_TOKEN) ver
 
 ## Session Continuity
 
-Last session: 2026-02-16 (Phase 10 complete)
-Stopped at: Completed 10-03-PLAN.md — all documentation sections created, audit fixes applied, Phase 10 complete
-Resume file: .planning/phases/10-documentation-audit/10-03-SUMMARY.md
+Last session: 2026-02-17 (Phase 9 marked complete — no bugs)
+Stopped at: Phase 9 (Bug Triage) closed — no major bugs from CLI QA
+Resume file: N/A
 
-**Next step:** Execute Phase 11 (Public Presence Enhancement) with `/gsd:execute-phase 11`
+**Next step:** Plan Phase 11 (Documentation Visuals) with `/gsd:discuss-phase 11` or `/gsd:plan-phase 11`

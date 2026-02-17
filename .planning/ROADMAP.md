@@ -51,21 +51,19 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 08-01-PLAN.md — QA all CLI workflows (init, calibrate, compare) with real rig data
+- [x] 08-01-PLAN.md — QA all CLI workflows (init, calibrate, compare) with real rig data
 
-#### Phase 9: Bug Triage
+#### Phase 9: Bug Triage ✓ (completed 2026-02-17)
 **Goal**: Issues discovered during CLI QA are triaged and resolved or captured
 **Depends on**: Phase 8
 **Requirements**: QA-04
 **Success Criteria** (what must be TRUE):
-  1. All bugs discovered in Phase 8 are categorized (quick fix vs. future work)
-  2. Quick fixes are applied and verified
-  3. Larger issues are captured as todos or GitHub issues
-  4. User confirms CLI workflows are in releasable state
-**Plans**: TBD
+  1. All bugs discovered in Phase 8 are categorized (quick fix vs. future work) — ✓ no major bugs found
+  2. Quick fixes are applied and verified — ✓ N/A
+  3. Larger issues are captured as todos or GitHub issues — ✓ N/A
+  4. User confirms CLI workflows are in releasable state — ✓ confirmed
 
-Plans:
-- [ ] 09-01: TBD
+**Result**: No major bugs discovered during CLI QA. Phase completed with no plans needed.
 
 #### Phase 10: Documentation Audit
 **Goal**: Docstrings and Sphinx documentation are audited for quality and consistency
@@ -125,8 +123,8 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12
 | 5. Documentation Site | v1.2 | 4/4 | Complete | 2026-02-14 |
 | 6. Interactive Tutorials | v1.2 | 4/4 | Complete | 2026-02-15 |
 | 7. Infrastructure Check | v1.4 | 1/1 | Complete | 2026-02-15 |
-| 8. CLI QA Execution | v1.4 | 0/TBD | Not started | - |
-| 9. Bug Triage | v1.4 | 0/TBD | Not started | - |
-| 10. Documentation Audit | v1.4 | Complete    | 2026-02-16 | - |
+| 8. CLI QA Execution | v1.4 | 1/1 | Complete | 2026-02-15 |
+| 9. Bug Triage | v1.4 | 0/0 | Complete | 2026-02-17 |
+| 10. Documentation Audit | v1.4 | 3/3 | Complete | 2026-02-16 |
 | 11. Documentation Visuals | v1.4 | 0/TBD | Not started | - |
 | 12. Tutorial Verification | v1.4 | 0/TBD | Not started | - |
