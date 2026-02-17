@@ -378,8 +378,8 @@ class TestOptimizeInterface:
                     t=ext.t + np.random.normal(0, 0.01, 3),
                 )
 
-        # Perturb initial distances
-        initial_distances = {
+        # Perturb initial water_z values
+        initial_water_zs = {
             cam: dist + np.random.normal(0, 0.01)
             for cam, dist in ground_truth_distances.items()
         }
@@ -390,7 +390,7 @@ class TestOptimizeInterface:
             initial_extrinsics=initial_extrinsics,
             board=board,
             reference_camera="cam0",
-            initial_water_zs=initial_distances,
+            initial_water_zs=initial_water_zs,
         )
 
         # Should achieve low RMS error

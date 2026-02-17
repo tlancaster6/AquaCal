@@ -288,11 +288,11 @@ class TestLoadConfig:
         # intrinsic_board should be None (backward compatible)
         assert config.intrinsic_board is None
 
-    def test_load_config_without_initial_distances(self, valid_config_yaml):
+    def test_load_config_without_initial_water_z(self, valid_config_yaml):
         """Test that initial_water_z is None when not provided."""
-        # Ensure initial_distances is not in config
-        if "initial_distances" in valid_config_yaml.get("interface", {}):
-            del valid_config_yaml["interface"]["initial_distances"]
+        # Ensure initial_water_z is not in config
+        if "initial_water_z" in valid_config_yaml.get("interface", {}):
+            del valid_config_yaml["interface"]["initial_water_z"]
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
@@ -302,9 +302,9 @@ class TestLoadConfig:
         # initial_water_z should be None (backward compatible)
         assert config.initial_water_z is None
 
-    def test_load_config_with_per_camera_initial_distances(self, valid_config_yaml):
-        """Test loading config with per-camera initial_distances."""
-        valid_config_yaml["interface"]["initial_distances"] = {
+    def test_load_config_with_per_camera_initial_water_z(self, valid_config_yaml):
+        """Test loading config with per-camera initial_water_z."""
+        valid_config_yaml["interface"]["initial_water_z"] = {
             "cam0": 0.25,
             "cam1": 0.28,
         }
@@ -317,9 +317,9 @@ class TestLoadConfig:
         assert config.initial_water_z is not None
         assert config.initial_water_z == {"cam0": 0.25, "cam1": 0.28}
 
-    def test_load_config_with_scalar_initial_distance(self, valid_config_yaml):
-        """Test loading config with scalar initial_distance (expanded to all cameras)."""
-        valid_config_yaml["interface"]["initial_distances"] = 0.3
+    def test_load_config_with_scalar_initial_water_z(self, valid_config_yaml):
+        """Test loading config with scalar initial_water_z (expanded to all cameras)."""
+        valid_config_yaml["interface"]["initial_water_z"] = 0.3
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
@@ -329,12 +329,10 @@ class TestLoadConfig:
         assert config.initial_water_z is not None
         assert config.initial_water_z == {"cam0": 0.3, "cam1": 0.3}
 
-    def test_load_config_with_incomplete_initial_distances_dict(
-        self, valid_config_yaml
-    ):
-        """Test that incomplete initial_distances dict raises ValueError."""
-        # Only provide distance for cam0, not cam1
-        valid_config_yaml["interface"]["initial_distances"] = {"cam0": 0.25}
+    def test_load_config_with_incomplete_initial_water_z_dict(self, valid_config_yaml):
+        """Test that incomplete initial_water_z dict raises ValueError."""
+        # Only provide value for cam0, not cam1
+        valid_config_yaml["interface"]["initial_water_z"] = {"cam0": 0.25}
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
@@ -344,9 +342,9 @@ class TestLoadConfig:
             ):
                 load_config(f.name)
 
-    def test_load_config_with_negative_scalar_initial_distance(self, valid_config_yaml):
-        """Test that negative scalar initial_distance raises ValueError."""
-        valid_config_yaml["interface"]["initial_distances"] = -0.15
+    def test_load_config_with_negative_scalar_initial_water_z(self, valid_config_yaml):
+        """Test that negative scalar initial_water_z raises ValueError."""
+        valid_config_yaml["interface"]["initial_water_z"] = -0.15
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
@@ -354,9 +352,9 @@ class TestLoadConfig:
             with pytest.raises(ValueError, match="initial_water_z must be positive"):
                 load_config(f.name)
 
-    def test_load_config_with_negative_dict_initial_distance(self, valid_config_yaml):
-        """Test that negative value in initial_distances dict raises ValueError."""
-        valid_config_yaml["interface"]["initial_distances"] = {
+    def test_load_config_with_negative_dict_initial_water_z(self, valid_config_yaml):
+        """Test that negative value in initial_water_z dict raises ValueError."""
+        valid_config_yaml["interface"]["initial_water_z"] = {
             "cam0": 0.25,
             "cam1": -0.15,
         }
@@ -369,11 +367,11 @@ class TestLoadConfig:
             ):
                 load_config(f.name)
 
-    def test_load_config_with_extra_cameras_in_initial_distances(
+    def test_load_config_with_extra_cameras_in_initial_water_z(
         self, valid_config_yaml, capsys
     ):
-        """Test that extra cameras in initial_distances dict produce a warning."""
-        valid_config_yaml["interface"]["initial_distances"] = {
+        """Test that extra cameras in initial_water_z dict produce a warning."""
+        valid_config_yaml["interface"]["initial_water_z"] = {
             "cam0": 0.25,
             "cam1": 0.28,
             "cam2": 0.30,  # Extra camera not in cameras list
@@ -395,9 +393,9 @@ class TestLoadConfig:
         assert "cam1" in config.initial_water_z
         assert "cam2" in config.initial_water_z
 
-    def test_load_config_with_invalid_type_initial_distance(self, valid_config_yaml):
-        """Test that invalid type for initial_distances raises ValueError."""
-        valid_config_yaml["interface"]["initial_distances"] = "invalid"
+    def test_load_config_with_invalid_type_initial_water_z(self, valid_config_yaml):
+        """Test that invalid type for initial_water_z raises ValueError."""
+        valid_config_yaml["interface"]["initial_water_z"] = "invalid"
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
@@ -1189,7 +1187,7 @@ class TestRunCalibrationFromConfig:
     ):
         """Test that initial_water_z is passed to optimize_interface."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            initial_distances = {"cam0": 0.25, "cam1": 0.28}
+            initial_water_z = {"cam0": 0.25, "cam1": 0.28}
             config = CalibrationConfig(
                 board=sample_board_config,
                 camera_names=["cam0", "cam1"],
@@ -1202,7 +1200,7 @@ class TestRunCalibrationFromConfig:
                     "cam1": Path("/path/cam1_uw.mp4"),
                 },
                 output_dir=Path(tmpdir),
-                initial_water_z=initial_distances,
+                initial_water_z=initial_water_z,
             )
 
             run_calibration_from_config(config)
@@ -1212,7 +1210,7 @@ class TestRunCalibrationFromConfig:
             call_args = mock_calibration_stages["optimize"].call_args
 
             # Check that initial_water_z was passed
-            assert call_args[1]["initial_water_z"] == initial_distances
+            assert call_args[1]["initial_water_z"] == initial_water_z
 
     def test_run_calibration_from_config_estimates_validation_poses(
         self, mock_calibration_stages, sample_board_config, capsys
