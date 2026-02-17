@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-15)
 ## Current Position
 
 Phase: 11 of 12 (Documentation Visuals)
-Plan: not yet planned
-Status: Ready to plan
-Last activity: 2026-02-17 — Phase 9 (Bug Triage) marked complete — no major bugs found during CLI QA
+Plan: 01 complete (Plan 02 next)
+Status: In progress
+Last activity: 2026-02-17 — Phase 11 Plan 01 complete — palette, style guide, hero image, updated diagrams
 
 Progress: [██████████████████░░] 83% (10/12 phases complete)
 
@@ -49,6 +49,7 @@ Progress: [██████████████████░░] 83% (10
 | Phase 10 P01 | 3 | 2 tasks | 1 files |
 | Phase 10 P02 | 14 | 2 tasks | 43 files |
 | Phase 10 P03 | 4 | 2 tasks | 7 files |
+| Phase 11 P01 | 3 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -69,10 +70,11 @@ Recent decisions affecting current work:
 - v1.2: Pre-execute notebooks for reproducible docs builds without runtime dependencies
 - v1.2: Trusted Publishing (OIDC) for PyPI — no API tokens needed
 - v1.2: python-semantic-release for automated version bumping from conventional commits
+- [Phase 11]: Hero image uses 2D cross-section with 3 cameras, refracted rays, and minimal labels only
+- [Phase 11]: Centralized palette.py module — all diagram scripts import colors from docs/_static/scripts/palette.py
 
 ### Pending Todos
 
-- Design better hero image for README (Phase 11)
 - Reduce memory and CPU load during calibration
 
 ### Blockers/Concerns
@@ -81,8 +83,8 @@ None - all previously flagged infrastructure items (RTD, DOI, RELEASE_TOKEN) ver
 
 ## Session Continuity
 
-Last session: 2026-02-17 (Phase 9 marked complete — no bugs)
-Stopped at: Phase 9 (Bug Triage) closed — no major bugs from CLI QA
+Last session: 2026-02-17 (Phase 11 Plan 01 complete — Visual Foundation)
+Stopped at: Completed 11-01-PLAN.md (Visual Foundation)
 Resume file: N/A
 
-**Next step:** Plan Phase 11 (Documentation Visuals) with `/gsd:discuss-phase 11` or `/gsd:plan-phase 11`
+**Next step:** Execute Phase 11 Plan 02 (new diagrams: sparsity pattern, BFS pose graph, pipeline Mermaid)
