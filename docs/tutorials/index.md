@@ -2,25 +2,24 @@
 
 Interactive Jupyter notebook tutorials demonstrating AquaCal's calibration pipeline with real and synthetic data.
 
-Each tutorial is a self-contained notebook you can run locally or on Google Colab to explore calibration workflows, diagnose optimization issues, and validate results.
+Each tutorial is self-contained and can be run locally or on Google Colab.
 
-## Available Tutorials
+## Tutorial 01: Calibrate Your Rig
 
-**Full Pipeline Walkthrough** — End-to-end calibration from video files to 3D reconstruction results. Covers ChArUco detection, intrinsic/extrinsic initialization, joint bundle adjustment, and result validation.
+End-to-end calibration from data loading to validated 3D results. Covers ChArUco detection, intrinsic/extrinsic initialization, joint refractive bundle adjustment, and a built-in diagnostics section for interpreting reprojection errors, checking interface distance recovery, and troubleshooting common issues.
 
-**Diagnostics and Troubleshooting** — Understanding optimizer convergence, reprojection error patterns, and quality metrics. Learn how to identify problematic frames, interpret residual plots, and tune optimization settings.
+**Start here** if you want to calibrate a real or synthetic underwater multi-camera rig.
 
-**Synthetic Data Testing** — Generate ground truth calibration data with known parameters, run the pipeline, and measure accuracy. Demonstrates validation methodology and parameter recovery analysis.
+## Tutorial 02: Why Refractive Calibration Matters
 
-:::{note}
-Notebooks will be added in Phase 6 Plans 03-04. The toctree below is prepared for upcoming content.
-:::
+Controlled synthetic experiments that quantify what you gain from modeling Snell's law refraction. Compares refractive vs non-refractive calibration on the same data — showing how non-refractive models introduce systematic bias in focal length and camera position even when reprojection error looks acceptable.
+
+**Start here** if you want to understand when the refractive model is essential and how to validate parameter recovery accuracy.
 
 :::{toctree}
 :maxdepth: 1
 :hidden:
 
 01_full_pipeline
-02_diagnostics
-03_synthetic_validation
+02_synthetic_validation
 :::
