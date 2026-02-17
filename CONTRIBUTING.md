@@ -42,7 +42,7 @@ Thank you for your interest in contributing to AquaCal. This guide will help you
 This project uses git hooks via [pre-commit](https://pre-commit.com/) to catch issues early:
 
 - **On commit**: ruff lint/format, trailing whitespace, end-of-file fixer, YAML check, large file check, and secret detection ([detect-secrets](https://github.com/Yelp/detect-secrets))
-- **On push**: full ruff lint/format check across all files, fast test suite (`pytest -m "not slow"`), documentation build, and secret detection
+- **On push**: full ruff lint/format check across all files, fast test suite (`pytest -m "not slow"`), and secret detection
 
 Install both hooks after cloning:
 ```bash
