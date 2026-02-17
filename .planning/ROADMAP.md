@@ -77,9 +77,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — Audit docstrings and Sphinx docs, produce findings report
-- [ ] 10-02-PLAN.md — Rename interface_distance to water_z across codebase
-- [ ] 10-03-PLAN.md — User review + create new doc sections + apply audit fixes
+- [x] 10-01-PLAN.md — Audit docstrings and Sphinx docs, produce findings report
+- [x] 10-02-PLAN.md — Rename interface_distance to water_z across codebase
+- [x] 10-03-PLAN.md — User review + create new doc sections + apply audit fixes
 
 #### Phase 11: Documentation Visuals
 **Goal**: Documentation has improved visual aids where they enhance understanding
@@ -90,10 +90,11 @@ Plans:
   2. New images or visualizations are added where they aid understanding
   3. Visual abstract or hero image exists for README and documentation
   4. User confirms visuals improve documentation clarity
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 11-01: TBD
+- [ ] 11-01-PLAN.md — Style guide, hero image, update existing diagrams to shared palette
+- [ ] 11-02-PLAN.md — Mermaid pipeline, sparsity pattern, BFS graph, user verification
 
 #### Phase 12: Tutorial Verification
 **Goal**: All Jupyter tutorials run correctly with proper embedded outputs
