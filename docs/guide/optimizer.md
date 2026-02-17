@@ -20,6 +20,11 @@ flowchart LR
     S2 --> S3
     S3 --> S4
     S4 --> O["Refined K, R, t<br/>water_z, boards"]
+
+    classDef stage fill:#00897B,stroke:#004D40,color:#fff
+    classDef data fill:#E0F7FA,stroke:#4DD0E1,color:#263238
+    class S1,S2,S3,S4 stage
+    class I1,I2,O data
 ```
 
 Each stage builds on the previous one, progressively refining the calibration. Stages 3 and 4 use the same optimization infrastructure ({mod}`aquacal.calibration._optim_common`), just with different parameter sets.
