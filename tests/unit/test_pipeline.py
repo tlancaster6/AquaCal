@@ -340,7 +340,7 @@ class TestLoadConfig:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(
-                ValueError, match="initial_distances dict must cover all cameras"
+                ValueError, match="initial_water_z dict must cover all cameras"
             ):
                 load_config(f.name)
 
@@ -351,7 +351,7 @@ class TestLoadConfig:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(valid_config_yaml, f)
             f.flush()
-            with pytest.raises(ValueError, match="initial_distances must be positive"):
+            with pytest.raises(ValueError, match="initial_water_z must be positive"):
                 load_config(f.name)
 
     def test_load_config_with_negative_dict_initial_distance(self, valid_config_yaml):
@@ -365,7 +365,7 @@ class TestLoadConfig:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(
-                ValueError, match="initial_distances\\['cam1'\\] must be positive"
+                ValueError, match="initial_water_z\\['cam1'\\] must be positive"
             ):
                 load_config(f.name)
 
@@ -403,7 +403,7 @@ class TestLoadConfig:
             yaml.dump(valid_config_yaml, f)
             f.flush()
             with pytest.raises(
-                ValueError, match="initial_distances must be a number or dict"
+                ValueError, match="initial_water_z must be a number or dict"
             ):
                 load_config(f.name)
 
