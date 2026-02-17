@@ -103,3 +103,13 @@ None - plan executed exactly as written.
 ---
 *Phase: 12-tutorial-verification*
 *Completed: 2026-02-17*
+
+## Self-Check: PASSED
+
+- FOUND: `docs/tutorials/01_full_pipeline.ipynb` (33 cells, all outputs cleared)
+- FOUND: `docs/tutorials/02_synthetic_validation.ipynb` (renamed from 03)
+- FOUND: `docs/tutorials/index.md` (2-tutorial toctree)
+- FOUND: `.planning/phases/12-tutorial-verification/12-01-SUMMARY.md`
+- CONFIRMED: `695cf8a` — task 1 commit (merge diagnostics + restructure)
+- CONFIRMED: `0d89566` — task 2 commit (update index)
+- CONFIRMED: `9e7c230` — metadata commit
