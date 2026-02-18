@@ -86,6 +86,7 @@ Recent decisions affecting current work:
 
 - Design better hero image for README (deferred from Phase 11 — user wants to rethink concept)
 - Reduce memory and CPU load during calibration
+- Check version field in JSON output reads local version properly
 
 ### Blockers/Concerns
 
