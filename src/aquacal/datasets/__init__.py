@@ -54,10 +54,15 @@ Downloaded datasets are cached in `./aquacal_data/`::
 from aquacal.datasets._manifest import list_datasets
 from aquacal.datasets.download import clear_cache, get_cache_info
 from aquacal.datasets.loader import ExampleDataset, load_example
-from aquacal.datasets.synthetic import SyntheticScenario, generate_synthetic_rig
+from aquacal.datasets.synthetic import (
+    SyntheticScenario,
+    generate_synthetic_detections,
+    generate_synthetic_rig,
+)
 
 __all__ = [
     "generate_synthetic_rig",
+    "generate_synthetic_detections",
     "SyntheticScenario",
     "load_example",
     "ExampleDataset",

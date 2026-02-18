@@ -62,7 +62,6 @@ Homepage = "https://github.com/tlancaster6/AquaCal"
 Documentation = "https://aquacal.readthedocs.io"
 Repository = "https://github.com/tlancaster6/AquaCal"
 Issues = "https://github.com/tlancaster6/AquaCal/issues"
-Changelog = "https://github.com/tlancaster6/AquaCal/blob/main/CHANGELOG.md"
 
 [project.scripts]
 aquacal = "aquacal.cli:main"

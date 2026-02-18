@@ -84,7 +84,7 @@ python -m pytest tests/unit/test_camera.py -v
 
 ### Commit Messages
 
-This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automated versioning and changelog generation. Format your commit messages as:
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automated versioning. Format your commit messages as:
 
 ```
 <type>(<scope>): <description>
@@ -126,13 +126,7 @@ When deprecating functionality in AquaCal:
        # existing implementation
    ```
 
-2. **Document in CHANGELOG.md** under the "Deprecated" category:
-   ```markdown
-   ### Deprecated
-   - `old_function()` - Use `new_function()` instead (will be removed in 1.4.0)
-   ```
-
-3. **Maintain for at least 2 minor versions** before removal.
+2. **Maintain for at least 2 minor versions** before removal.
 
 4. **Document the replacement** in the function's docstring:
    ```python

@@ -4,7 +4,11 @@ __version__ = "0.1.0"
 
 # Load/save calibration results
 # Run calibration
-from aquacal.calibration.pipeline import load_config, run_calibration
+from aquacal.calibration.pipeline import (
+    calibrate_from_detections,
+    load_config,
+    run_calibration,
+)
 
 # Core types
 from aquacal.config.schema import (
@@ -26,6 +30,7 @@ __all__ = [
     "CameraIntrinsics",
     "CameraExtrinsics",
     # Run calibration
+    "calibrate_from_detections",
     "run_calibration",
     "load_config",
 ]

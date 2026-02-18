@@ -47,6 +47,122 @@ from aquacal.validation.reconstruction import compute_3d_distance_errors
 from aquacal.validation.reprojection import compute_reprojection_errors
 
 
+def calibrate_from_detections(
+    detections: DetectionResult,
+    intrinsics: dict[str, CameraIntrinsics],
+    board: BoardGeometry,
+    *,
+    reference_camera: str | None = None,
+    n_air: float = 1.0,
+    n_water: float = 1.333,
+    loss: str = "huber",
+    loss_scale: float = 1.0,
+    min_corners: int = 4,
+    verbose: int = 0,
+) -> tuple[CalibrationResult, dict[int, BoardPose]]:
+    """Run Stages 2-3 on pre-computed detections and return a CalibrationResult.
+
+    This is a high-level convenience function that takes detections and intrinsics
+    (typically from synthetic data or a previous detection step) and runs the
+    extrinsic initialization (Stage 2) and joint refractive optimization (Stage 3).
+
+    Args:
+        detections: Detected corners across all cameras and frames.
+        intrinsics: Per-camera intrinsic parameters.
+        board: Board geometry used for detection.
+        reference_camera: Name of the reference camera (identity extrinsics).
+            Defaults to the first camera in sorted order.
+        n_air: Refractive index of air.
+        n_water: Refractive index of water.
+        loss: Robust loss function for Stage 3 ('huber', 'cauchy', etc.).
+        loss_scale: Scale parameter for the robust loss.
+        min_corners: Minimum corners per detection to use.
+        verbose: Verbosity level (0=silent, 1=summary, 2=per-iteration).
+
+    Returns:
+        Tuple of (CalibrationResult, board_poses) where board_poses maps
+        frame index to the optimized BoardPose.
+
+    Example:
+        >>> from aquacal.datasets import generate_synthetic_rig, generate_synthetic_detections
+        >>> from aquacal.calibration import calibrate_from_detections
+        >>> scenario = generate_synthetic_rig("small", noisy=True)
+        >>> board = BoardGeometry(scenario.board_config)
+        >>> detections = generate_synthetic_detections(
+        ...     scenario.intrinsics, scenario.extrinsics, scenario.water_zs,
+        ...     board, scenario.board_poses, noise_std=scenario.noise_std,
+        ... )
+        >>> result, poses = calibrate_from_detections(
+        ...     detections, scenario.intrinsics, board,
+        ... )
+        >>> print(f"RMS: {result.diagnostics.reprojection_error_rms:.3f} px")
+    """
+    camera_names = sorted(intrinsics.keys())
+    if reference_camera is None:
+        reference_camera = camera_names[0]
+    interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
+
+    # Stage 2: Extrinsic initialization
+    pose_graph = build_pose_graph(detections, min_cameras=2)
+    initial_extrinsics = estimate_extrinsics(
+        pose_graph,
+        intrinsics,
+        board,
+        reference_camera,
+    )
+
+    # Stage 3: Joint refractive optimization
+    opt_extrinsics, opt_distances, opt_poses_list, rms = optimize_interface(
+        detections=detections,
+        intrinsics=intrinsics,
+        initial_extrinsics=initial_extrinsics,
+        board=board,
+        reference_camera=reference_camera,
+        interface_normal=interface_normal,
+        n_air=n_air,
+        n_water=n_water,
+        loss=loss,
+        loss_scale=loss_scale,
+        min_corners=min_corners,
+        verbose=verbose,
+    )
+    board_poses = {bp.frame_idx: bp for bp in opt_poses_list}
+
+    # Build CalibrationResult
+    interface_params = InterfaceParams(
+        normal=interface_normal,
+        n_air=n_air,
+        n_water=n_water,
+    )
+    result = _build_calibration_result(
+        intrinsics=intrinsics,
+        extrinsics=opt_extrinsics,
+        water_z_values=opt_distances,
+        board_config=board.config,
+        interface_params=interface_params,
+        diagnostics=DiagnosticsData(
+            reprojection_error_rms=rms,
+            reprojection_error_per_camera={},
+            validation_3d_error_mean=0.0,
+            validation_3d_error_std=0.0,
+        ),
+        metadata=CalibrationMetadata(
+            calibration_date=datetime.now().isoformat(),
+            software_version=importlib.metadata.version("aquacal"),
+            config_hash="",
+            num_frames_used=len(board_poses),
+            num_frames_holdout=0,
+        ),
+    )
+
+    # Compute per-camera reprojection errors
+    reproj = compute_reprojection_errors(result, detections, board_poses)
+    result.diagnostics.reprojection_error_rms = reproj.rms
+    result.diagnostics.reprojection_error_per_camera = reproj.per_camera
+
+    return result, board_poses
+
+
 def load_config(config_path: str | Path) -> CalibrationConfig:
     """
     Load calibration configuration from YAML file.

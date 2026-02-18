@@ -8,4 +8,3 @@
 - [ ] Code formatted (`ruff format --check src/ tests/`)
 - [ ] Linting passes (`ruff check src/ tests/`)
 - [ ] Conventional commit messages used (`feat:`, `fix:`, `docs:`, etc.)
-- [ ] CHANGELOG.md updated (if user-facing change)

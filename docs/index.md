@@ -64,5 +64,4 @@ guide/index
 api/index
 tutorials/index
 contributing
-changelog
 :::

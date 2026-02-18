@@ -702,6 +702,78 @@ def plot_reprojection_quiver(
     return fig
 
 
+def plot_per_camera_error(result: CalibrationResult) -> "plt.Figure":
+    """Bar chart of per-camera RMS reprojection error with overall RMS line.
+
+    Args:
+        result: CalibrationResult with populated diagnostics.
+
+    Returns:
+        matplotlib Figure.
+    """
+    import matplotlib.pyplot as plt
+
+    cam_names = sorted(result.cameras.keys())
+    rms_values = [
+        result.diagnostics.reprojection_error_per_camera.get(cam, 0.0)
+        for cam in cam_names
+    ]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(cam_names, rms_values, color="steelblue", alpha=0.8)
+    ax.axhline(
+        result.diagnostics.reprojection_error_rms,
+        color="red",
+        linestyle="--",
+        label=f"Overall RMS: {result.diagnostics.reprojection_error_rms:.3f} px",
+    )
+    ax.set_xlabel("Camera")
+    ax.set_ylabel("RMS Reprojection Error (px)")
+    ax.set_title("Per-Camera Reprojection Error")
+    ax.legend()
+    ax.grid(axis="y", alpha=0.3)
+    plt.xticks(rotation=45, ha="right")
+    fig.tight_layout()
+    return fig
+
+
+def plot_error_distribution(reprojection_errors: ReprojectionErrors) -> "plt.Figure":
+    """Histogram of per-corner reprojection error magnitudes.
+
+    Args:
+        reprojection_errors: Pre-computed reprojection errors with residuals.
+
+    Returns:
+        matplotlib Figure.
+    """
+    import matplotlib.pyplot as plt
+
+    all_errors = np.linalg.norm(reprojection_errors.residuals, axis=1)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.hist(all_errors, bins=30, color="steelblue", alpha=0.7, edgecolor="black")
+    ax.axvline(
+        np.mean(all_errors),
+        color="red",
+        linestyle="--",
+        label=f"Mean: {np.mean(all_errors):.3f} px",
+    )
+    ax.set_xlabel("Reprojection Error (px)")
+    ax.set_ylabel("Frequency")
+    ax.set_title("Reprojection Error Distribution (All Cameras)")
+    ax.legend()
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+
+    print("Error statistics:")
+    print(f"  Mean:            {np.mean(all_errors):.3f} px")
+    print(f"  Median:          {np.median(all_errors):.3f} px")
+    print(f"  95th percentile: {np.percentile(all_errors, 95):.3f} px")
+    print(f"  Max:             {np.max(all_errors):.3f} px")
+
+    return fig
+
+
 def save_diagnostic_report(
     report: DiagnosticReport,
     calibration: CalibrationResult,

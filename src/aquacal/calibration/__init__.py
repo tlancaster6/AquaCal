@@ -16,6 +16,7 @@ from aquacal.calibration.intrinsics import (
     calibrate_intrinsics_single,
 )
 from aquacal.calibration.pipeline import (
+    calibrate_from_detections,
     load_config,
     run_calibration,
     run_calibration_from_config,
@@ -41,6 +42,7 @@ __all__ = [
     # refinement
     "joint_refinement",
     # pipeline
+    "calibrate_from_detections",
     "load_config",
     "split_detections",
     "run_calibration",
