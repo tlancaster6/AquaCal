@@ -64,6 +64,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-19 (phase 14 plan 03 executed)
-Stopped at: Completed 14-geometry-rewiring/14-03-PLAN.md
-Resume file: .planning/phases/14-geometry-rewiring/14-03-SUMMARY.md
+Last session: 2026-02-19 (phase 15 context gathered)
+Stopped at: Phase 15 context gathered
+Resume file: .planning/phases/15-utility-and-i-o-rewiring/15-CONTEXT.md
