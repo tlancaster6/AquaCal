@@ -1,6 +1,7 @@
 """Command-line interface for AquaCal calibration pipeline."""
 
 import argparse
+import importlib.metadata
 import re
 import sys
 from pathlib import Path
@@ -29,7 +30,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.1.0",
+        version=f"%(prog)s {importlib.metadata.version('aquacal')}",
     )
 
     subparsers = parser.add_subparsers(

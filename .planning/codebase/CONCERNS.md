@@ -30,7 +30,7 @@
 **B.2 - Missing `evaluate_reconstruction` import in experiments.py**
 - Symptoms: `NameError: name 'evaluate_reconstruction' is not defined` at `experiments.py:475` and `experiments.py:981`
 - Files: `tests/synthetic/experiments.py`, `tests/synthetic/experiment_helpers.py`
-- Trigger: `python tests/synthetic/compare_refractive.py` or `pytest tests/synthetic/test_refractive_comparison.py -k experiment_2 or experiment_3`
+- Trigger: `python tests/synthetic/compare_refractive.py`
 - Workaround: Manually add `evaluate_reconstruction,` to line 23 in `tests/synthetic/experiments.py`
 - Status: Documented in `dev/tasks/b2_report.md`
 

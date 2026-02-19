@@ -75,7 +75,7 @@ AquaCal/
 │   │   ├── experiment_helpers.py   # Shared experiment logic
 │   │   ├── experiments.py          # Experiment implementations (fidelity, depth, scaling)
 │   │   ├── ground_truth.py         # Synthetic rig generation, test data
-│   │   └── test_refractive_comparison.py # Pytest-based experiments
+│   │   └── test_full_pipeline.py   # End-to-end pipeline validation
 │   └── integration/                # Placeholder for future integration tests
 ├── dev/                            # Development and documentation (gitignored)
 │   ├── DESIGN.md                   # Architecture and design decisions
@@ -323,7 +323,7 @@ AquaCal/
 **New Feature (e.g., intrinsics refinement improvement):**
 - Primary code: `src/aquacal/calibration/refinement.py` (or new stage module)
 - Tests: `tests/unit/test_refinement.py`
-- Integration tests: `tests/synthetic/test_refractive_comparison.py` (if impacts validation metrics)
+- Integration tests: `tests/synthetic/test_full_pipeline.py` (if impacts validation metrics)
 - Documentation: Update `dev/DESIGN.md` (architecture section), `CLAUDE.md` (if CLI interface changes)
 
 **New Camera Model (e.g., rational distortion):**

@@ -1,6 +1,8 @@
 """AquaCal: Refractive multi-camera calibration library."""
 
-__version__ = "0.1.0"
+from importlib.metadata import version as _get_version
+
+__version__ = _get_version("aquacal")
 
 # Load/save calibration results
 # Run calibration

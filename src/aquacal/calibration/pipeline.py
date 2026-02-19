@@ -548,7 +548,7 @@ def run_calibration(
         >>> from aquacal import run_calibration
         >>> result = run_calibration("config.yaml", verbose=True)
         >>> print(f"Calibrated {len(result.cameras)} cameras")
-        >>> print(f"Water surface at Z = {result.interface.water_z:.3f} m")
+        >>> print(f"Water surface at Z = {result.cameras['cam0'].water_z:.3f} m")
 
     Note:
         For details on the optimizer pipeline, see the

@@ -2,7 +2,7 @@
 
 ## What This Is
 
-AquaCal is a Python library for calibrating multi-camera arrays that view underwater scenes through a flat water surface. It models Snell's law refraction at the air-water interface to jointly optimize camera extrinsics, water surface position, and calibration board poses. Available on PyPI with Sphinx documentation, example datasets, and Jupyter tutorials.
+AquaCal is a Python library for calibrating multi-camera arrays that view underwater scenes through a flat water surface. It models Snell's law refraction at the air-water interface to jointly optimize camera extrinsics, water surface position, and calibration board poses. Available on PyPI with Sphinx documentation, example datasets, Jupyter tutorials, and comprehensive user guides.
 
 ## Core Value
 
@@ -34,20 +34,16 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 - ✓ Jupyter notebook examples demonstrating the pipeline — v1.2
 - ✓ Cleanup of legacy development artifacts — v1.2
 - ✓ CI/CD pipeline (GitHub Actions for tests, linting, publishing) — v1.2
+- ✓ Infrastructure complete: Read the Docs, Zenodo DOI, RELEASE_TOKEN — v1.4
+- ✓ CLI workflows user-verified with real rig data (init, calibrate, compare) — v1.4
+- ✓ Documentation audit: docstrings and Sphinx docs reviewed, terminology unified (`water_z`) — v1.4
+- ✓ Documentation visuals: palette system, Mermaid pipeline, BFS graph, sparsity pattern — v1.4
+- ✓ Tutorials restructured (3→2) with pre-executed outputs and progressive experiments — v1.4
+- ✓ User guide pages: CLI reference, camera models, troubleshooting, glossary — v1.4
 
 ### Active
 
-## Current Milestone: v1.4 QA & Polish
-
-**Goal:** Human-in-the-loop QA of CLI workflows with real rig data, documentation audit and polish, and shipping pending infrastructure todos.
-
-**Target features:**
-- Human QA of calibrate, init, and compare CLI workflows with real data
-- Documentation audit (inconsistencies, redundancy, factual errors)
-- Improved visualizations and ASCII diagrams in docs
-- Tutorial verification with correct embedded outputs
-- Visual abstract / hero image creation
-- Ship pending todos (Read the Docs, DOI badge, RELEASE_TOKEN)
+(No active milestone — planning next)
 
 ### Out of Scope
 
@@ -62,15 +58,15 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 
 ## Context
 
-Shipped v1.2 with ~39,900 LOC Python.
+Shipped v1.4.1 with ~40,000 LOC Python.
 Tech stack: NumPy, SciPy, OpenCV, Matplotlib, Pandas, PyYAML, Sphinx (Furo), GitHub Actions.
-Published on PyPI as `aquacal` v1.2.0. Sphinx docs with theory pages, API reference, and Jupyter tutorials.
-Zenodo DOI pending webhook setup.
+Published on PyPI as `aquacal` v1.4.1. Sphinx docs live on Read the Docs. Zenodo DOI active.
+584 tests passing (unit + synthetic). Two Jupyter tutorial notebooks with pre-executed outputs.
 
-Known issues:
-- Read the Docs deployment not yet configured (docs build locally)
-- Zenodo DOI badge placeholder until webhook is set up
-- RELEASE_TOKEN PAT needed for semantic-release to trigger publish workflow
+Known issues / tech debt:
+- Hero image redesign deferred (user wants to rethink concept; generation script kept)
+- Memory/CPU optimization for large calibrations not yet addressed
+- Version field in JSON output may not read local version properly
 
 ## Constraints
 
@@ -82,9 +78,9 @@ Known issues:
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| PyPI + GitHub distribution | Standard for research Python libraries | ✓ Good — v1.2.0 live on PyPI |
+| PyPI + GitHub distribution | Standard for research Python libraries | ✓ Good — v1.4.1 live on PyPI |
 | Real + synthetic example data | Real data builds trust, synthetic demonstrates correctness | ✓ Good — both available |
-| Jupyter notebooks for examples | Interactive, visual — ideal for research audience | ✓ Good — 3 notebooks shipped |
+| Jupyter notebooks for examples | Interactive, visual — ideal for research audience | ✓ Good — 2 notebooks shipped |
 | MIT license | Maximizes adoption in research community | ✓ Good |
 | Ruff over Black/mypy | Faster, all-in-one linting and formatting | ✓ Good |
 | Trusted Publishing (OIDC) | No API tokens needed for PyPI | ✓ Good |
@@ -92,6 +88,11 @@ Known issues:
 | Sphinx + Furo theme | Clean, modern docs with MyST Markdown | ✓ Good |
 | FrameSet Protocol | Structural subtyping for image/video input flexibility | ✓ Good |
 | Pre-execute notebooks | Reproducible docs builds without runtime dependencies | ✓ Good |
+| Rename interface_distance → water_z | Clearer semantics — it's a Z-coordinate, not a distance | ✓ Good — 55 files updated |
+| Centralized palette.py | Shared color palette for all diagram scripts | ✓ Good — consistent visuals |
+| Mermaid for pipeline diagram | Renders in Sphinx, easier to maintain than ASCII | ✓ Good |
+| Merge diagnostics into tutorial 01 | Single calibrate-then-diagnose flow is more natural | ✓ Good |
+| 2-tutorial structure | Pipeline + synthetic validation covers key use cases | ✓ Good |
 
 ---
-*Last updated: 2026-02-15 after v1.3 milestone started*
+*Last updated: 2026-02-19 after v1.4 milestone*

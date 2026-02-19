@@ -249,10 +249,10 @@ contribution from methodology improvements.
 Experiment logic lives in reusable functions in `tests/synthetic/`. Two access
 paths:
 
-- **Pytest** (`tests/synthetic/test_refractive_comparison.py`): Marked
-  `@pytest.mark.slow`. Runs experiments and asserts on key metrics (e.g.,
-  "refractive focal length error < 0.5%, non-refractive > 2%"). Plots saved
-  as test artifacts. Verifies correctness in CI.
+- **Tutorial** (`docs/tutorials/02_synthetic_validation.ipynb`): Three
+  progressive experiments (parameter fidelity, depth generalization, depth
+  scaling) demonstrating why refractive calibration matters. Pre-executed
+  with embedded outputs.
 - **Script** (`tests/synthetic/compare_refractive.py`): Run as
   `python tests/synthetic/compare_refractive.py --output-dir results/`.
   Calls the same experiment functions and writes the full plot suite and CSV

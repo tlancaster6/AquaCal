@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.2 MVP** — Phases 1-6 (shipped 2026-02-15)
-- 🚧 **v1.4 QA & Polish** — Phases 7-12 (in progress)
+- ✅ **v1.4 QA & Polish** — Phases 7-12 (shipped 2026-02-19)
 
 ## Phases
 
@@ -21,101 +21,21 @@ See `.planning/milestones/v1.2-ROADMAP.md` for full details.
 
 </details>
 
-### 🚧 v1.4 QA & Polish (In Progress)
+<details>
+<summary>✅ v1.4 QA & Polish (Phases 7-12) — SHIPPED 2026-02-19</summary>
 
-**Milestone Goal:** Human-in-the-loop QA of CLI workflows, documentation audit and polish, visual enhancements, and shipping pending infrastructure todos.
+- [x] Phase 7: Infrastructure Check (1/1 plans) — completed 2026-02-15
+- [x] Phase 8: CLI QA Execution (1/1 plans) — completed 2026-02-15
+- [x] Phase 9: Bug Triage (0/0 plans — no bugs found) — completed 2026-02-17
+- [x] Phase 10: Documentation Audit (3/3 plans) — completed 2026-02-16
+- [x] Phase 11: Documentation Visuals (2/2 plans) — completed 2026-02-17
+- [x] Phase 12: Tutorial Verification (3/3 plans) — completed 2026-02-19
 
-#### Phase 7: Infrastructure Check ✓ (completed 2026-02-15)
-**Goal**: Quickly validate whether pending infrastructure todos are already resolved
-**Depends on**: Phase 6
-**Requirements**: INFRA-01
-**Success Criteria** (what must be TRUE):
-  1. User knows current status of Read the Docs deployment
-  2. User knows current status of Zenodo DOI badge
-  3. User knows current status of RELEASE_TOKEN configuration
-  4. User has clear action list of what infrastructure work remains
-**Plans**: 1 plan
+See `.planning/milestones/v1.4-ROADMAP.md` for full details.
 
-Plans:
-- [x] 07-01-PLAN.md — Audit infrastructure status (RTD, DOI, RELEASE_TOKEN)
-
-#### Phase 8: CLI QA Execution
-**Goal**: User validates all CLI workflows work correctly with real rig data
-**Depends on**: Phase 7
-**Requirements**: QA-01, QA-02, QA-03
-**Success Criteria** (what must be TRUE):
-  1. User successfully runs `aquacal calibrate` end-to-end with real data and confirms output correctness
-  2. User successfully runs `aquacal init` with real data directories and verifies generated config
-  3. User successfully runs `aquacal compare` on multiple calibration runs and validates comparison output
-  4. User documents any bugs, friction points, or unexpected behaviors discovered during QA
-**Plans**: 1 plan
-
-Plans:
-- [x] 08-01-PLAN.md — QA all CLI workflows (init, calibrate, compare) with real rig data
-
-#### Phase 9: Bug Triage ✓ (completed 2026-02-17)
-**Goal**: Issues discovered during CLI QA are triaged and resolved or captured
-**Depends on**: Phase 8
-**Requirements**: QA-04
-**Success Criteria** (what must be TRUE):
-  1. All bugs discovered in Phase 8 are categorized (quick fix vs. future work) — ✓ no major bugs found
-  2. Quick fixes are applied and verified — ✓ N/A
-  3. Larger issues are captured as todos or GitHub issues — ✓ N/A
-  4. User confirms CLI workflows are in releasable state — ✓ confirmed
-
-**Result**: No major bugs discovered during CLI QA. Phase completed with no plans needed.
-
-#### Phase 10: Documentation Audit
-**Goal**: Docstrings and Sphinx documentation are audited for quality and consistency
-**Depends on**: Phase 9
-**Requirements**: DOCS-01, DOCS-02, DOCS-03
-**Success Criteria** (what must be TRUE):
-  1. Agent has audited all docstrings for inconsistencies, redundancy, and factual errors
-  2. Agent has audited Sphinx documentation for inconsistencies, redundancy, and factual errors
-  3. User has reviewed audit findings and confirmed fixes are applied
-  4. Documentation has consistent terminology, accurate technical content, and no formatting issues
-**Plans**: 3 plans
-
-Plans:
-- [x] 10-01-PLAN.md — Audit docstrings and Sphinx docs, produce findings report
-- [x] 10-02-PLAN.md — Rename interface_distance to water_z across codebase
-- [x] 10-03-PLAN.md — User review + create new doc sections + apply audit fixes
-
-#### Phase 11: Documentation Visuals
-**Goal**: Documentation has improved visual aids where they enhance understanding
-**Depends on**: Phase 10
-**Requirements**: VIS-01, VIS-02, VIS-03
-**Success Criteria** (what must be TRUE):
-  1. ASCII diagrams in documentation are replaced with better visualizations
-  2. New images or visualizations are added where they aid understanding
-  3. Visual abstract or hero image exists for README and documentation
-  4. User confirms visuals improve documentation clarity
-**Plans**: 2 plans
-
-Plans:
-- [x] 11-01-PLAN.md — Style guide, hero image, update existing diagrams to shared palette
-- [x] 11-02-PLAN.md — Mermaid pipeline, sparsity pattern, BFS graph, user verification
-
-#### Phase 12: Tutorial Verification
-**Goal**: All Jupyter tutorials run correctly with proper embedded outputs
-**Depends on**: Phase 11
-**Requirements**: TUT-01, TUT-02
-**Success Criteria** (what must be TRUE):
-  1. User has run all Jupyter tutorials end-to-end and confirmed they execute without errors
-  2. Static cell outputs in documentation are verified as correctly embedded
-  3. Tutorial content is accurate and matches current API
-  4. Tutorials provide clear learning path for new users
-**Plans**: 3 plans
-
-Plans:
-- [ ] 12-01-PLAN.md — Restructure to 2 tutorials: merge diagnostics into pipeline, rename files, update index
-- [ ] 12-02-PLAN.md — Rewrite synthetic validation with 3 experiments, execute both tutorials
-- [ ] 12-03-PLAN.md — User verification of tutorial quality
+</details>
 
 ## Progress
-
-**Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -129,5 +49,5 @@ Phases execute in numeric order: 7 → 8 → 9 → 10 → 11 → 12
 | 8. CLI QA Execution | v1.4 | 1/1 | Complete | 2026-02-15 |
 | 9. Bug Triage | v1.4 | 0/0 | Complete | 2026-02-17 |
 | 10. Documentation Audit | v1.4 | 3/3 | Complete | 2026-02-16 |
-| 11. Documentation Visuals | v1.4 | Complete    | 2026-02-17 | - |
-| 12. Tutorial Verification | v1.4 | 0/3 | Not started | - |
+| 11. Documentation Visuals | v1.4 | 2/2 | Complete | 2026-02-17 |
+| 12. Tutorial Verification | v1.4 | 3/3 | Complete | 2026-02-19 |

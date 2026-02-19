@@ -33,7 +33,7 @@ python -m pytest tests/ --cov                  # Generate coverage report
 - `tests/unit/test_camera.py` → `src/aquacal/core/camera.py`
 - `tests/unit/test_interface_estimation.py` → `src/aquacal/calibration/interface_estimation.py`
 - `tests/synthetic/test_full_pipeline.py` → End-to-end pipeline validation
-- `tests/synthetic/test_refractive_comparison.py` → Synthetic refractive geometry comparison
+- `docs/tutorials/02_synthetic_validation.ipynb` → Synthetic refractive geometry comparison (moved from tests to tutorial)
 
 **Naming:**
 - Test classes: `Test<Feature>` (e.g., `TestCameraProperties`, `TestPackUnpackParams`)
@@ -309,7 +309,7 @@ python -m pytest tests/                # Run all tests (default)
 
 **Marked Tests:**
 - `tests/synthetic/test_full_pipeline.py::TestFullPipelineIdeal::test_ideal_extrinsics` — `@pytest.mark.slow`
-- `tests/synthetic/test_refractive_comparison.py` — Multiple `@pytest.mark.slow` tests
+- `tests/synthetic/test_full_pipeline.py` — Multiple `@pytest.mark.slow` tests (refractive comparison moved to tutorial 02)
 
 ## Test Isolation
 
