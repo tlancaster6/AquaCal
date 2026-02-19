@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 13 of 17 (Setup)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-02-19 — Roadmap created for v1.5 AquaKit Integration
+Plan: 2 of TBD in current phase
+Status: In progress
+Last activity: 2026-02-19 — Completed 13-02: Document PyTorch prerequisite in README, Sphinx docs, and CHANGELOG
 
 Progress: [████████░░░░░░░░░░░░] 12/17 phases complete (v1.2 + v1.4 shipped)
 
@@ -38,6 +38,8 @@ Recent decisions affecting current work:
 - [v1.5 start]: NumPy internals retained; torch conversion happens only at AquaKit call boundaries
 - [v1.5 start]: Delete-after-tests strategy — rewire first, test equivalence, then delete originals
 - [v1.5 start]: AquaKit bug fixes performed as needed during rewiring
+- [13-02]: PyTorch prerequisite is the FIRST item in the install section (not a footnote)
+- [13-02]: CHANGELOG uses Unreleased section since v1.5 not yet released
 
 ### Pending Todos
 
@@ -51,6 +53,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-19 (phase 13 context gathered)
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-setup/13-CONTEXT.md
+Last session: 2026-02-19 (phase 13 plan 02 executed)
+Stopped at: Completed 13-02-PLAN.md
+Resume file: .planning/phases/13-setup/13-02-SUMMARY.md
