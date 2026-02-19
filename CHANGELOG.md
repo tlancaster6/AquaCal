@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v1.4.2 (2026-02-19)
+
+### Bug Fixes
+
+- Variable name typo fix
+  ([`0b6643c`](https://github.com/tlancaster6/AquaCal/commit/0b6643c0bec1122f9872fa189094c1e49e1fd2da))
+
+- Variable name typo fix
+  ([`b77b863`](https://github.com/tlancaster6/AquaCal/commit/b77b863b774325192427bdb9a9ab2513fe919dcd))
+
+### Chores
+
+- Complete v1.4 QA & Polish milestone
+  ([`a0087ef`](https://github.com/tlancaster6/AquaCal/commit/a0087ef0b64fa00dc5ee2f06dd729820612579df))
+
+### Documentation
+
+- Create milestone v1.5 roadmap (5 phases)
+  ([`c8ca625`](https://github.com/tlancaster6/AquaCal/commit/c8ca625f353f4c02711db3525337cc536b518d70))
+
+- Define milestone v1.5 requirements
+  ([`2595922`](https://github.com/tlancaster6/AquaCal/commit/25959226eb4e5f41dd96112e904bc3ce98dcc1d5))
+
+- Start milestone v1.5 AquaKit Integration
+  ([`e8cb0c3`](https://github.com/tlancaster6/AquaCal/commit/e8cb0c3270ae07e7744fd147d20daa984fadc102))
+
+
 ## v1.4.1 (2026-02-19)
 
 ### Bug Fixes
