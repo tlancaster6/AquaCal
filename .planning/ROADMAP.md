@@ -41,7 +41,7 @@ See `.planning/milestones/v1.4-ROADMAP.md` for full details.
 **Milestone Goal:** Wire AquaKit shared library into AquaCal, replace redundant code, verify numerical equivalence, and produce a migration report for future candidates.
 
 - [x] **Phase 13: Setup** — Add AquaKit dependency and PyTorch compatibility handling (completed 2026-02-19)
-- [ ] **Phase 14: Geometry Rewiring** — Route refractive geometry functions through AquaKit
+- [x] **Phase 14: Geometry Rewiring** — Route refractive geometry functions through AquaKit (completed 2026-02-19)
 - [ ] **Phase 15: Utility and I/O Rewiring** — Route transforms, schema types, and I/O through AquaKit
 - [ ] **Phase 16: Testing** — Verify numerical equivalence and confirm full suite health
 - [ ] **Phase 17: Cleanup, Docs, and Migration Report** — Delete dead code, update docs, document future candidates
@@ -128,7 +128,7 @@ Plans:
 | 11. Documentation Visuals | v1.4 | 2/2 | Complete | 2026-02-17 |
 | 12. Tutorial Verification | v1.4 | 3/3 | Complete | 2026-02-19 |
 | 13. Setup | v1.5 | 2/2 | Complete | 2026-02-19 |
-| 14. Geometry Rewiring | v1.5 | 0/3 | Not started | - |
+| 14. Geometry Rewiring | v1.5 | Complete    | 2026-02-19 | - |
 | 15. Utility and I/O Rewiring | v1.5 | 0/TBD | Not started | - |
 | 16. Testing | v1.5 | 0/TBD | Not started | - |
 | 17. Cleanup, Docs, and Migration Report | v1.5 | 0/TBD | Not started | - |
