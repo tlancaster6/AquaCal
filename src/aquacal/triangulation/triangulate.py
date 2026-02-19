@@ -3,9 +3,11 @@
 import numpy as np
 
 from aquacal.config.schema import CalibrationResult, Vec2, Vec3
+from aquacal.core._aquakit_bridge import (
+    _bridge_refractive_back_project,
+    _make_interface_params,
+)
 from aquacal.core.camera import Camera
-from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_back_project
 
 
 def triangulate_point(
@@ -26,25 +28,11 @@ def triangulate_point(
         or refractive_back_project() fails for all cameras.
 
     Notes:
-        - Uses refractive_back_project() to get rays in water
+        - Uses _bridge_refractive_back_project() to get rays in water
         - Finds point minimizing sum of squared distances to all rays
     """
     if len(observations) < 2:
         return None
-
-    # Build camera_distances dict with ALL cameras
-    camera_distances = {
-        cam_name: calibration.cameras[cam_name].water_z
-        for cam_name in calibration.cameras
-    }
-
-    # Create single shared interface with all cameras
-    interface = Interface(
-        normal=calibration.interface.normal,
-        camera_distances=camera_distances,
-        n_air=calibration.interface.n_air,
-        n_water=calibration.interface.n_water,
-    )
 
     rays = []
     for cam_name, pixel in observations.items():
@@ -54,7 +42,12 @@ def triangulate_point(
         cam_calib = calibration.cameras[cam_name]
         camera = Camera(cam_name, cam_calib.intrinsics, cam_calib.extrinsics)
 
-        result = refractive_back_project(camera, interface, pixel)
+        interface_aq = _make_interface_params(
+            water_z=cam_calib.water_z,
+            n_air=calibration.interface.n_air,
+            n_water=calibration.interface.n_water,
+        )
+        result = _bridge_refractive_back_project(camera, interface_aq, pixel)
         if result[0] is not None:
             rays.append((result[0], result[1]))
 
