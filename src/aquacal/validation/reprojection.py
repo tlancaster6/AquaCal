@@ -156,8 +156,10 @@ def compute_reprojection_error_single(
 
     Returns:
         Tuple of (residuals, valid_ids):
+
         - residuals: (M, 2) array of pixel residuals for valid corners
         - valid_ids: (M,) array of corner IDs that were successfully projected
+
         Returns (None, None) if no corners could be projected.
     """
     corners_3d = board.transform_corners(board_pose.rvec, board_pose.tvec)

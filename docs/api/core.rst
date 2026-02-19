@@ -40,6 +40,7 @@ Board Geometry
 .. automodule:: aquacal.core.board
    :members:
    :show-inheritance:
+   :no-index:
 
 Interface Model
 ---------------

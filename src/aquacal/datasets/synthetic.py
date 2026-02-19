@@ -220,21 +220,16 @@ def generate_real_rig_array(
     """
     Generate camera array matching the real-world 13-camera rig.
 
-    Rig geometry:
-    - 13 cameras total:
-      - cam0: center camera at origin (reference)
-      - cam1-cam6: inner circle, radius 300mm, evenly spaced at 60 deg intervals
-      - cam7-cam12: outer circle, radius 600mm, evenly spaced at 60 deg intervals
-    - All cameras point straight down toward water surface
-    - Roll angles: image width (horizontal axis) is tangent to the circle
-      - Center camera (cam0): roll = 0 deg (defines coordinate system)
-      - Circle cameras: roll = theta + 90 deg, where theta is angular position on circle
-      - Inner and outer cameras at same angular position have same roll
+    Rig geometry (13 cameras total):
 
-    Camera specs:
-    - Image size: 1600 x 1200 pixels (4:3 aspect ratio)
-    - FOV: 56 deg horizontal, 43 deg vertical
-    - Height above water: ~750mm (with small per-camera variation)
+    - cam0: center camera at origin (reference)
+    - cam1-cam6: inner circle, radius 300mm, evenly spaced at 60 deg intervals
+    - cam7-cam12: outer circle, radius 600mm, evenly spaced at 60 deg intervals
+    - All cameras point straight down toward water surface
+    - Roll: image width is tangent to the circle. Center camera has roll=0;
+      circle cameras have roll = theta + 90 deg.
+
+    Camera specs: 1600x1200 pixels, 56 deg horizontal FOV, ~750mm above water.
 
     Args:
         height_above_water: Mean interface distance (meters), default 0.75
@@ -653,17 +648,16 @@ def generate_synthetic_rig(
     ground truth. It's designed for testing and validating the AquaCal pipeline.
 
     Available presets:
-    - 'small': 2 cameras (line layout), 10 frames, clean detections by default.
-      Good for quick smoke tests and debugging.
-    - 'medium': 6 cameras (grid layout), 80 frames, clean detections by default.
-      Balanced size for integration testing.
-    - 'large': 13 cameras (real rig geometry), 300 frames, clean detections by default.
-      Full-scale realistic scenario matching actual hardware.
 
-    All presets use the same ChArUco board:
-    - 12x9 squares (11x8 corners)
-    - 60mm square size, 45mm marker size
-    - DICT_5X5_100 ArUco dictionary
+    - ``'small'``: 2 cameras (line layout), 10 frames. Good for quick smoke
+      tests and debugging.
+    - ``'medium'``: 6 cameras (grid layout), 80 frames. Balanced size for
+      integration testing.
+    - ``'large'``: 13 cameras (real rig geometry), 300 frames. Full-scale
+      realistic scenario matching actual hardware.
+
+    All presets use the same ChArUco board (12x9 squares, 60mm square size,
+    45mm marker size, DICT_5X5_100).
 
     Args:
         preset: Preset name ('small', 'medium', or 'large')

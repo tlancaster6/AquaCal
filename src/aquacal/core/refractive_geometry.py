@@ -91,8 +91,10 @@ def trace_ray_air_to_water(
 
     Returns:
         Tuple of (intersection_point, refracted_direction):
+
         - intersection_point: where ray hits interface (world coords)
         - refracted_direction: unit direction of ray in water (points +Z, into water)
+
         Returns (None, None) if ray doesn't hit interface or TIR occurs.
     """
     # Get ray from camera in world frame
@@ -139,8 +141,10 @@ def refractive_back_project(
 
     Returns:
         Tuple of (ray_origin, ray_direction):
+
         - ray_origin: point on interface where ray enters water
         - ray_direction: unit direction of ray in water
+
         Returns (None, None) if back-projection fails.
     """
     # Delegates to trace_ray_air_to_water

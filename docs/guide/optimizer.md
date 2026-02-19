@@ -231,6 +231,7 @@ This prevents auxiliary cameras from poisoning the primary solution while still 
 
 See {func}`aquacal.calibration.interface_estimation.register_auxiliary_camera` for implementation.
 
+(camera-models)=
 ## Camera Models
 
 AquaCal supports three distortion models for intrinsic calibration (Stage 1). Choosing the right model depends on your lens type and available calibration data.
@@ -362,7 +363,7 @@ If your Stage 1 RMS is very low (< 0.2 pixels) but you see any of these symptoms
 
 **For rational or fisheye models:** Manually downgrade to the standard model by removing the camera from `rational_model_cameras` or `fisheye_cameras`.
 
-For practical troubleshooting, see the [Camera Models and Overfitting](troubleshooting.md#camera-models-and-overfitting) section in the Troubleshooting guide.
+For practical troubleshooting, see the {ref}`Camera Models and Overfitting <camera-models-and-overfitting>` section in the Troubleshooting guide.
 
 ## See Also
 

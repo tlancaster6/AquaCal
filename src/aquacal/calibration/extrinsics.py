@@ -513,13 +513,11 @@ def estimate_extrinsics(
     Uses BFS traversal from reference camera, computing each camera's
     pose relative to world frame (centered at reference camera).
 
-    Process:
-    1. Fix reference camera at world origin (R=I, t=0)
-    2. BFS through pose graph:
-       - When visiting a frame node from a known camera:
-         compute board pose via PnP
-       - When visiting a camera node from a known frame:
-         compute camera pose via PnP + inversion
+    The algorithm fixes the reference camera at world origin (R=I, t=0),
+    then runs BFS through the pose graph. When visiting a frame node from
+    a known camera, it computes the board pose via PnP. When visiting a
+    camera node from a known frame, it computes the camera pose via PnP
+    and inversion.
 
     Args:
         pose_graph: Pose graph from build_pose_graph

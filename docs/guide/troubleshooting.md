@@ -100,6 +100,7 @@ Ensure the final water_z value is within the optimization bounds `[0.01, 2.0]` m
 
 ---
 
+(camera-models-and-overfitting)=
 ## Camera Models and Overfitting
 
 **Problem:** Stage 1 RMS is very low (< 0.2 pixels), but Stage 3/4 validation errors are high or undistortion produces artifacts.
@@ -139,7 +140,7 @@ These models do NOT auto-simplify. If you suspect overfitting:
 - **Rational**: Use only if standard model gives RMS > 1.0 pixels and you have 50+ calibration frames
 - **Fisheye**: Use only for true fisheye lenses (GoPro, ultra-wide security cameras)
 
-For detailed theory, see the [Camera Models](#camera-models) section in the [Optimizer Pipeline](optimizer.md#camera-models) page.
+For detailed theory, see the {ref}`Camera Models <camera-models>` section in the Optimizer Pipeline guide.
 
 ---
 
