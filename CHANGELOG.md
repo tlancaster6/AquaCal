@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.4.1 (2026-02-19)
+
+### Bug Fixes
+
+- **docs**: Resolve Sphinx build warnings and RTD pandoc requirement
+  ([`9e1b285`](https://github.com/tlancaster6/AquaCal/commit/9e1b2854672b4c21bc4e03731adf88fa09cc83f5))
+
+### Documentation
+
+- Capture todo - Check version field in JSON output reads local version properly
+  ([`9409e66`](https://github.com/tlancaster6/AquaCal/commit/9409e664a96af5c5ea1da2fde721766ccda69704))
+
+- Dropping readme image and refining tutorial notebooks
+  ([`a338969`](https://github.com/tlancaster6/AquaCal/commit/a338969f0a51c012603e8496dc7cc84f230558c2))
+
+
 ## v1.4.0 (2026-02-18)
 
 ### Bug Fixes
