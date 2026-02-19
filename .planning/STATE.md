@@ -38,6 +38,8 @@ Recent decisions affecting current work:
 - [v1.5 start]: NumPy internals retained; torch conversion happens only at AquaKit call boundaries
 - [v1.5 start]: Delete-after-tests strategy — rewire first, test equivalence, then delete originals
 - [v1.5 start]: AquaKit bug fixes performed as needed during rewiring
+- [13-01]: aquakit added as hard dep (>=1.0,<2); _check_torch() guard in __init__.py fails fast with clear ImportError
+- [13-01]: CI uses CPU-only torch index URL to minimize download size; noqa: E402 suppresses ruff for post-guard imports
 - [13-02]: PyTorch prerequisite is the FIRST item in the install section (not a footnote)
 - [13-02]: CHANGELOG uses Unreleased section since v1.5 not yet released
 
@@ -53,6 +55,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-19 (phase 13 plan 02 executed)
-Stopped at: Completed 13-02-PLAN.md
-Resume file: .planning/phases/13-setup/13-02-SUMMARY.md
+Last session: 2026-02-19 (phase 13 plan 01 executed)
+Stopped at: Completed 13-01-PLAN.md
+Resume file: .planning/phases/13-setup/13-01-SUMMARY.md
