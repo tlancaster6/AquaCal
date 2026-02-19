@@ -5,23 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** v1.5 AquaKit Integration — Phase 14: Geometry Rewiring
+**Current focus:** v1.5 AquaKit Integration — Phase 14: Geometry Rewiring (COMPLETE — proceed to Phase 15)
 
 ## Current Position
 
-Phase: 14 of 17 (Geometry Rewiring)
-Plan: 1 of TBD in current phase
-Status: In progress
-Last activity: 2026-02-19 — Phase 14 Plan 02 complete (call site rewiring)
+Phase: 14 of 17 (Geometry Rewiring — COMPLETE)
+Plan: 3 of 3 in current phase (all complete)
+Status: Phase 14 complete — ready for Phase 15 (equivalence testing)
+Last activity: 2026-02-19 — Phase 14 Plan 03 complete (back-project rewiring + public API bridge)
 
-Progress: [█████████░░░░░░░░░░░] 13/17 phases complete (v1.2 + v1.4 shipped, Phase 13 done)
+Progress: [█████████░░░░░░░░░░░] 13/17 phases complete (v1.2 + v1.4 shipped, Phase 13 done; Phase 14 rewiring complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 32
+- Total plans completed: 35
 - v1.2: 20 plans, ~1.85 hours
 - v1.4: 10 plans
+- v1.5 Phase 14: 3 plans, ~20 min
 
 **Recent Trend:**
 - Stable
@@ -47,6 +48,9 @@ Recent decisions affecting current work:
 - [14-01]: Bridge module owns all torch imports; callers import bridge functions, never torch directly
 - [14-02]: rendering.py and reprojection.py retain Interface import for type hints; bridge wrapping extracts fields internally
 - [14-02]: pipeline.py frame_residuals builds interface_aq per-camera inside loop since each camera has its own water_z
+- [14-03]: core/__init__.py exports bridge functions under original public names (aliased imports) — zero breaking changes
+- [14-03]: AquaKit InterfaceParams deliberately excluded from core/__init__.py public API to prevent collision with schema type
+- [14-03]: refractive_project_batch removed from public API (fast shims deleted; no bridge batch yet — deferred to Phase 16/17)
 
 ### Pending Todos
 
@@ -56,10 +60,10 @@ Recent decisions affecting current work:
 ### Blockers/Concerns
 
 - PyTorch is not an aquakit pip dependency — users must install it manually; SETUP-02 must document this clearly
-- `refractive_project` API change is non-trivial (two-step process; returns interface point not pixel) — Phase 14 needs careful call-site audit
+- Phase 14 complete: `refractive_project` API call-site audit finished, all 5 functions rewired
 
 ## Session Continuity
 
-Last session: 2026-02-19 (phase 14 plan 02 executed)
-Stopped at: Completed 14-geometry-rewiring/14-02-PLAN.md
-Resume file: .planning/phases/14-geometry-rewiring/14-02-SUMMARY.md
+Last session: 2026-02-19 (phase 14 plan 03 executed)
+Stopped at: Completed 14-geometry-rewiring/14-03-PLAN.md
+Resume file: .planning/phases/14-geometry-rewiring/14-03-SUMMARY.md
