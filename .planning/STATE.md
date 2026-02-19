@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 14 of 17 (Geometry Rewiring)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-02-19 — Phase 13 (Setup) complete, verified
+Plan: 1 of TBD in current phase
+Status: In progress
+Last activity: 2026-02-19 — Phase 14 Plan 01 complete (bridge module)
 
 Progress: [█████████░░░░░░░░░░░] 13/17 phases complete (v1.2 + v1.4 shipped, Phase 13 done)
 
@@ -42,6 +42,9 @@ Recent decisions affecting current work:
 - [13-01]: CI uses CPU-only torch index URL to minimize download size; noqa: E402 suppresses ruff for post-guard imports
 - [13-02]: PyTorch prerequisite is the FIRST item in the install section (not a footnote)
 - [13-02]: CHANGELOG uses Unreleased section since v1.5 not yet released
+- [14-01]: _make_interface_params() factory prevents aquakit.types.InterfaceParams name collision with aquacal's own InterfaceParams
+- [14-01]: _bridge_refractive_project uses two-step: AquaKit finds interface point, camera.project() maps to pixel
+- [14-01]: Bridge module owns all torch imports; callers import bridge functions, never torch directly
 
 ### Pending Todos
 
@@ -55,6 +58,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-19 (phase 14 context gathered)
-Stopped at: Phase 14 context gathered
-Resume file: .planning/phases/14-geometry-rewiring/14-CONTEXT.md
+Last session: 2026-02-19 (phase 14 plan 01 executed)
+Stopped at: Completed 14-geometry-rewiring/14-01-PLAN.md
+Resume file: .planning/phases/14-geometry-rewiring/14-01-SUMMARY.md
