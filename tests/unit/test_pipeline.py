@@ -1210,7 +1210,7 @@ class TestRunCalibrationFromConfig:
             call_args = mock_calibration_stages["optimize"].call_args
 
             # Check that initial_water_z was passed
-            assert call_args[1]["initial_water_z"] == initial_water_z
+            assert call_args[1]["initial_water_zs"] == initial_water_z
 
     def test_run_calibration_from_config_estimates_validation_poses(
         self, mock_calibration_stages, sample_board_config, capsys
