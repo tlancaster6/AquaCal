@@ -55,6 +55,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-19 (phase 13 complete)
-Stopped at: Phase 13 verified and complete
-Resume file: .planning/phases/13-setup/13-VERIFICATION.md
+Last session: 2026-02-19 (phase 14 context gathered)
+Stopped at: Phase 14 context gathered
+Resume file: .planning/phases/14-geometry-rewiring/14-CONTEXT.md
