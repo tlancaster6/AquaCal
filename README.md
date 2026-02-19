@@ -20,14 +20,25 @@ milestone is reached.
 
 ## Installation
 
+AquaCal requires [PyTorch](https://pytorch.org/get-started/) as a prerequisite. Install it first:
+
+```bash
+pip install torch
+```
+
+Then install AquaCal:
+
 ```bash
 pip install aquacal
 ```
 
+> **Note:** For GPU-accelerated PyTorch variants, see the [official install guide](https://pytorch.org/get-started/).
+
 ## Quick Start
 
-1. Install AquaCal:
+1. Install [PyTorch](https://pytorch.org/get-started/) and AquaCal:
    ```bash
+   pip install torch
    pip install aquacal
    ```
 

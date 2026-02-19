@@ -45,6 +45,17 @@ Interactive Jupyter notebook examples: full pipeline, diagnostics, and synthetic
 
 ## Quick Start
 
+:::{important}
+AquaCal requires [PyTorch](https://pytorch.org/get-started/) as a prerequisite. Install it before installing AquaCal:
+
+```bash
+pip install torch
+pip install aquacal
+```
+
+For GPU-accelerated variants, see the [official PyTorch install guide](https://pytorch.org/get-started/).
+:::
+
 ```python
 from aquacal import run_calibration, load_calibration
 
