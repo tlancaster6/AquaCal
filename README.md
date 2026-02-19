@@ -1,7 +1,5 @@
 # AquaCal
 
-![AquaCal ray trace](docs/_static/hero_ray_trace.png)
-
 ![Build](https://img.shields.io/github/actions/workflow/status/tlancaster6/AquaCal/test.yml?branch=main&label=build) ![Coverage](https://img.shields.io/codecov/c/github/tlancaster6/AquaCal?label=coverage) ![PyPI](https://img.shields.io/pypi/v/aquacal) ![Python](https://img.shields.io/pypi/pyversions/aquacal) ![License](https://img.shields.io/github/license/tlancaster6/AquaCal) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18644658.svg)](https://doi.org/10.5281/zenodo.18644658)
 
 Refractive multi-camera calibration for underwater arrays. AquaCal calibrates cameras in air viewing through a flat water surface, using Snell's law to achieve accurate 3D reconstruction in refractive environments.
