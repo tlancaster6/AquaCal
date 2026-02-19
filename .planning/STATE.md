@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Accurate refractive camera calibration from standard ChArUco board observations — researchers can pip install aquacal, point it at their videos, and get a calibration result they trust.
-**Current focus:** v1.5 AquaKit Integration — Phase 13: Setup
+**Current focus:** v1.5 AquaKit Integration — Phase 14: Geometry Rewiring
 
 ## Current Position
 
-Phase: 13 of 17 (Setup)
-Plan: 2 of TBD in current phase
-Status: In progress
-Last activity: 2026-02-19 — Completed 13-02: Document PyTorch prerequisite in README, Sphinx docs, and CHANGELOG
+Phase: 14 of 17 (Geometry Rewiring)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-02-19 — Phase 13 (Setup) complete, verified
 
-Progress: [████████░░░░░░░░░░░░] 12/17 phases complete (v1.2 + v1.4 shipped)
+Progress: [█████████░░░░░░░░░░░] 13/17 phases complete (v1.2 + v1.4 shipped, Phase 13 done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 30
+- Total plans completed: 32
 - v1.2: 20 plans, ~1.85 hours
 - v1.4: 10 plans
 
@@ -55,6 +55,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-19 (phase 13 plan 01 executed)
-Stopped at: Completed 13-01-PLAN.md
-Resume file: .planning/phases/13-setup/13-01-SUMMARY.md
+Last session: 2026-02-19 (phase 13 complete)
+Stopped at: Phase 13 verified and complete
+Resume file: .planning/phases/13-setup/13-VERIFICATION.md
