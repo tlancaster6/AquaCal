@@ -74,17 +74,37 @@ Deferred to next milestone (full PyTorch migration):
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| *(populated by roadmapper)* | | |
+| SETUP-01 | Phase 13 | Pending |
+| SETUP-02 | Phase 13 | Pending |
+| GEOM-01 | Phase 14 | Pending |
+| GEOM-02 | Phase 14 | Pending |
+| GEOM-03 | Phase 14 | Pending |
+| GEOM-04 | Phase 14 | Pending |
+| GEOM-05 | Phase 14 | Pending |
+| UTIL-01 | Phase 15 | Pending |
+| UTIL-02 | Phase 15 | Pending |
+| IO-01 | Phase 15 | Pending |
+| IO-02 | Phase 15 | Pending |
+| IO-03 | Phase 15 | Pending |
+| TEST-01 | Phase 16 | Pending |
+| TEST-02 | Phase 16 | Pending |
+| TEST-03 | Phase 16 | Pending |
+| CLEAN-01 | Phase 17 | Pending |
+| CLEAN-02 | Phase 17 | Pending |
+| DOCS-01 | Phase 17 | Pending |
+| DOCS-02 | Phase 17 | Pending |
+| DOCS-03 | Phase 17 | Pending |
+| MIGR-01 | Phase 17 | Pending |
 
 **Coverage:**
-- v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- v1 requirements: 21 total
+- Mapped to phases: 21
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-19*
-*Last updated: 2026-02-19 after initial definition*
+*Last updated: 2026-02-19 — traceability populated by roadmapper*
