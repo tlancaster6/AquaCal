@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 Phase: 14 of 17 (Geometry Rewiring)
 Plan: 1 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-19 — Phase 14 Plan 01 complete (bridge module)
+Last activity: 2026-02-19 — Phase 14 Plan 02 complete (call site rewiring)
 
 Progress: [█████████░░░░░░░░░░░] 13/17 phases complete (v1.2 + v1.4 shipped, Phase 13 done)
 
@@ -45,6 +45,8 @@ Recent decisions affecting current work:
 - [14-01]: _make_interface_params() factory prevents aquakit.types.InterfaceParams name collision with aquacal's own InterfaceParams
 - [14-01]: _bridge_refractive_project uses two-step: AquaKit finds interface point, camera.project() maps to pixel
 - [14-01]: Bridge module owns all torch imports; callers import bridge functions, never torch directly
+- [14-02]: rendering.py and reprojection.py retain Interface import for type hints; bridge wrapping extracts fields internally
+- [14-02]: pipeline.py frame_residuals builds interface_aq per-camera inside loop since each camera has its own water_z
 
 ### Pending Todos
 
@@ -58,6 +60,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-19 (phase 14 plan 01 executed)
-Stopped at: Completed 14-geometry-rewiring/14-01-PLAN.md
-Resume file: .planning/phases/14-geometry-rewiring/14-01-SUMMARY.md
+Last session: 2026-02-19 (phase 14 plan 02 executed)
+Stopped at: Completed 14-geometry-rewiring/14-02-PLAN.md
+Resume file: .planning/phases/14-geometry-rewiring/14-02-SUMMARY.md
