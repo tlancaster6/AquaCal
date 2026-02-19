@@ -97,6 +97,7 @@ class Interface:
         return self.n_water / self.n_air
 
 
+# DEPRECATED: use _bridge_ray_plane_intersection from core._aquakit_bridge
 def ray_plane_intersection(
     ray_origin: Vec3, ray_direction: Vec3, plane_point: Vec3, plane_normal: Vec3
 ) -> tuple[Vec3, float] | tuple[None, None]:

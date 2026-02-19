@@ -13,6 +13,7 @@ from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface, ray_plane_intersection
 
 
+# DEPRECATED: use _bridge_snells_law_3d from core._aquakit_bridge
 def snells_law_3d(
     incident_direction: Vec3, surface_normal: Vec3, n_ratio: float
 ) -> Vec3 | None:
@@ -78,6 +79,7 @@ def snells_law_3d(
     return t / np.linalg.norm(t)
 
 
+# DEPRECATED: use _bridge_trace_ray_air_to_water from core._aquakit_bridge
 def trace_ray_air_to_water(
     camera: Camera, interface: Interface, pixel: Vec2
 ) -> tuple[Vec3, Vec3] | tuple[None, None]:
@@ -125,6 +127,7 @@ def trace_ray_air_to_water(
     return intersection, refracted
 
 
+# DEPRECATED: use _bridge_refractive_back_project from core._aquakit_bridge
 def refractive_back_project(
     camera: Camera, interface: Interface, pixel: Vec2
 ) -> tuple[Vec3, Vec3] | tuple[None, None]:
@@ -539,6 +542,7 @@ def _is_flat_interface(normal: Vec3) -> bool:
     return abs(normal[0]) < 1e-6 and abs(normal[1]) < 1e-6 and abs(normal[2] + 1) < 1e-6
 
 
+# DEPRECATED: use _bridge_refractive_project from core._aquakit_bridge
 def refractive_project(
     camera: Camera,
     interface: Interface,
@@ -591,6 +595,7 @@ def refractive_project(
         return _refractive_project_brent(camera, interface, point_3d)
 
 
+# DEPRECATED: use _bridge_refractive_project (handles batch via loop) from core._aquakit_bridge
 def refractive_project_batch(
     camera: Camera,
     interface: Interface,
@@ -641,54 +646,5 @@ def refractive_project_batch(
         )
 
     return _refractive_project_newton_batch(
-        camera, interface, points_3d, max_iterations, tolerance
-    )
-
-
-# Deprecated backward-compatibility shims
-def refractive_project_fast(
-    camera: Camera,
-    interface: Interface,
-    point_3d: Vec3,
-    max_iterations: int = 10,
-    tolerance: float = 1e-9,
-) -> Vec2 | None:
-    """
-    Deprecated: use refractive_project() instead.
-
-    refractive_project() auto-selects the fast Newton-Raphson path for flat
-    interfaces, making this function redundant.
-    """
-    import warnings
-
-    warnings.warn(
-        "refractive_project_fast() is deprecated. Use refractive_project(), "
-        "which auto-selects the fast path for flat interfaces.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return refractive_project(camera, interface, point_3d, max_iterations, tolerance)
-
-
-def refractive_project_fast_batch(
-    camera: Camera,
-    interface: Interface,
-    points_3d: NDArray[np.float64],
-    max_iterations: int = 10,
-    tolerance: float = 1e-9,
-) -> NDArray[np.float64]:
-    """
-    Deprecated: use refractive_project_batch() instead.
-
-    refractive_project_batch() provides the same functionality with a clearer name.
-    """
-    import warnings
-
-    warnings.warn(
-        "refractive_project_fast_batch() is deprecated. Use refractive_project_batch() instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return refractive_project_batch(
         camera, interface, points_3d, max_iterations, tolerance
     )
