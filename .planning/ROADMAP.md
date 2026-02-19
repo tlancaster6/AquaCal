@@ -71,7 +71,11 @@ Plans:
   3. `refractive_project` call sites use the two-step AquaKit flow (find interface point, then project through camera) and the `refractive_project_fast` / `refractive_project_fast_batch` shims are removed or deprecated
   4. `refractive_back_project` call sites pass raw tensors (not Camera objects) to AquaKit
   5. `ray_plane_intersection` call sites route through `aquakit.ray_plane_intersection` with numpy/torch conversion
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 14-01-PLAN.md — Create AquaKit bridge module with numpy↔torch conversion helpers and all 5 function wrappers
+- [ ] 14-02-PLAN.md — Rewire all refractive_project call sites to bridge; delete fast shims; mark originals DEPRECATED
+- [ ] 14-03-PLAN.md — Rewire refractive_back_project in triangulate.py; update core/__init__.py to export bridge functions
 
 ### Phase 15: Utility and I/O Rewiring
 **Goal**: Pose transforms, schema types, and I/O utilities in AquaCal route through AquaKit
@@ -124,7 +128,7 @@ Plans:
 | 11. Documentation Visuals | v1.4 | 2/2 | Complete | 2026-02-17 |
 | 12. Tutorial Verification | v1.4 | 3/3 | Complete | 2026-02-19 |
 | 13. Setup | v1.5 | 2/2 | Complete | 2026-02-19 |
-| 14. Geometry Rewiring | v1.5 | 0/TBD | Not started | - |
+| 14. Geometry Rewiring | v1.5 | 0/3 | Not started | - |
 | 15. Utility and I/O Rewiring | v1.5 | 0/TBD | Not started | - |
 | 16. Testing | v1.5 | 0/TBD | Not started | - |
 | 17. Cleanup, Docs, and Migration Report | v1.5 | 0/TBD | Not started | - |
