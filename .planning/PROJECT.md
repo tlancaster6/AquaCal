@@ -43,7 +43,17 @@ Accurate refractive camera calibration from standard ChArUco board observations 
 
 ### Active
 
-(No active milestone — planning next)
+#### Current Milestone: v1.5 AquaKit Integration
+
+**Goal:** Wire AquaKit shared library into AquaCal, replace redundant code, verify numerical equivalence, and identify future migration candidates.
+
+**Target features:**
+- Add `aquakit` as a pip dependency
+- Rewire geometry (refractive projection, Snell's law, ray tracing), transforms, schema types, and I/O to use AquaKit
+- NumPy internals with torch conversion at AquaKit call boundaries
+- Remove dead/redundant code after rewiring
+- Numerical equivalence tests (1e-4 relative tolerance)
+- Written migration report for conservative future AquaKit candidates
 
 ### Out of Scope
 
@@ -66,7 +76,7 @@ Published on PyPI as `aquacal` v1.4.1. Sphinx docs live on Read the Docs. Zenodo
 Known issues / tech debt:
 - Hero image redesign deferred (user wants to rethink concept; generation script kept)
 - Memory/CPU optimization for large calibrations not yet addressed
-- Version field in JSON output may not read local version properly
+- ~~Version field in JSON output~~ — fixed
 
 ## Constraints
 
@@ -89,10 +99,12 @@ Known issues / tech debt:
 | FrameSet Protocol | Structural subtyping for image/video input flexibility | ✓ Good |
 | Pre-execute notebooks | Reproducible docs builds without runtime dependencies | ✓ Good |
 | Rename interface_distance → water_z | Clearer semantics — it's a Z-coordinate, not a distance | ✓ Good — 55 files updated |
+| AquaKit as shared geometry layer | Cross-library code reuse (AquaCal, AquaMVS, future) | — Pending |
+| NumPy internals + torch at edges | Clean boundary for incremental PyTorch migration | — Pending |
 | Centralized palette.py | Shared color palette for all diagram scripts | ✓ Good — consistent visuals |
 | Mermaid for pipeline diagram | Renders in Sphinx, easier to maintain than ASCII | ✓ Good |
 | Merge diagnostics into tutorial 01 | Single calibrate-then-diagnose flow is more natural | ✓ Good |
 | 2-tutorial structure | Pipeline + synthetic validation covers key use cases | ✓ Good |
 
 ---
-*Last updated: 2026-02-19 after v1.4 milestone*
+*Last updated: 2026-02-19 after v1.5 milestone started*
