@@ -22,10 +22,12 @@ from aquacal.config.schema import (
     DetectionResult,
     FrameDetections,
 )
+from aquacal.core._aquakit_bridge import (
+    _bridge_refractive_project,
+    _make_interface_params,
+)
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
-from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project
 
 
 @dataclass
@@ -504,7 +506,6 @@ def generate_synthetic_detections(
         DetectionResult matching format from real detection pipeline
     """
     rng = np.random.default_rng(seed)
-    interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
     frames: dict[int, FrameDetections] = {}
 
     for bp in board_poses:
@@ -513,9 +514,10 @@ def generate_synthetic_detections(
 
         for cam_name in intrinsics:
             camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
-            interface = Interface(
-                normal=interface_normal,
-                camera_distances={cam_name: water_zs[cam_name]},
+            interface_aq = _make_interface_params(
+                water_z=water_zs[cam_name],
+                n_air=1.0,
+                n_water=1.333,
             )
 
             corner_ids: list[int] = []
@@ -523,7 +525,7 @@ def generate_synthetic_detections(
 
             for corner_id in range(board.num_corners):
                 point_3d = corners_3d[corner_id]
-                projected = refractive_project(camera, interface, point_3d)
+                projected = _bridge_refractive_project(camera, interface_aq, point_3d)
 
                 if projected is not None:
                     # Check if within image bounds

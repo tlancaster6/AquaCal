@@ -485,9 +485,11 @@ def register_auxiliary_camera(
     Raises:
         InsufficientDataError: If no usable frames found
     """
+    from aquacal.core._aquakit_bridge import (
+        _bridge_refractive_project,
+        _make_interface_params,
+    )
     from aquacal.core.camera import create_camera
-    from aquacal.core.interface_model import Interface
-    from aquacal.core.refractive_geometry import refractive_project
 
     if interface_normal is None:
         interface_normal = np.array([0.0, 0.0, -1.0], dtype=np.float64)
@@ -579,15 +581,10 @@ def register_auxiliary_camera(
 
         R = rvec_to_matrix(rvec)
         ext = CameraExtrinsics(R=R, t=tvec)
-        # Interface distance is the water surface Z-coordinate
-        iface_dist = water_z
 
         camera = create_camera(camera_name, camera_intrinsics, ext)
-        interface = Interface(
-            normal=interface_normal,
-            camera_distances={camera_name: iface_dist},
-            n_air=n_air,
-            n_water=n_water,
+        interface_aq = _make_interface_params(
+            water_z=water_z, n_air=n_air, n_water=n_water
         )
 
         resid = []
@@ -597,7 +594,7 @@ def register_auxiliary_camera(
 
             for i, cid in enumerate(corner_ids):
                 pt_3d = corners_3d[int(cid)]
-                projected = refractive_project(camera, interface, pt_3d)
+                projected = _bridge_refractive_project(camera, interface_aq, pt_3d)
                 if projected is not None:
                     resid.append(projected[0] - corners_2d[i, 0])
                     resid.append(projected[1] - corners_2d[i, 1])

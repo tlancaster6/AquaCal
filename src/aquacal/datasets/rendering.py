@@ -17,10 +17,13 @@ from aquacal.config.schema import (
     CameraIntrinsics,
     DetectionResult,
 )
+from aquacal.core._aquakit_bridge import (
+    _bridge_refractive_project,
+    _make_interface_params,
+)
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project
 
 
 def render_synthetic_frame(
@@ -65,10 +68,16 @@ def render_synthetic_frame(
     corners_2d: list[NDArray[np.float64]] = []
     valid_corner_ids: list[int] = []
 
+    interface_aq = _make_interface_params(
+        water_z=interface.get_water_z(camera_name),
+        n_air=interface.n_air,
+        n_water=interface.n_water,
+    )
+
     for corner_id, point_3d in corners_3d.items():
         if underwater:
-            # Refractive projection
-            projected = refractive_project(camera, interface, point_3d)
+            # Refractive projection via bridge
+            projected = _bridge_refractive_project(camera, interface_aq, point_3d)
         else:
             # Standard pinhole projection (in-air)
             projected = camera.project(point_3d, apply_distortion=True)

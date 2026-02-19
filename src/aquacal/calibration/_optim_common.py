@@ -16,10 +16,12 @@ from aquacal.config.schema import (
     DetectionResult,
     Vec3,
 )
+from aquacal.core._aquakit_bridge import (
+    _bridge_refractive_project,
+    _make_interface_params,
+)
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
-from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project
 from aquacal.utils.transforms import matrix_to_rvec, rvec_to_matrix
 
 
@@ -469,18 +471,15 @@ def compute_residuals(
 
             camera = Camera(cam_name, intrinsics[cam_name], extrinsics[cam_name])
 
-            interface = Interface(
-                normal=interface_normal,
-                camera_distances={cam_name: water_zs[cam_name]},
-                n_air=n_air,
-                n_water=n_water,
+            interface_aq = _make_interface_params(
+                water_z=water_zs[cam_name], n_air=n_air, n_water=n_water
             )
 
             for i, corner_id in enumerate(detection.corner_ids):
                 point_3d = corners_3d[corner_id]
                 detected_px = detection.corners_2d[i]
 
-                projected = refractive_project(camera, interface, point_3d)
+                projected = _bridge_refractive_project(camera, interface_aq, point_3d)
 
                 if projected is None:
                     residuals.extend([100.0, 100.0])

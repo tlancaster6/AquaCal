@@ -1192,9 +1192,11 @@ def _estimate_validation_poses(
     """
     from scipy.optimize import least_squares
 
+    from aquacal.core._aquakit_bridge import (
+        _bridge_refractive_project,
+        _make_interface_params,
+    )
     from aquacal.core.camera import create_camera
-    from aquacal.core.interface_model import Interface
-    from aquacal.core.refractive_geometry import refractive_project
 
     refined_poses = {}
 
@@ -1203,7 +1205,7 @@ def _estimate_validation_poses(
             continue
         frame_det = detections.frames[frame_idx]
 
-        # Build cameras and interface objects
+        # Build cameras dict
         cameras = {}
         for cam_name in frame_det.detections:
             if cam_name not in intrinsics:
@@ -1211,13 +1213,6 @@ def _estimate_validation_poses(
             cameras[cam_name] = create_camera(
                 cam_name, intrinsics[cam_name], extrinsics[cam_name]
             )
-
-        interface = Interface(
-            normal=interface_normal,
-            camera_distances=water_z_values,
-            n_air=n_air,
-            n_water=n_water,
-        )
 
         # Cost function: refractive reprojection residuals for this frame
         def frame_residuals(params):
@@ -1230,9 +1225,12 @@ def _estimate_validation_poses(
                 if cam_name not in cameras:
                     continue
                 camera = cameras[cam_name]
+                interface_aq = _make_interface_params(
+                    water_z=water_z_values[cam_name], n_air=n_air, n_water=n_water
+                )
                 for i, corner_id in enumerate(det.corner_ids):
                     pt_3d = corners_3d[int(corner_id)]
-                    projected = refractive_project(camera, interface, pt_3d)
+                    projected = _bridge_refractive_project(camera, interface_aq, pt_3d)
                     if projected is not None:
                         residuals.append(det.corners_2d[i, 0] - projected[0])
                         residuals.append(det.corners_2d[i, 1] - projected[1])

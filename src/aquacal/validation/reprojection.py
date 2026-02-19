@@ -12,10 +12,13 @@ from aquacal.config.schema import (
     Detection,
     DetectionResult,
 )
+from aquacal.core._aquakit_bridge import (
+    _bridge_refractive_project,
+    _make_interface_params,
+)
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
 from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project
 
 
 @dataclass
@@ -86,16 +89,15 @@ def compute_reprojection_errors(
 
             cam_calib = calibration.cameras[cam_name]
             camera = Camera(cam_name, cam_calib.intrinsics, cam_calib.extrinsics)
-            interface = Interface(
-                normal=calibration.interface.normal,
-                camera_distances={cam_name: cam_calib.water_z},
+            interface_aq = _make_interface_params(
+                water_z=cam_calib.water_z,
                 n_air=calibration.interface.n_air,
                 n_water=calibration.interface.n_water,
             )
 
             for i, corner_id in enumerate(detection.corner_ids):
                 point_3d = corners_3d[int(corner_id)]
-                projected = refractive_project(camera, interface, point_3d)
+                projected = _bridge_refractive_project(camera, interface_aq, point_3d)
 
                 if projected is not None:
                     detected = detection.corners_2d[i]
@@ -167,9 +169,16 @@ def compute_reprojection_error_single(
     residuals_list = []
     valid_ids_list = []
 
+    # Build AquaKit interface params from the Interface object
+    interface_aq = _make_interface_params(
+        water_z=interface.get_water_z(camera.name),
+        n_air=interface.n_air,
+        n_water=interface.n_water,
+    )
+
     for i, corner_id in enumerate(detection.corner_ids):
         point_3d = corners_3d[int(corner_id)]
-        projected = refractive_project(camera, interface, point_3d)
+        projected = _bridge_refractive_project(camera, interface_aq, point_3d)
 
         if projected is not None:
             detected = detection.corners_2d[i]

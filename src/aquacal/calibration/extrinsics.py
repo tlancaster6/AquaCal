@@ -18,10 +18,12 @@ from aquacal.config.schema import (
     ConnectivityError,
     DetectionResult,
 )
+from aquacal.core._aquakit_bridge import (
+    _bridge_refractive_project,
+    _make_interface_params,
+)
 from aquacal.core.board import BoardGeometry
 from aquacal.core.camera import Camera
-from aquacal.core.interface_model import Interface
-from aquacal.core.refractive_geometry import refractive_project
 from aquacal.utils.transforms import compose_poses, invert_pose, rvec_to_matrix
 
 
@@ -155,12 +157,7 @@ def refractive_solve_pnp(
     # Set up identity-extrinsics camera (camera frame = world frame)
     identity_ext = CameraExtrinsics(R=np.eye(3), t=np.zeros(3))
     camera = Camera("_pnp", intrinsics, identity_ext)
-    interface = Interface(
-        normal=interface_normal,
-        camera_distances={"_pnp": water_z},
-        n_air=n_air,
-        n_water=n_water,
-    )
+    interface_aq = _make_interface_params(water_z=water_z, n_air=n_air, n_water=n_water)
 
     # Get 3D object points in board frame
     object_points = board.get_corner_array(corner_ids).astype(np.float64)
@@ -175,7 +172,7 @@ def refractive_solve_pnp(
         pts_cam = (R @ object_points.T).T + tvec
         resid = np.empty(n_pts * 2, dtype=np.float64)
         for i, pt in enumerate(pts_cam):
-            projected = refractive_project(camera, interface, pt)
+            projected = _bridge_refractive_project(camera, interface_aq, pt)
             if projected is None:
                 resid[2 * i] = 100.0
                 resid[2 * i + 1] = 100.0
