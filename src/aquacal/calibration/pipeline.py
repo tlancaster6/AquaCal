@@ -790,7 +790,7 @@ def run_calibration_from_config(
         initial_extrinsics=extrinsics,
         board=board,
         reference_camera=reference_camera,
-        initial_water_z=config.initial_water_z,
+        initial_water_zs=config.initial_water_z,
         interface_normal=interface_normal,
         n_air=config.n_air,
         n_water=config.n_water,
