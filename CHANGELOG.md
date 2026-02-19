@@ -2,6 +2,13 @@
 
 <!-- version list -->
 
+## Unreleased
+
+### Features
+
+- **deps**: Add AquaKit as a dependency for shared refractive geometry and I/O utilities
+- **deps**: Add import-time PyTorch check with actionable error message
+
 ## v1.4.1 (2026-02-19)
 
 ### Bug Fixes
