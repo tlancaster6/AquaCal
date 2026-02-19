@@ -56,7 +56,10 @@ See `.planning/milestones/v1.4-ROADMAP.md` for full details.
   1. `pip install aquacal` also installs `aquakit` as a transitive dependency
   2. Importing `aquacal` when PyTorch is not installed raises a clear, actionable error message (not a cryptic `ModuleNotFoundError` deep in the stack)
   3. Sphinx docs and README document the PyTorch prerequisite install step
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 13-01-PLAN.md — Add aquakit dependency, torch check, and CI updates
+- [ ] 13-02-PLAN.md — Document PyTorch prerequisite in README, Sphinx docs, and CHANGELOG
 
 ### Phase 14: Geometry Rewiring
 **Goal**: All refractive geometry calls in AquaCal route through AquaKit with numpy/torch conversion at boundaries
@@ -120,7 +123,7 @@ See `.planning/milestones/v1.4-ROADMAP.md` for full details.
 | 10. Documentation Audit | v1.4 | 3/3 | Complete | 2026-02-16 |
 | 11. Documentation Visuals | v1.4 | 2/2 | Complete | 2026-02-17 |
 | 12. Tutorial Verification | v1.4 | 3/3 | Complete | 2026-02-19 |
-| 13. Setup | v1.5 | 0/TBD | Not started | - |
+| 13. Setup | v1.5 | 0/2 | Not started | - |
 | 14. Geometry Rewiring | v1.5 | 0/TBD | Not started | - |
 | 15. Utility and I/O Rewiring | v1.5 | 0/TBD | Not started | - |
 | 16. Testing | v1.5 | 0/TBD | Not started | - |
